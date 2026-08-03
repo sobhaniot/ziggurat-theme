@@ -1,0 +1,36 @@
+.services-section {
+  padding: 100px 0;
+}
+.section-header {
+  text-align: center;
+  margin-bottom: 50px;
+}
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
+}
+.service-card {
+  padding: 35px;
+  background: #fff;
+  border-radius: 15px;
+  text-align: center;
+  transition: 0.3s;
+}
+.service-card:hover {
+  transform: translateY(-10px);
+}
+.service-icon {
+  font-size: 40px;
+  margin-bottom: 20px;
+}
+@media (max-width: 900px) {
+  .services-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .services-grid {
+    grid-template-columns: 1fr;
+  }
+}

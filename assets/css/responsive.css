@@ -1,0 +1,40 @@
+@media(max-width:768px){
+    #main-header .container {
+        height:70px;
+    }
+    #main-menu {
+        display:none;
+        position:absolute;
+        top:70px;
+        right:0;
+        width:100%;
+        background:white;
+        padding:20px;
+    }
+    #main-menu.active {
+        display:block;
+    }
+    #main-menu .menu {
+        flex-direction:column;
+        gap:15px;
+        align-items:flex-start;
+    }
+    .header-buttons {
+        display:none;
+    }
+    #mobile-menu-btn {
+        display:block;
+    }
+}
+@media(max-width:768px){
+    .about-wrapper{
+        flex-direction:column;
+    }
+    .about-image,
+    .about-content{
+        width:100%;
+    }
+    .about-content h2{
+        font-size:30px;
+    }
+}

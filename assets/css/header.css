@@ -1,0 +1,146 @@
+/* =========================
+   Main Header
+========================= */
+#main-header {
+  width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 999;
+  background: rgba(255, 255, 255, 0.95);
+  transition: 0.3s ease;
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
+}
+#main-header .container {
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+/* =========================
+   Logo
+========================= */
+.logo a {
+  font-size: 32px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: var(--primary-color);
+}
+.logo img {
+  max-height: 70px;
+  width: auto;
+}
+/* =========================
+   Menu
+========================= */
+#main-menu .menu {
+  display: flex;
+  align-items: center;
+  gap: 35px;
+}
+#main-menu .menu li a {
+  font-size: 16px;
+  color: var(--text-color);
+  transition: 0.3s;
+  position: relative;
+}
+#main-menu .menu li a:hover {
+  color: var(--secondary-color);
+}
+#main-menu .menu li a::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  right: 0;
+  width: 0;
+  height: 2px;
+  background: var(--secondary-color);
+  transition: 0.3s;
+}
+#main-menu .menu li a:hover::after {
+  width: 100%;
+}
+/* =========================
+   Login Button
+========================= */
+.header-buttons .btn-login {
+  background: var(--primary-color);
+}
+.header-buttons .btn-login:hover {
+  background: var(--secondary-color);
+}
+/* =========================
+   Mobile Button
+========================= */
+#mobile-menu-btn {
+  display: none;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+#mobile-menu-btn span {
+  display: block;
+  width: 30px;
+  height: 3px;
+  background: #111;
+  margin: 6px 0;
+  transition: 0.3s;
+}
+@media (max-width: 900px) {
+  #mobile-menu-btn {
+    display: block;
+  }
+  .main-navigation {
+    display: none;
+  }
+  .main-navigation.active {
+    display: block;
+  }
+}
+@media (max-width: 900px) {
+  #main-header .container {
+    position: relative;
+  }
+  .main-navigation {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 100%;
+    background: #fff;
+    display: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  }
+  .main-navigation.active {
+    display: block;
+  }
+  .main-navigation .menu {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+  }
+  .main-navigation .menu li {
+    margin: 10px 0;
+  }
+  .main-navigation .menu a {
+    color: #222;
+    text-decoration: none;
+    font-size: 18px;
+  }
+}
+.site-header {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 999;
+  transition: 0.3s;
+}
+.site-header.scrolled {
+  background: #fff;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+}
+.site-header.scrolled .logo img {
+  max-height: 60px;
+}
+.logo img {
+  transition: 0.3s;
+}

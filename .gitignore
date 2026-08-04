@@ -1,0 +1,15 @@
+# Windows
+Thumbs.db
+desktop.ini
+# macOS
+.DS_Store
+# VS Code
+.vscode/
+# Logs
+*.log
+# Node
+node_modules/
+# Composer
+vendor/
+# Environment
+.env

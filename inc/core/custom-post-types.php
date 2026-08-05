@@ -103,3 +103,38 @@ add_action(
     'init',
     'zigurat_register_brand_post_type'
 );
+
+function zigurat_register_service_post_type()
+{
+    $labels = array(
+        'name'          => 'خدمات',
+        'singular_name' => 'خدمت',
+        'add_new'       => 'افزودن خدمت',
+        'add_new_item'  => 'افزودن خدمت جدید',
+        'edit_item'     => 'ویرایش خدمت',
+        'new_item'      => 'خدمت جدید',
+        'view_item'     => 'مشاهده خدمت',
+        'search_items'  => 'جست‌وجوی خدمات',
+        'not_found'     => 'خدمتی پیدا نشد',
+        'menu_name'     => 'خدمات',
+    );
+
+    register_post_type('service', array(
+        'labels'             => $labels,
+        'public'             => true,
+        'publicly_queryable' => false,
+        'show_in_menu'       => true,
+        'menu_icon'          => 'dashicons-screenoptions',
+        'has_archive'        => false,
+        'rewrite'            => false,
+        'supports'           => array(
+            'title',
+            'editor',
+            'thumbnail',
+            'excerpt',
+            'page-attributes'
+        ),
+        'show_in_rest'       => true,
+    ));
+}
+add_action('init', 'zigurat_register_service_post_type');

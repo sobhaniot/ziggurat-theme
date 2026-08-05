@@ -20,9 +20,25 @@
 .service-card:hover {
   transform: translateY(-10px);
 }
+.service-image {
+  margin-bottom: 20px;
+}
+.service-image img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 10px;
+}
 .service-icon {
   font-size: 40px;
   margin-bottom: 20px;
+}
+.service-card h3 {
+  margin-top: 0;
+}
+.service-description p:last-child {
+  margin-bottom: 0;
 }
 @media (max-width: 900px) {
   .services-grid {

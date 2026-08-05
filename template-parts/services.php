@@ -1,83 +1,44 @@
+<?php
+$services = new WP_Query(array(
+    'post_type'      => 'service',
+    'post_status'    => 'publish',
+    'posts_per_page' => 6,
+    'orderby'        => array(
+        'menu_order' => 'ASC',
+        'title'      => 'ASC',
+    ),
+));
+
+if (!$services->have_posts()) {
+    return;
+}
+?>
 <section class="services-section">
-    <div class="container">
+    <?php if (is_front_page()) : ?>
         <div class="section-header">
-            <h2>
-                خدمات زیگورات
-            </h2>
-            <p>
-                ارائه خدمات تخصصی طراحی، ساخت و اجرای فضاهای تجاری
-            </p>
+            <h2>خدمات زیگورات</h2>
         </div>
-        <div class="services-grid">
-            <div class="service-card">
-                <div class="service-icon">
-                    <i class="fa-solid fa-sign-hanging"></i>
+    <?php endif; ?>
+    <div class="services-grid">
+        <?php while ($services->have_posts()) : ?>
+            <?php $services->the_post(); ?>
+            <article class="service-card">
+                <?php if (has_post_thumbnail()) : ?>
+                    <div class="service-image">
+                        <?php the_post_thumbnail('medium_large'); ?>
+                    </div>
+                <?php else : ?>
+                    <div class="service-icon" aria-hidden="true">✦</div>
+                <?php endif; ?>
+                <h3><?php the_title(); ?></h3>
+                <div class="service-description">
+                    <?php
+                    $description = has_excerpt() ? get_the_excerpt() : wp_trim_words(get_the_content(), 24);
+                    echo wp_kses_post(wpautop($description));
+                    ?>
                 </div>
-                <h3>
-                    تابلو سازی
-                </h3>
-                <p>
-                    طراحی و اجرای انواع تابلوهای تبلیغاتی،
-                    چلنیوم، حروف برجسته و نورپردازی
-                </p>
-            </div>
-            <div class="service-card">
-                <div class="service-icon">
-                    <i class="fa-solid fa-building"></i>
-                </div>
-                <h3>
-                    دکوراسیون تجاری
-                </h3>
-                <p>
-                    طراحی و اجرای دکور فروشگاه‌ها،
-                    فضاهای اداری و نمایشگاهی
-                </p>
-            </div>
-            <div class="service-card">
-                <div class="service-icon">
-                    <i class="fa-solid fa-layer-group"></i>
-                </div>
-                <h3>
-                    کامپوزیت و نما
-                </h3>
-                <p>
-                    اجرای نمای کامپوزیت،
-                    سازه‌های مدرن و ترکیب متریال
-                </p>
-            </div>
-            <div class="service-card">
-                <div class="service-icon">
-                    <i class="fa-solid fa-lightbulb"></i>
-                </div>
-                <h3>
-                    نورپردازی
-                </h3>
-                <p>
-                    طراحی سیستم نور برای ایجاد جلوه بصری بهتر
-                </p>
-            </div>
-            <div class="service-card">
-                <div class="service-icon">
-                    <i class="fa-solid fa-cubes"></i>
-                </div>
-                <h3>
-                    سازه فلزی
-                </h3>
-                <p>
-                    ساخت سازه‌های فلزی، استندها و المان‌های تبلیغاتی
-                </p>
-            </div>
-            <div class="service-card">
-                <div class="service-icon">
-                    <i class="fa-solid fa-pen-ruler"></i>
-                </div>
-                <h3>
-                    طراحی و اجرا
-                </h3>
-                <p>
-                    از ایده اولیه تا اجرای کامل پروژه در کنار شما هستیم
-                </p>
-            </div>
-        </div>
+            </article>
+        <?php endwhile; ?>
     </div>
 </section>
+<?php wp_reset_postdata(); ?>

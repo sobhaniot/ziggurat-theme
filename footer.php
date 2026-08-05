@@ -1,3 +1,7 @@
+<?php
+$contact_details = zigurat_get_contact_details();
+$phone_url = preg_replace('/[^0-9+]/', '', $contact_details['phone']);
+?>
 <footer class="site-footer">
     <div class="container">
         <div class="footer-grid">
@@ -81,16 +85,16 @@
                 </h3>
                 <ul class="footer-contact">
                     <li>
-                        <a href="tel:09125606941">
-                            📞 09125606941
+                        <a href="tel:<?php echo esc_attr($phone_url); ?>">
+                            📞 <?php echo esc_html($contact_details['phone']); ?>
                         </a>
                     </li>
                     <li>
-                        📍 تهران، ایران
+                        📍 <?php echo esc_html($contact_details['address']); ?>
                     </li>
                     <li>
-                        <a href="mailto:zigguratcorporation@gmail.com">
-                            ✉ zigguratcorporation@gmail.com
+                        <a href="mailto:<?php echo esc_attr($contact_details['email']); ?>">
+                            ✉ <?php echo esc_html($contact_details['email']); ?>
                         </a>
                     </li>
                 </ul>

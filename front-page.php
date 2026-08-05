@@ -16,8 +16,6 @@ get_header();
 
     <?php get_template_part('template-parts/clients'); ?>
 
-    <?php get_template_part('template-parts/contact'); ?>
-
 </main>
 
 <?php

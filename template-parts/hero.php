@@ -49,6 +49,3 @@ $image = get_the_post_thumbnail_url(
         </div>
     </div>
 </section>
-<a href="#about" class="scroll-down">
-    ↓
-</a>

@@ -48,6 +48,20 @@
 .footer-contact li {
   line-height: 2;
 }
+.social-links--footer {
+  margin-top: 20px;
+}
+.social-links--footer a {
+  border-color: rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .06);
+}
+.social-links--footer a:hover {
+  padding-right: 5px;
+}
+.social-links--footer img {
+  width: 28px;
+  height: 28px;
+}
 .footer-bottom {
   margin-top: 60px;
   padding: 20px;

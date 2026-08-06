@@ -5,6 +5,7 @@ get_header();
     <?php
     while (have_posts()) :
         the_post();
+        $about_stats = zigurat_get_about_stats(get_the_ID());
     ?>
         <section class="about-hero">
             <div class="container">
@@ -30,77 +31,12 @@ get_header();
         <section class="about-stats">
             <div class="container">
                 <div class="stats-grid">
-                    <div class="stat-item">
-                        <strong
-                            class="counter"
-                            data-count="<?php echo esc_attr(get_post_meta(get_the_ID(), '_about_projects', true)); ?>">
-                            0
-                        </strong>
-                        <span>
-                            <?php
-                            echo esc_html(
-                                get_post_meta(
-                                    get_the_ID(),
-                                    '_about_projects_suffix',
-                                    true
-                                )
-                            );
-                            ?>
-                        </span>
-                    </div>
-                    <div class="stat-item">
-                        <strong
-                            class="counter"
-                            data-count="<?php echo esc_attr(get_post_meta(get_the_ID(), '_about_experience', true)); ?>">
-                            0
-                        </strong>
-                        <span>
-                            <?php
-                            echo esc_html(
-                                get_post_meta(
-                                    get_the_ID(),
-                                    '_about_experience_suffix',
-                                    true
-                                )
-                            );
-                            ?>
-                        </span>
-                    </div>
-                    <div class="stat-item">
-                        <strong
-                            class="counter"
-                            data-count="<?php echo esc_attr(get_post_meta(get_the_ID(), '_about_clients', true)); ?>">
-                            0
-                        </strong>
-                        <span>
-                            <?php
-                            echo esc_html(
-                                get_post_meta(
-                                    get_the_ID(),
-                                    '_about_clients_suffix',
-                                    true
-                                )
-                            );
-                            ?>
-                        </span>
-                    </div>
-                    <div class="stat-item">
-                        <strong
-                            class="counter"
-                            data-count="<?php echo esc_attr(get_post_meta(get_the_ID(), '_about_cities', true)); ?>">
-                            0
-                        </strong>
-                        <span>
-                            <?php
-                            echo esc_html(
-                                get_post_meta(
-                                    get_the_ID(),
-                                    '_about_cities_suffix',
-                                    true
-                                )
-                            );
-                            ?> </span>
-                    </div>
+                    <?php foreach ($about_stats as $stat): ?>
+                        <div class="stat-item">
+                            <strong class="counter" data-count="<?php echo esc_attr($stat['value']); ?>">0</strong>
+                            <span><?php echo esc_html($stat['suffix']); ?></span>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
         </section>

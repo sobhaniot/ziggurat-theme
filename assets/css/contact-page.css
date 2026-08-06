@@ -61,6 +61,38 @@
 .contact-detail strong {
   font-size: 16px;
 }
+.contact-socials {
+  margin-top: 28px;
+}
+.contact-socials h3 {
+  margin-bottom: 14px;
+  font-size: 18px;
+}
+.social-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.social-links a {
+  display: inline-flex;
+  min-width: 42px;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  border: 1px solid #e4e4e4;
+  border-radius: 10px;
+  background: #fff;
+}
+.social-links img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+.social-links span {
+  padding: 0 7px;
+  font-size: 13px;
+}
 .contact-form {
   display: grid;
   gap: 10px;

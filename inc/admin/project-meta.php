@@ -24,10 +24,12 @@ function zigurat_project_meta_callback($post)
 {
     wp_nonce_field('zigurat_project_nonce', 'zigurat_project_nonce_field');
     $city     = get_post_meta($post->ID, '_project_city', true);
+    $province = get_post_meta($post->ID, '_project_province', true);
     $client   = get_post_meta($post->ID, '_project_client', true);
     $date     = get_post_meta($post->ID, '_project_date', true);
     $type     = get_post_meta($post->ID, '_project_type', true);
     $duration = get_post_meta($post->ID, '_project_duration', true);
+    $featured = (bool) get_post_meta($post->ID, '_project_featured_for_client', true);
 ?>
     <table class="form-table">
         <tr>
@@ -36,6 +38,15 @@ function zigurat_project_meta_callback($post)
                 <input type="text"
                     name="project_city"
                     value="<?php echo esc_attr($city); ?>"
+                    class="regular-text">
+            </td>
+        </tr>
+        <tr>
+            <th><label for="project_province">استان اجرا</label></th>
+            <td>
+                <input type="text" id="project_province"
+                    name="project_province"
+                    value="<?php echo esc_attr($province); ?>"
                     class="regular-text">
             </td>
         </tr>
@@ -58,12 +69,23 @@ function zigurat_project_meta_callback($post)
             </td>
         </tr>
         <tr>
-            <th>نوع اجرا</th>
+            <th><label for="project_type">نوع فعالیت/اجرا</label></th>
             <td>
                 <input type="text"
                     name="project_type"
                     value="<?php echo esc_attr($type); ?>"
                     class="regular-text">
+                <p class="description">برای نمونه: تابلوسازی، چاپ، بازسازی، دکوراسیون یا نورپردازی</p>
+            </td>
+        </tr>
+        <tr>
+            <th>نمایش در صفحه اول</th>
+            <td>
+                <label>
+                    <input type="checkbox" name="project_featured_for_client" value="1" <?php checked($featured); ?>>
+                    این پروژه، پروژهٔ برگزیدهٔ این کارفرما باشد
+                </label>
+                <p class="description">اگر برای یک کارفرما چند پروژه برگزیده شود، جدیدترین پروژه نمایش داده می‌شود.</p>
             </td>
         </tr>
         <tr>

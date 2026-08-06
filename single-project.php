@@ -4,10 +4,11 @@ if (have_posts()) :
     while (have_posts()) : the_post();
         $project_id = get_the_ID();
         // Meta fields
-        $city = get_post_meta(get_the_ID(), '_project_city', true);
-        $client = get_post_meta(get_the_ID(), '_project_client', true);
+        $city = zigurat_get_project_term_name($project_id, 'project_city', '_project_city');
+        $province = zigurat_get_project_term_name($project_id, 'project_province', '_project_province');
+        $client = zigurat_get_project_term_name($project_id, 'project_client', '_project_client');
         $date = get_post_meta(get_the_ID(), '_project_date', true);
-        $type = get_post_meta(get_the_ID(), '_project_type', true);
+        $type = zigurat_get_project_term_name($project_id, 'project_sign_type', '_project_type');
         $duration = get_post_meta(get_the_ID(), '_project_duration', true);
         // Gallery
         $gallery = get_post_meta(
@@ -42,11 +43,15 @@ if (have_posts()) :
                         <?php echo esc_html($city); ?>
                     </div>
                     <div class="info-item">
+                        <strong>استان اجرا:</strong>
+                        <?php echo esc_html($province); ?>
+                    </div>
+                    <div class="info-item">
                         <strong>تاریخ اجرا:</strong>
                         <?php echo esc_html($date); ?>
                     </div>
                     <div class="info-item">
-                        <strong>نوع اجرا:</strong>
+                        <strong>نوع فعالیت/اجرا:</strong>
                         <?php echo esc_html($type); ?>
                     </div>
                     <div class="info-item">

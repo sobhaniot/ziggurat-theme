@@ -8,7 +8,7 @@ function zigurat_save_brand_meta($post_id)
     }
     if (
         !wp_verify_nonce(
-            $_POST['brand_nonce_field'],
+            sanitize_text_field(wp_unslash($_POST['brand_nonce_field'])),
             'brand_nonce'
         )
     ) {
@@ -32,7 +32,7 @@ function zigurat_save_brand_meta($post_id)
             $post_id,
             '_brand_website',
             esc_url_raw(
-                $_POST['brand_website']
+                wp_unslash($_POST['brand_website'])
             )
         );
     }

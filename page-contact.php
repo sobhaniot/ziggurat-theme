@@ -43,6 +43,12 @@ $phone_url = preg_replace('/[^0-9+]/', '', $contact_details['phone']);
                         <span>نشانی</span>
                         <strong><?php echo esc_html($contact_details['address']); ?></strong>
                     </div>
+                    <?php if (zigurat_get_social_links()): ?>
+                        <div class="contact-socials">
+                            <h3>شبکه‌های اجتماعی</h3>
+                            <?php zigurat_render_social_links('social-links--contact'); ?>
+                        </div>
+                    <?php endif; ?>
                 </aside>
 
                 <div class="contact-form-card">

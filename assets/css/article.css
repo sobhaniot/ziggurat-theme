@@ -1,9 +1,14 @@
 .article-single {
-  padding: 100px 0;
+  padding: 140px 0 100px;
+}
+.article-single-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 42px;
+  align-items: start;
 }
 .article-content {
-  max-width: 900px;
-  margin: auto;
+  min-width: 0;
 }
 .article-title {
   font-size: 42px;
@@ -11,6 +16,9 @@
   margin-bottom: 20px;
 }
 .article-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
   color: #777;
   margin-bottom: 40px;
 }
@@ -32,10 +40,84 @@
   margin-top: 40px;
 }
 .article-navigation {
-  max-width: 900px;
   margin: 50px auto 0;
   padding-top: 30px;
   border-top: 1px solid #eee;
+}
+.article-sidebar {
+  position: sticky;
+  top: 115px;
+  display: grid;
+  gap: 22px;
+}
+.article-sidebar-widget {
+  padding: 24px;
+  border: 1px solid #eee;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0,0,0,.06);
+}
+.article-sidebar-widget h2 {
+  margin-bottom: 18px;
+  font-size: 22px;
+}
+.article-sidebar-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+.article-sidebar-search input,
+.article-sidebar-search button {
+  min-height: 42px;
+  padding: 7px 10px;
+  border: 1px solid #ddd;
+  border-radius: 7px;
+  font: inherit;
+}
+.article-sidebar-search button {
+  border-color: var(--secondary-color);
+  background: var(--secondary-color);
+  cursor: pointer;
+}
+.all-articles-link {
+  display: block;
+  margin: 15px 0;
+  color: #7a5917;
+  font-weight: 700;
+}
+.article-sidebar-categories li + li {
+  border-top: 1px solid #eee;
+}
+.article-sidebar-categories a {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+}
+.popular-articles {
+  padding-right: 22px;
+}
+.popular-articles li {
+  padding: 10px 3px;
+}
+.popular-articles li + li {
+  border-top: 1px solid #eee;
+}
+.popular-articles a,
+.popular-articles small {
+  display: block;
+}
+.popular-articles small {
+  margin-top: 4px;
+  color: #888;
+}
+@media (max-width: 900px) {
+  .article-single-layout {
+    grid-template-columns: 1fr;
+  }
+  .article-sidebar {
+    position: static;
+  }
 }
 @media (max-width: 600px) {
   .article-title {

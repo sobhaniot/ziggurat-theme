@@ -11,6 +11,8 @@ function ziggurat_run_theme_installer()
     ziggurat_create_default_pages();
     ziggurat_create_default_services();
     ziggurat_create_main_menu();
+    zigurat_ensure_cooperation_page_and_menu(true);
+    zigurat_sync_main_navigation(true);
     ziggurat_set_front_page();
 }
 
@@ -79,6 +81,10 @@ function ziggurat_create_default_pages()
         'contact' => array(
             'title'    => 'تماس با ما',
             'template' => 'page-contact.php'
+        ),
+        'cooperation' => array(
+            'title'    => 'همکاری با ما',
+            'template' => 'page-cooperation.php'
         ),
         'login' => array(
             'title'    => 'ورود',
@@ -150,14 +156,13 @@ function ziggurat_create_main_menu()
             'url' => home_url('/projects/')
         ),
         array(
-            'title' => 'خدمات',
-            'object' => 'page',
-            'slug' => 'services'
+            'title' => 'مطالب',
+            'url' => get_post_type_archive_link('article')
         ),
         array(
-            'title' => 'درباره زیگورات',
+            'title' => 'همکاری با ما',
             'object' => 'page',
-            'slug' => 'about'
+            'slug' => 'cooperation'
         ),
         array(
             'title' => 'تماس با ما',

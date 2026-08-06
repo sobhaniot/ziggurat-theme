@@ -39,7 +39,7 @@
             <!-- دکمه ورود -->
             <div class="header-buttons">
                 <a href="<?php echo esc_url(home_url('/login')); ?>" class="btn-login">
-                    ورود انبارداری
+                    پنل مدیران
                 </a>
             </div>
             <!-- دکمه موبایل -->

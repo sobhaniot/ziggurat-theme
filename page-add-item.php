@@ -8,11 +8,12 @@ include_once ("inc/check_login.php");
 include_once ("inc/create_post.php");
 
 if (!check_login_cookies()) {
-    wp_redirect(home_url('/'));
+    wp_safe_redirect(home_url('/login/'));
     exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    check_admin_referer('zigurat_add_inventory_item', 'zigurat_inventory_nonce');
     global $wpdb;
     $table_name = 'zigurat_inventory';
 
@@ -117,6 +118,7 @@ if (!empty($item_names) && !is_wp_error($item_names)) {
     <?php endif; ?>
 
     <form id="add-item-form" action="" method="post">
+        <?php wp_nonce_field('zigurat_add_inventory_item', 'zigurat_inventory_nonce'); ?>
         
         <p>
             <label for="category">دسته‌بندی</label>
@@ -214,4 +216,3 @@ get_footer();
 
 
 ?>
-

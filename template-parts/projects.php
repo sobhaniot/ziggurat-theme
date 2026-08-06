@@ -10,10 +10,13 @@
         </div>
         <div class="projects-grid">
             <?php
+            $home_project_ids = zigurat_get_home_project_ids();
             $projects = new WP_Query(array(
                 'post_type'      => 'project',
                 'posts_per_page' => 6,
-                'post_status'    => 'publish'
+                'post_status'    => 'publish',
+                'post__in'       => $home_project_ids ?: array(0),
+                'orderby'        => 'post__in',
             ));
             if ($projects->have_posts()) :
                 while ($projects->have_posts()) :
@@ -35,11 +38,7 @@
                                     <?php the_title(); ?>
                                 </h3>
                                 <?php
-                                $city = get_post_meta(
-                                    get_the_ID(),
-                                    '_project_city',
-                                    true
-                                );
+                                $city = zigurat_get_project_term_name(get_the_ID(), 'project_city', '_project_city');
                                 if ($city) :
                                 ?>
                                     <span>

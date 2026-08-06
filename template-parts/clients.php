@@ -20,7 +20,7 @@ $query = new WP_Query(array(
                     <?php
                     $website = get_post_meta(
                         get_the_ID(),
-                        '_client_website',
+                        '_brand_website',
                         true
                     );
                     ?>
@@ -29,7 +29,7 @@ $query = new WP_Query(array(
                             <a
                                 href="<?php echo esc_url($website); ?>"
                                 target="_blank"
-                                rel="noopener">
+                                rel="noopener noreferrer">
                             <?php endif; ?>
                             <?php the_post_thumbnail(
                                 'medium',

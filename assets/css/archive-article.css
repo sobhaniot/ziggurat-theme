@@ -18,6 +18,38 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 35px;
 }
+.article-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 12px;
+  align-items: center;
+  margin: -20px 0 40px;
+  padding: 20px;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  background: #fff;
+}
+.article-filters select,
+.article-filters input,
+.article-filters button {
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 12px;
+  font: inherit;
+  border: 1px solid #ddd;
+  border-radius: 7px;
+  background: #fff;
+}
+.article-filters button {
+  border-color: var(--secondary-color);
+  background: var(--secondary-color);
+  cursor: pointer;
+}
+.article-filters > a {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: #8b641a;
+}
 .article-card {
   background: #fff;
   border-radius: 15px;
@@ -36,6 +68,19 @@
   color: #999;
   font-size: 14px;
   margin-bottom: 15px;
+}
+.article-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.article-categories span {
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: #f3ead5;
+  color: #735516;
+  font-size: 13px;
 }
 .article-card h2 {
   font-size: 22px;
@@ -66,6 +111,9 @@
 }
 @media (max-width: 600px) {
   .articles-grid {
+    grid-template-columns: 1fr;
+  }
+  .article-filters {
     grid-template-columns: 1fr;
   }
   .section-header h1 {

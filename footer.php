@@ -98,6 +98,7 @@ $phone_url = preg_replace('/[^0-9+]/', '', $contact_details['phone']);
                         </a>
                     </li>
                 </ul>
+                <?php zigurat_render_social_links('social-links--footer'); ?>
             </div>
         </div>
     </div>

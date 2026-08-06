@@ -60,6 +60,34 @@
 #main-menu .menu li a:hover::after {
   width: 100%;
 }
+#main-menu .menu-item-has-children {
+  position: relative;
+}
+#main-menu .sub-menu {
+  position: absolute;
+  top: calc(100% + 18px);
+  right: 0;
+  min-width: 210px;
+  padding: 10px;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(8px);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, .13);
+  transition: .2s ease;
+}
+#main-menu .menu-item-has-children:hover > .sub-menu,
+#main-menu .menu-item-has-children:focus-within > .sub-menu {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+}
+#main-menu .sub-menu li a {
+  display: block;
+  padding: 9px 12px;
+  white-space: nowrap;
+}
 /* =========================
    Login Button
 ========================= */
@@ -125,6 +153,15 @@
     color: #222;
     text-decoration: none;
     font-size: 18px;
+  }
+  #main-menu .sub-menu {
+    position: static;
+    min-width: 0;
+    padding: 4px 18px 4px 0;
+    visibility: visible;
+    opacity: 1;
+    transform: none;
+    box-shadow: none;
   }
 }
 .site-header {

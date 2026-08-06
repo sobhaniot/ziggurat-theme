@@ -37,20 +37,20 @@ function zigurat_about_stats_callback($post)
         'zigurat_about_stats_nonce',
         'zigurat_about_stats_nonce_field'
     );
+    $project_stats = zigurat_get_project_stats();
     $stats = array(
-        'projects' => 'پروژه اجرا شده',
-        'experience' => 'سال تجربه',
-        'clients' => 'مشتری',
-        'cities' => 'شهر اجرا'
+        'projects'   => array('label' => 'پروژه اجرا شده', 'automatic' => true, 'value' => $project_stats['projects']),
+        'experience' => array('label' => 'سال تجربه', 'automatic' => false),
+        'clients'    => array('label' => 'مشتری', 'automatic' => false),
+        'cities'     => array('label' => 'شهر اجرا', 'automatic' => true, 'value' => $project_stats['cities']),
+        'provinces'  => array('label' => 'استان اجرا', 'automatic' => true, 'value' => $project_stats['provinces']),
     );
 ?>
     <table class="form-table">
-        <?php foreach ($stats as $key => $label):
-            $value = get_post_meta(
-                $post->ID,
-                '_about_' . $key,
-                true
-            );
+        <?php foreach ($stats as $key => $config):
+            $value = $config['automatic']
+                ? $config['value']
+                : get_post_meta($post->ID, '_about_' . $key, true);
             $suffix = get_post_meta(
                 $post->ID,
                 '_about_' . $key . '_suffix',
@@ -59,24 +59,57 @@ function zigurat_about_stats_callback($post)
         ?>
             <tr>
                 <th>
-                    <?php echo $label; ?>
+                    <?php echo esc_html($config['label']); ?>
                 </th>
                 <td>
                     <input
                         type="number"
-                        name="about_<?php echo $key; ?>"
+                        <?php if (!$config['automatic']): ?>name="about_<?php echo esc_attr($key); ?>"<?php endif; ?>
                         value="<?php echo esc_attr($value); ?>"
                         placeholder="عدد"
-                        style="width:120px;">
+                        style="width:120px;" <?php readonly($config['automatic']); ?>>
                     <input
                         type="text"
                         name="about_<?php echo $key; ?>_suffix"
                         value="<?php echo esc_attr($suffix); ?>"
                         placeholder="پسوند"
                         style="width:120px;">
+                    <?php if ($config['automatic']): ?>
+                        <span class="description">این مقدار از پروژه‌های منتشرشده به‌صورت خودکار محاسبه و در دیتابیس ذخیره می‌شود.</span>
+                    <?php endif; ?>
                 </td>
             </tr>
         <?php endforeach; ?>
     </table>
 <?php
+}
+
+/** داده یکپارچه آمار برای صفحه اول و صفحه درباره ما. */
+function zigurat_get_about_stats($about_id)
+{
+    $project_stats = zigurat_get_project_stats();
+    $defaults = array(
+        'projects'   => 'پروژه اجرا شده',
+        'experience' => 'سال تجربه',
+        'clients'    => 'مشتری',
+        'cities'     => 'شهر اجرا',
+        'provinces'  => 'استان اجرا',
+    );
+    $values = array(
+        'projects'   => $project_stats['projects'],
+        'experience' => (int) get_post_meta($about_id, '_about_experience', true),
+        'clients'    => (int) get_post_meta($about_id, '_about_clients', true),
+        'cities'     => $project_stats['cities'],
+        'provinces'  => $project_stats['provinces'],
+    );
+
+    $result = array();
+    foreach ($values as $key => $value) {
+        $suffix = get_post_meta($about_id, '_about_' . $key . '_suffix', true);
+        $result[$key] = array(
+            'value'  => $value,
+            'suffix' => $suffix !== '' ? $suffix : $defaults[$key],
+        );
+    }
+    return $result;
 }

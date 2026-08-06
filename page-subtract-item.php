@@ -7,7 +7,7 @@ include_once ("inc/check_login.php");
 include_once ("inc/create_post.php");
 
 if (!check_login_cookies()) {
-    wp_redirect(home_url('/'));
+    wp_safe_redirect(home_url('/login/'));
     exit;
 }
 
@@ -15,6 +15,7 @@ if (!check_login_cookies()) {
 
 // پردازش فرم
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    check_admin_referer('zigurat_subtract_inventory_item', 'zigurat_inventory_nonce');
     global $wpdb;
     $table_name = 'zigurat_inventory';
 
@@ -137,6 +138,7 @@ if (!empty($project_items) && !is_wp_error($project_items)) {
     <?php endif; ?>
 
     <form id="subtract-item-form" action="" method="post">
+    <?php wp_nonce_field('zigurat_subtract_inventory_item', 'zigurat_inventory_nonce'); ?>
     <p>
             <label for="category">دسته‌بندی</label>
             <select name="item_category" id="category">

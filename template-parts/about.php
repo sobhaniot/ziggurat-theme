@@ -6,6 +6,7 @@ if (!$about) {
 $title = get_the_title($about);
 $link  = get_permalink($about->ID);
 $excerpt = $about->post_excerpt;
+$about_stats = zigurat_get_about_stats($about->ID);
 if (empty($excerpt)) {
     $excerpt = wp_trim_words(
         wp_strip_all_tags($about->post_content),
@@ -52,84 +53,14 @@ if (empty($excerpt)) {
         </div>
         <div class="about-stats">
             <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-number">
-                        <strong
-                            class="counter"
-                            data-count="<?php echo esc_attr(get_post_meta($about->ID, '_about_projects', true)); ?>">
-                            0
-                        </strong>
-                        <span>
-                            <?php
-                            echo esc_html(
-                                get_post_meta(
-                                    $about->ID,
-                                    '_about_projects_suffix',
-                                    true
-                                )
-                            );
-                            ?> </span>
+                <?php foreach ($about_stats as $stat): ?>
+                    <div class="stat-item">
+                        <div class="stat-number">
+                            <strong class="counter" data-count="<?php echo esc_attr($stat['value']); ?>">0</strong>
+                            <span><?php echo esc_html($stat['suffix']); ?></span>
+                        </div>
                     </div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number">
-                        <strong
-                            class="counter"
-                            data-count="<?php echo esc_attr(get_post_meta($about->ID, '_about_experience', true)); ?>">
-                            0
-                        </strong>
-                        <span>
-                            <?php
-                            echo esc_html(
-                                get_post_meta(
-                                    $about->ID,
-                                    '_about_experience_suffix',
-                                    true
-                                )
-                            );
-                            ?> </span>
-                    </div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number">
-                        <strong
-                            class="counter"
-                            data-count="<?php echo esc_attr(get_post_meta($about->ID, '_about_clients', true)); ?>">
-                            0
-                        </strong>
-                        <span>
-                            <?php
-                            echo esc_html(
-                                get_post_meta(
-                                    $about->ID,
-                                    '_about_clients_suffix',
-                                    true
-                                )
-                            );
-                            ?>
-                        </span>
-                    </div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number">
-                        <strong
-                            class="counter"
-                            data-count="<?php echo esc_attr(get_post_meta($about->ID, '_about_cities', true)); ?>">
-                            0
-                        </strong>
-                        <span>
-                            <?php
-                            echo esc_html(
-                                get_post_meta(
-                                    $about->ID,
-                                    '_about_cities_suffix',
-                                    true
-                                )
-                            );
-                            ?>
-                        </span>
-                    </div>
-                </div>
+                <?php endforeach; ?>
             </div>
         </div>
     </div>

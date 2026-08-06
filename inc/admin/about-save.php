@@ -27,14 +27,13 @@ function zigurat_save_about_stats($post_id)
         return;
     }
     $fields = array(
-        'about_projects',
         'about_experience',
         'about_clients',
-        'about_cities',
         'about_projects_suffix',
         'about_experience_suffix',
         'about_clients_suffix',
-        'about_cities_suffix'
+        'about_cities_suffix',
+        'about_provinces_suffix'
     );
     foreach ($fields as $field) {
         if (isset($_POST[$field])) {

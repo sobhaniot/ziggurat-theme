@@ -5,7 +5,7 @@ Template Name: Inventory Transactions
 include_once ("inc/check_login.php");
 
 if (!check_login_cookies()) {
-    wp_redirect(home_url('/'));
+    wp_safe_redirect(home_url('/login/'));
     exit;
 }
 
@@ -70,7 +70,7 @@ $query = new WP_Query($args);
 ?>
 
 <div class="transactions-list-container">
-    <h2>ورود و خروج کالاها</h2>
+    <h2>گزارش حساب و گردش انبار</h2>
     <div class="toolbar">
 
     <button id="print-button" class="toolbar-btn">
@@ -205,4 +205,3 @@ $(document).ready(function() {
 </script>
 
 <?php get_footer(); ?>
-

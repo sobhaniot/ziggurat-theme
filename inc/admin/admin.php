@@ -3,11 +3,20 @@ function zigurat_change_post_menu_labels()
 {
     global $menu;
     global $submenu;
-    $menu[5][0] = 'انبار';
-    $submenu['edit.php'][5][0]  = 'همه تراکنشها';
-    $submenu['edit.php'][10][0] = 'افزودن تراکنش';
-    $submenu['edit.php'][15][0] = 'نوع تراکنش';
-    $submenu['edit.php'][16][0] = 'برچسب';
+    if (isset($menu[5][0])) {
+        $menu[5][0] = 'انبار';
+    }
+    $submenu_labels = array(
+        5  => 'همه تراکنشها',
+        10 => 'افزودن تراکنش',
+        15 => 'نوع تراکنش',
+        16 => 'برچسب',
+    );
+    foreach ($submenu_labels as $position => $label) {
+        if (isset($submenu['edit.php'][$position][0])) {
+            $submenu['edit.php'][$position][0] = $label;
+        }
+    }
 }
 add_action('admin_menu', 'zigurat_change_post_menu_labels');
 function zigurat_change_post_object_labels()

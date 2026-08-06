@@ -4,6 +4,9 @@
 .hero {
   padding: 40px 0;
 }
+body.home .hero {
+  padding-top: 130px;
+}
 .hero-wrapper {
   position: relative;
   max-width: 1400px;
@@ -66,4 +69,10 @@
 }
 .hero-btn:hover {
   transform: translateY(-5px);
+}
+
+@media (max-width: 768px) {
+  body.home .hero {
+    padding-top: 100px;
+  }
 }

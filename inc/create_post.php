@@ -8,7 +8,8 @@ function create_post($item_category,$item_name, $action, $quantity, $project='')
     }
     
     // ایجاد پست جدید 
-    $username = $_COOKIE['ziguser'];
+    $current_user = wp_get_current_user();
+    $username = $current_user->exists() ? $current_user->user_login : 'unknown';
     // تبدیل تاریخ میلادی به شمسی و تنظیم زمان به وقت ایران 
     $miladi_date = new DateTime('now', new DateTimeZone('UTC')); 
     $miladi_date->setTimezone(new DateTimeZone('Asia/Tehran')); 
@@ -32,9 +33,16 @@ function create_post($item_category,$item_name, $action, $quantity, $project='')
         $term_action = get_term_by('name', $action, 'category');
         wp_set_post_terms($post_id, array($term_action->term_id), 'category');
 
-        $term_user = get_term_by('name', ucfirst($username), 'employee');
-        
-        wp_set_post_terms($post_id, array($term_user->term_id), 'employee');
+        $term_user = get_term_by('name', $username, 'employee');
+        if (!$term_user) {
+            $created_user_term = wp_insert_term($username, 'employee');
+            if (!is_wp_error($created_user_term)) {
+                $term_user = get_term($created_user_term['term_id'], 'employee');
+            }
+        }
+        if ($term_user && !is_wp_error($term_user)) {
+            wp_set_post_terms($post_id, array($term_user->term_id), 'employee');
+        }
 
         if($project){
             $term_project = get_term_by('name', ucfirst($project), 'project_item');

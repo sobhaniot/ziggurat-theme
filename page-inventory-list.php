@@ -5,7 +5,7 @@ Template Name: Inventory List
 include_once ("inc/check_login.php");
 
 if (!check_login_cookies()) {
-    wp_redirect(home_url('/'));
+    wp_safe_redirect(home_url('/login/'));
     exit;
 }
 
@@ -44,6 +44,11 @@ function get_inventory_list($only_available = false) {
 
 <div class="inventory-list-container">
     <h2>لیست انبار</h2>
+    <div class="toolbar" style="margin-bottom:20px;">
+        <a class="toolbar-btn primary" href="<?php echo esc_url(home_url('/add-item/')); ?>">افزودن کالا</a>
+        <a class="toolbar-btn" href="<?php echo esc_url(home_url('/subtract-item/')); ?>">کسر کالا</a>
+        <a class="toolbar-btn" href="<?php echo esc_url(home_url('/inventory-transactions/')); ?>">گزارش حساب</a>
+    </div>
     <div style="margin-bottom:20px;">
     <div class="inventory-filter">
         <?php if($only_available): ?>
@@ -87,5 +92,3 @@ function get_inventory_list($only_available = false) {
 </p>
 
 <?php get_footer(); ?>
-
-

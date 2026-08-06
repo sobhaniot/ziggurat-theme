@@ -31,6 +31,7 @@ function zigurat_save_project_meta($post_id)
     }
     $fields = array(
         'project_city',
+        'project_province',
         'project_client',
         'project_date',
         'project_type',
@@ -41,13 +42,19 @@ function zigurat_save_project_meta($post_id)
             update_post_meta(
                 $post_id,
                 '_' . $field,
-                sanitize_text_field($_POST[$field])
+                sanitize_text_field(wp_unslash($_POST[$field]))
             );
         }
     }
+    update_post_meta(
+        $post_id,
+        '_project_featured_for_client',
+        isset($_POST['project_featured_for_client']) ? '1' : '0'
+    );
+    zigurat_sync_project_taxonomies($post_id, true);
     // ذخیره گالری تصاویر
     if (isset($_POST['project_gallery'])) {
-        $gallery = sanitize_text_field($_POST['project_gallery']);
+        $gallery = sanitize_text_field(wp_unslash($_POST['project_gallery']));
         update_post_meta(
             $post_id,
             '_project_gallery',

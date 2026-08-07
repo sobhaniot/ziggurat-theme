@@ -5,7 +5,7 @@
 }
 .manager-login,
 .manager-panel {
-  max-width: 1200px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: 36px;
   border: 1px solid rgba(200, 155, 60, 0.25);
@@ -236,6 +236,15 @@
   transform: translateY(-4px);
   border-color: var(--secondary-color);
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.08);
+}
+.manager-action--inactive {
+  cursor: default;
+  opacity: .78;
+}
+.manager-action--inactive:hover {
+  transform: none;
+  border-color: #eee;
+  box-shadow: none;
 }
 .manager-action__icon {
   margin-bottom: 10px;

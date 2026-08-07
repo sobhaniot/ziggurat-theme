@@ -35,6 +35,10 @@ if (have_posts()) :
                 </div>
                 <div class="project-info-card">
                     <div class="info-item">
+                        <strong>تعداد بازدید:</strong>
+                        <?php echo esc_html(number_format_i18n(zigurat_get_project_views($project_id))); ?>
+                    </div>
+                    <div class="info-item">
                         <strong>کارفرما:</strong>
                         <?php echo esc_html($client); ?>
                     </div>

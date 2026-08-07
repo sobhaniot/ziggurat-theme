@@ -13,7 +13,7 @@
             $home_project_ids = zigurat_get_home_project_ids();
             $projects = new WP_Query(array(
                 'post_type'      => 'project',
-                'posts_per_page' => 6,
+                'posts_per_page' => -1,
                 'post_status'    => 'publish',
                 'post__in'       => $home_project_ids ?: array(0),
                 'orderby'        => 'post__in',

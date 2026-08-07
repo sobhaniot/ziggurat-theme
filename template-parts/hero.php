@@ -15,6 +15,8 @@ $image = get_the_post_thumbnail_url(
     $home->ID,
     'full'
 );
+$contact_page = get_page_by_path('contact');
+$consultation_url = ($contact_page ? get_permalink($contact_page) : home_url('/contact/')) . '#consultation-form';
 ?>
 <section
     id="hero"
@@ -40,7 +42,7 @@ $image = get_the_post_thumbnail_url(
                         مشاهده پروژه‌ها
                     </a>
                     <a
-                        href="<?php echo esc_url(home_url('/contact')); ?>"
+                        href="<?php echo esc_url($consultation_url); ?>"
                         class="hero-btn secondary">
                         درخواست مشاوره
                     </a>

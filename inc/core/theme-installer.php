@@ -105,6 +105,10 @@ function ziggurat_create_default_pages()
         'subtract-item' => array(
             'title'    => 'کسر کالا',
             'template' => 'page-subtract-item.php'
+        ),
+        'inventory-catalog' => array(
+            'title'    => 'تعریف دسته و کالا',
+            'template' => 'page-inventory-catalog.php'
         )
     );
     foreach ($pages as $slug => $page) {

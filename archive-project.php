@@ -61,6 +61,7 @@ get_header();
                             }
                             ?>
                             <div class="project-card-content">
+                                <div class="project-card-meta"><?php echo esc_html(number_format_i18n(zigurat_get_project_views(get_the_ID()))); ?> بازدید</div>
                                 <h2>
                                     <?php the_title(); ?>
                                 </h2>

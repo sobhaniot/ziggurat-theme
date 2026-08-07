@@ -10,7 +10,7 @@
 }
 .projects-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 30px;
 }
 .project-filters {
@@ -76,7 +76,7 @@
 }
 .projects-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 30px;
 }
 .project-card {
@@ -113,6 +113,11 @@
   .project-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+.project-card-meta {
+  margin-bottom: 8px;
+  color: #999;
+  font-size: 13px;
 }
 @media (max-width: 600px) {
   .projects-grid {

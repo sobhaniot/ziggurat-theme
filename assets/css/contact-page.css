@@ -98,6 +98,7 @@
   gap: 10px;
 }
 .contact-form input,
+.contact-form select,
 .contact-form textarea {
   box-sizing: border-box;
   width: 100%;
@@ -108,10 +109,14 @@
   resize: vertical;
 }
 .contact-form input:focus,
+.contact-form select:focus,
 .contact-form textarea:focus {
   outline: 0;
   border-color: #d6a936;
   box-shadow: 0 0 0 3px rgba(214, 169, 54, .16);
+}
+#consultation-form {
+  scroll-margin-top: 115px;
 }
 .contact-form button {
   padding: 14px 25px;

@@ -1,218 +1,56 @@
 <?php
-/*
-Template Name: Add Item
-*/
-// چک کردن وضعیت لاگین
+/* Template Name: Add Item */
+if (!defined('ABSPATH')) { exit; }
+zigurat_require_manager();
 
-include_once ("inc/check_login.php");
-include_once ("inc/create_post.php");
-
-if (!check_login_cookies()) {
-    wp_safe_redirect(home_url('/login/'));
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['zigurat_inventory_add'])) {
+    $nonce = isset($_POST['zigurat_inventory_nonce']) ? sanitize_text_field(wp_unslash($_POST['zigurat_inventory_nonce'])) : '';
+    if (!wp_verify_nonce($nonce, 'zigurat_inventory_add')) {
+        $status = 'invalid';
+    } else {
+        $result = zigurat_inventory_adjust_stock('add', array(
+            'product_id' => $_POST['product_id'] ?? 0,
+            'quantity' => $_POST['item_quantity'] ?? 0,
+            'notes' => $_POST['notes'] ?? '',
+        ));
+        $status = is_wp_error($result) ? $result->get_error_code() : 'added';
+    }
+    wp_safe_redirect(add_query_arg('inventory-status', sanitize_key($status), zigurat_inventory_page_url('add-item')));
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    check_admin_referer('zigurat_add_inventory_item', 'zigurat_inventory_nonce');
-    global $wpdb;
-    $table_name = 'zigurat_inventory';
-
-    $item_name = sanitize_text_field($_POST['item_name']);
-    $item_category = sanitize_text_field($_POST['item_category']);
-    $item_quantity = intval($_POST['item_quantity']);
-    
-    if(!empty($item_category) && !empty($item_name) && !empty($item_quantity)){
-        
-        // دریافت اطلاعات فعلی کالا
-        $current_quantity = $wpdb->get_var($wpdb->prepare(
-            "SELECT item_quantity FROM $table_name WHERE item_name = %s AND item_category = %s",
-            $item_name, $item_category
-        ));
-
-        // به‌روزرسانی تعداد کالا در انبار
-        if ($current_quantity !== null) {
-            $new_quantity = $current_quantity + $item_quantity;
-            $wpdb->update(
-                $table_name,
-                array('item_quantity' => $new_quantity),
-                array('item_name' => $item_name, 'item_category' => $item_category)
-            );
-        } else {
-            // وارد کردن داده‌ها به جدول
-            $wpdb->insert(
-                $table_name,
-                array(
-                    'item_name' => $item_name,
-                    'item_category' => $item_category,
-                    'item_quantity' => $item_quantity
-                )
-            );
-        }
-
-        if(create_post($item_category, $item_name, "Add", $item_quantity)){
-            
-            wp_redirect($_SERVER['REQUEST_URI'] . '?success=1');
-            exit;
-        } else {
-            wp_redirect($_SERVER['REQUEST_URI'] . '?success=0');
-            exit;
-        }
-    }
-}
-
+$status = isset($_GET['inventory-status']) ? sanitize_key(wp_unslash($_GET['inventory-status'])) : '';
+$messages = array(
+    'added' => array('success', 'موجودی کالا افزایش یافت و گردش آن ثبت شد.'),
+    'invalid_quantity' => array('error', 'تعداد باید بیشتر از صفر باشد.'),
+    'invalid_item' => array('error', 'دسته و کالای معتبر را انتخاب کنید.'),
+    'invalid' => array('error', 'درخواست معتبر نیست؛ صفحه را تازه‌سازی کنید.'),
+    'database' => array('error', 'ثبت انجام نشد و موجودی تغییری نکرد.'),
+);
+$catalog = zigurat_inventory_get_catalog(false);
+$selected_product_id = isset($_GET['product_id']) ? absint($_GET['product_id']) : 0;
+$selected_category_id = isset($_GET['category_id']) ? absint($_GET['category_id']) : 0;
 get_header();
-
-function get_item_names() {
-    $terms = get_terms(array(
-        'taxonomy' => 'item_name',
-        'parent'   => 0,
-        'hide_empty' => false,
-    ));
-    return $terms;
-}
-
-
-
-$item_names = get_item_names();
-
-// echo '<pre>';
-// var_dump($item_names);
-// echo '</pre>';
-
-
-$all_parents = [];
-// az tamame daste ha va kalaha yek list dorost mikonad
-if (!empty($item_names) && !is_wp_error($item_names)) {
-
-    foreach ($item_names as $term) {
-        
-        $child_terms = get_terms(array(
-            'taxonomy' => 'item_name',
-            'parent'   => $term->term_id,
-            'hide_empty' => false,
-        ));
-
-        if (!empty($child_terms) && !is_wp_error($child_terms)) {
-            foreach ($child_terms as $child_term) {
-                $all_parents[$term->name][] = $child_term->name;
-            }
-        }
-    }
-}
-
 ?>
-
-<div class="add-item-form-container">
-    <h2>افزودن کالا به انبار</h2>
-    
-    <?php if (isset($_GET['success'])): ?>
-        <?php if ($_GET['success'] == '1'): ?>
-            <div class="success-message" style="background-color: #dff0d8; color: #3c763d; padding: 15px; margin-bottom: 20px; border: 1px solid #d6e9c6; border-radius: 4px; text-align: center; font-size: 16px;">
-                کالا با موفقیت به انبار اضافه شد
-            </div>
+<main class="inventory-page"><div class="container">
+    <?php get_template_part('template-parts/inventory-nav'); ?>
+    <section class="inventory-card inventory-form-card" aria-labelledby="inventory-add-title">
+        <div class="inventory-heading"><div><span>ورود کالا</span><h1 id="inventory-add-title">افزودن به انبار</h1></div><p>کالاها از فهرستی که مدیرکل تعریف کرده انتخاب می‌شوند.</p></div>
+        <?php if (isset($messages[$status])): ?><div class="inventory-notice inventory-notice--<?php echo esc_attr($messages[$status][0]); ?>" role="alert"><?php echo esc_html($messages[$status][1]); ?></div><?php endif; ?>
+        <?php if (!$catalog || !array_filter(wp_list_pluck($catalog, 'products'))): ?>
+            <div class="inventory-empty">هنوز کالایی تعریف نشده است. <?php if (current_user_can('manage_options')): ?><a href="<?php echo esc_url(zigurat_inventory_page_url('inventory-catalog')); ?>">تعریف دسته و کالا</a><?php else: ?>از مدیرکل بخواهید ابتدا کالاها را تعریف کند.<?php endif; ?></div>
         <?php else: ?>
-            <div class="error-message" style="background-color: #f2dede; color: #a94442; padding: 15px; margin-bottom: 20px; border: 1px solid #ebccd1; border-radius: 4px; text-align: center; font-size: 16px;">
-                خطا در ثبت تراکنش
-            </div>
+            <form class="inventory-form" method="post" data-inventory-dependent>
+                <?php wp_nonce_field('zigurat_inventory_add', 'zigurat_inventory_nonce'); ?><input type="hidden" name="zigurat_inventory_add" value="1">
+                <label for="inventory-category">دسته‌بندی *</label>
+                <select id="inventory-category" data-inventory-category required><option value="">انتخاب دسته</option><?php foreach ($catalog as $category): if (!$category['products']) continue; ?><option value="<?php echo (int) $category['id']; ?>" <?php selected($selected_category_id, $category['id']); ?>><?php echo esc_html($category['name']); ?></option><?php endforeach; ?></select>
+                <label for="inventory-product">نام کالا *</label>
+                <select id="inventory-product" name="product_id" data-inventory-product required><option value="">ابتدا دسته را انتخاب کنید</option><?php foreach ($catalog as $category): foreach ($category['products'] as $product): ?><option value="<?php echo (int) $product['id']; ?>" data-category-id="<?php echo (int) $category['id']; ?>" <?php selected($selected_product_id, $product['id']); ?>><?php echo esc_html($product['name']); ?></option><?php endforeach; endforeach; ?></select>
+                <label for="inventory-add-quantity">تعداد ورودی *</label><input id="inventory-add-quantity" name="item_quantity" type="number" min="1" step="1" required>
+                <label for="inventory-add-notes">توضیحات</label><textarea id="inventory-add-notes" name="notes" rows="4" placeholder="نام تأمین‌کننده یا شماره فاکتور"></textarea>
+                <button type="submit">ثبت ورود کالا</button>
+            </form>
         <?php endif; ?>
-    <?php endif; ?>
-
-    <form id="add-item-form" action="" method="post">
-        <?php wp_nonce_field('zigurat_add_inventory_item', 'zigurat_inventory_nonce'); ?>
-        
-        <p>
-            <label for="category">دسته‌بندی</label>
-            <select name="item_category" id="category">
-                <option value="">انتخاب کنید</option>
-            </select>
-        </p>
-        <p>
-            <label for="items">نام کالا</label>
-            <select name="item_name" id="items">
-                <option value="">انتخاب کنید</option>
-            </select>
-        </p>
-        <p>
-            <label for="item_quantity">تعداد</label>
-            <input type="number" name="item_quantity" id="item_quantity" class="input" value="" size="20"  />
-        </p>
-        <p class="submit">
-            <input type="submit" name="submit" id="add-item-submit" class="button button-primary" value="افزودن کالا" />
-        </p>
-    </form>
-
-</div>
-<script>
-    // list dasteha va kalaha ra be front enteghal midahad
-    var jsonData = <?php echo json_encode($all_parents); ?>;
-    console.log(jsonData);
-
-    $(document).ready(function() {
-            $.each(jsonData, function(key, value) {
-                $('#category').append($('<option></option>').attr('value', key).text(key));
-            });
-
-            // تغییر کشویی دوم با توجه به انتخاب کشویی اول
-            $('#category').on('change', function() {
-                var selectedCategory = $(this).val();
-                $('#items').empty().append($('<option></option>').attr('value', '').text('انتخاب کنید'));
-
-                if (selectedCategory) {
-                    $.each(jsonData[selectedCategory], function(index, item) {
-                        $('#items').append($('<option></option>').attr('value', item).text(item));
-                    });
-                }
-            });
-            // اضافه کردن بررسی ورودی‌ها هنگام کلیک روی دکمه ارسال
-            $('#add-item-form').on('submit', function(e) {
-                let isValid = true;
-
-                // بررسی هر فیلد
-                $('#add-item-form select, #add-item-form input').each(function() {
-                    if ($(this).val() === '') {
-                        isValid = false;
-                        $(this).css('border', '2px solid red'); // تغییر رنگ به قرمز
-                    } else {
-                        $(this).css('border', ''); // بازگرداندن رنگ به حالت عادی
-                    }
-                });
-
-                // اگر ورودی نامعتبر است، از ارسال فرم جلوگیری کنید
-                if (!isValid) {
-                    e.preventDefault();
-                    $('#add-item-response').text('لطفاً همه فیلدها را پر کنید').css({
-                        'color': 'red',
-                        'font-size': '30px', // اندازه فونت
-                        'text-align': 'center',
-                        'margin-top': '10px' // فاصله از بالا
-
-                    });
-
-                }
-            });
-        });
-        
-</script>
-<?php
-
-?>
-<script>
-    if (window.location.search.includes('success')) {
-        const url = new URL(window.location.href);
-        url.searchParams.delete('success');
-        window.history.replaceState({}, document.title, url.toString());
-    }
-</script>
-
-
-
-
-<p class="back-to-home"> 
-    <a href="<?php echo home_url(); ?>" class="button">بازگشت به صفحه اصلی</a> 
-</p>
-
-<?php
-get_footer();
-
-
-?>
+    </section>
+</div></main>
+<?php get_footer(); ?>

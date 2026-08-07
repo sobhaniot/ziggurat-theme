@@ -53,7 +53,10 @@ add_action('init', function () {
         'نام کالا',
         'نام کالاها',
         'item_name',
-        array('post')
+        array('post'),
+        true,
+        false,
+        false
     );
     // آیتم‌های پروژه
     zigurat_register_taxonomy_helper(
@@ -61,7 +64,10 @@ add_action('init', function () {
         'آیتم پروژه',
         'آیتم‌های پروژه',
         'project_item',
-        array('post')
+        array('post'),
+        true,
+        false,
+        false
     );
     // کارمندان
     zigurat_register_taxonomy_helper(
@@ -69,7 +75,10 @@ add_action('init', function () {
         'نام کارمند',
         'کارمندها',
         'employee',
-        array('post')
+        array('post'),
+        true,
+        false,
+        false
     );
     // دسته قدیمی نوع اجرا؛ فقط برای انتقال داده‌های قبلی ثبت می‌شود.
     zigurat_register_taxonomy_helper(

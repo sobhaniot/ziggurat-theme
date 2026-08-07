@@ -103,10 +103,11 @@ function zigurat_rebuild_project_cache()
     });
 
     $stats = array(
+        'cache_version'    => 3,
         'projects'         => count($project_ids),
         'cities'           => zigurat_count_used_project_terms('project_city'),
         'provinces'        => zigurat_count_used_project_terms('project_province'),
-        'home_project_ids' => array_slice($home_ids, 0, 6),
+        'home_project_ids' => $home_ids,
         'updated_at'       => time(),
     );
 
@@ -117,7 +118,11 @@ function zigurat_rebuild_project_cache()
 function zigurat_get_project_stats()
 {
     $stats = get_option('zigurat_project_stats');
-    if (!is_array($stats) || !isset($stats['projects'], $stats['cities'], $stats['provinces'])) {
+    if (
+        !is_array($stats)
+        || ($stats['cache_version'] ?? 0) !== 3
+        || !isset($stats['projects'], $stats['cities'], $stats['provinces'])
+    ) {
         $stats = zigurat_rebuild_project_cache();
     }
     return $stats;
@@ -128,6 +133,75 @@ function zigurat_get_home_project_ids()
     $stats = zigurat_get_project_stats();
     return isset($stats['home_project_ids']) ? array_map('absint', $stats['home_project_ids']) : array();
 }
+
+function zigurat_get_project_views($post_id)
+{
+    return max(0, (int) get_post_meta($post_id, '_project_views', true));
+}
+
+/** ثبت یک بازدید پروژه برای هر مرورگر در بازه ۱۲ ساعته. */
+function zigurat_record_project_view()
+{
+    if (!is_singular('project') || is_user_logged_in() || is_preview()) {
+        return;
+    }
+    $user_agent = isset($_SERVER['HTTP_USER_AGENT']) && is_string($_SERVER['HTTP_USER_AGENT'])
+        ? strtolower($_SERVER['HTTP_USER_AGENT'])
+        : '';
+    if ($user_agent && preg_match('/bot|crawler|spider|slurp|bingpreview/', $user_agent)) {
+        return;
+    }
+    $post_id = get_queried_object_id();
+    if (!$post_id) {
+        return;
+    }
+    $cookie_name = 'zigurat_project_view_' . $post_id;
+    if (!empty($_COOKIE[$cookie_name])) {
+        return;
+    }
+
+    global $wpdb;
+    add_post_meta($post_id, '_project_views', 0, true);
+    $wpdb->query($wpdb->prepare(
+        "UPDATE {$wpdb->postmeta} SET meta_value = CAST(meta_value AS UNSIGNED) + 1 WHERE post_id = %d AND meta_key = %s",
+        $post_id,
+        '_project_views'
+    ));
+    clean_post_cache($post_id);
+
+    setcookie($cookie_name, '1', array(
+        'expires'  => time() + (12 * HOUR_IN_SECONDS),
+        'path'     => COOKIEPATH ?: '/',
+        'domain'   => COOKIE_DOMAIN,
+        'secure'   => is_ssl(),
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ));
+}
+add_action('template_redirect', 'zigurat_record_project_view', 20);
+
+/** افزودن مقدار اولیه بازدید برای پروژه‌های قدیمی و جدید. */
+add_action('init', function () {
+    if (get_option('zigurat_project_views_version') === '1') {
+        return;
+    }
+    $project_ids = get_posts(array(
+        'post_type'      => 'project',
+        'post_status'    => 'any',
+        'posts_per_page' => -1,
+        'fields'         => 'ids',
+    ));
+    foreach ($project_ids as $project_id) {
+        add_post_meta($project_id, '_project_views', 0, true);
+    }
+    update_option('zigurat_project_views_version', '1', false);
+}, 51);
+
+add_action('save_post_project', function ($post_id) {
+    if (!wp_is_post_revision($post_id)) {
+        add_post_meta($post_id, '_project_views', 0, true);
+    }
+});
 
 function zigurat_schedule_project_cache_refresh()
 {
@@ -216,4 +290,5 @@ add_action('pre_get_posts', function ($query) {
     if ($tax_query) {
         $query->set('tax_query', $tax_query);
     }
+    $query->set('posts_per_page', 20);
 });

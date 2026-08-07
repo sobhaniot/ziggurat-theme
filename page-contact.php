@@ -51,12 +51,14 @@ $phone_url = preg_replace('/[^0-9+]/', '', $contact_details['phone']);
                     <?php endif; ?>
                 </aside>
 
-                <div class="contact-form-card">
-                    <h2>ارسال پیام</h2>
+                <div class="contact-form-card" id="consultation-form">
+                    <h2>درخواست مشاوره</h2>
                     <?php if ($contact_status === 'sent') : ?>
-                        <p class="contact-notice success">پیام شما با موفقیت ارسال شد. به‌زودی با شما تماس می‌گیریم.</p>
+                        <p class="contact-notice success">درخواست مشاوره شما با موفقیت ثبت شد. به‌زودی با شما تماس می‌گیریم.</p>
                     <?php elseif ($contact_status === 'invalid') : ?>
-                        <p class="contact-notice error">لطفاً نام و متن پیام را وارد کنید.</p>
+                        <p class="contact-notice error">لطفاً نام، شماره تماس و زمینه مشاوره را کامل وارد کنید.</p>
+                    <?php elseif ($contact_status === 'limited') : ?>
+                        <p class="contact-notice error">تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً یک ساعت دیگر دوباره تلاش کنید.</p>
                     <?php elseif ($contact_status === 'error') : ?>
                         <p class="contact-notice error">ارسال پیام انجام نشد. لطفاً دوباره تلاش کنید یا تماس بگیرید.</p>
                     <?php endif; ?>
@@ -69,13 +71,20 @@ $phone_url = preg_replace('/[^0-9+]/', '', $contact_details['phone']);
                         </div>
                         <label for="contact-name">نام و نام خانوادگی *</label>
                         <input id="contact-name" name="name" type="text" required>
-                        <label for="contact-phone">شماره تماس</label>
-                        <input id="contact-phone" name="phone" type="tel">
+                        <label for="contact-phone">شماره تماس *</label>
+                        <input id="contact-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required>
+                        <label for="consultation-field">زمینه مشاوره *</label>
+                        <select id="consultation-field" name="consultation_field" required>
+                            <option value="">انتخاب کنید</option>
+                            <?php foreach (zigurat_consultation_fields() as $field_key => $field_label): ?>
+                                <option value="<?php echo esc_attr($field_key); ?>"><?php echo esc_html($field_label); ?></option>
+                            <?php endforeach; ?>
+                        </select>
                         <label for="contact-email">ایمیل</label>
                         <input id="contact-email" name="email" type="email">
-                        <label for="contact-message">پیام شما *</label>
-                        <textarea id="contact-message" name="message" rows="6" required></textarea>
-                        <button type="submit">ارسال پیام</button>
+                        <label for="contact-message">توضیحات تکمیلی</label>
+                        <textarea id="contact-message" name="message" rows="5" placeholder="اگر توضیح بیشتری دارید اینجا بنویسید."></textarea>
+                        <button type="submit">ثبت درخواست مشاوره</button>
                     </form>
                 </div>
             </div>

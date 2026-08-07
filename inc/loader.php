@@ -27,7 +27,8 @@ $load_order = array(
     'core',
     'admin',
     'frontend',
-    'inventory'
+    'inventory',
+    'invoices'
 );
 foreach ($load_order as $folder) {
     zigurat_load_directory($folder);

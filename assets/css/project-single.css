@@ -1,6 +1,35 @@
 .project-single {
   padding-bottom: 80px;
 }
+.lightbox-open { overflow: hidden; }
+.zigurat-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 70px;
+  background: rgba(0, 0, 0, .92);
+}
+.zigurat-lightbox.is-open { display: flex; }
+.zigurat-lightbox img {
+  max-width: min(1200px, 90vw);
+  max-height: 88vh;
+  object-fit: contain;
+}
+.zigurat-lightbox button {
+  position: absolute;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 48px;
+  cursor: pointer;
+}
+.zigurat-lightbox__close { top: 12px; left: 24px; }
+.zigurat-lightbox__next { right: 20px; top: 45%; }
+.zigurat-lightbox__prev { left: 20px; top: 45%; }
 /* Hero */
 .project-hero {
   position: relative;

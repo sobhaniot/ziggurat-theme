@@ -109,6 +109,10 @@ function ziggurat_create_default_pages()
         'inventory-catalog' => array(
             'title'    => 'تعریف دسته و کالا',
             'template' => 'page-inventory-catalog.php'
+        ),
+        'invoices' => array(
+            'title'    => 'بخش فاکتور',
+            'template' => 'page-invoices.php'
         )
     );
     foreach ($pages as $slug => $page) {

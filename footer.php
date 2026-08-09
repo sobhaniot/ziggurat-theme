@@ -28,26 +28,20 @@ $phone_url = preg_replace('/[^0-9+]/', '', $contact_details['phone']);
                     خدمات ما
                 </h3>
                 <ul>
-                    <li>
-                        <a href="#">
-                            حروف برجسته
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#">
-                            تابلو کامپوزیت
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#">
-                            دکوراسیون داخلی
-                        </a>
-                    </li>
-                    <li>
-                        <a href="#">
-                            طراحی و اجرا
-                        </a>
-                    </li>
+                    <?php
+                    $footer_services = get_posts(array(
+                        'post_type'      => 'service',
+                        'post_status'    => 'publish',
+                        'posts_per_page' => 4,
+                        'orderby'        => array('menu_order' => 'ASC', 'title' => 'ASC'),
+                        'no_found_rows'  => true,
+                    ));
+                    $services_page = get_page_by_path('services');
+                    $services_url = $services_page ? get_permalink($services_page) : home_url('/services/');
+                    foreach ($footer_services as $footer_service):
+                    ?>
+                        <li><a href="<?php echo esc_url($services_url . '#service-' . $footer_service->ID); ?>"><?php echo esc_html(get_the_title($footer_service)); ?></a></li>
+                    <?php endforeach; ?>
                 </ul>
             </div>
             <!-- لینک ها -->
@@ -57,22 +51,22 @@ $phone_url = preg_replace('/[^0-9+]/', '', $contact_details['phone']);
                 </h3>
                 <ul>
                     <li>
-                        <a href="<?php echo home_url(); ?>">
+                        <a href="<?php echo esc_url(home_url('/')); ?>">
                             خانه
                         </a>
                     </li>
                     <li>
-                        <a href="<?php echo home_url('/projects'); ?>">
+                        <a href="<?php echo esc_url(get_post_type_archive_link('project')); ?>">
                             پروژه‌ها
                         </a>
                     </li>
                     <li>
-                        <a href="<?php echo home_url('/about'); ?>">
+                        <a href="<?php echo esc_url(home_url('/about/')); ?>">
                             درباره ما
                         </a>
                     </li>
                     <li>
-                        <a href="<?php echo home_url('/contact'); ?>">
+                        <a href="<?php echo esc_url(home_url('/contact/')); ?>">
                             تماس با ما
                         </a>
                     </li>

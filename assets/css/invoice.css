@@ -85,6 +85,13 @@
 .invoice-status--draft { background: #fff0cf; color: #75520d; }
 .invoice-settings-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
 .invoice-settings-help { margin: 0 0 16px; color: #666; }
+.invoice-stamp-setting { display: grid; gap: 10px; }
+.invoice-stamp-preview { display: flex; align-items: center; gap: 16px; padding: 10px; border: 1px dashed #cbb98f; border-radius: 9px; background: #fffbf2; }
+.invoice-stamp-preview img { width: 90px; height: 90px; object-fit: contain; }
+.invoice-stamp-preview label,
+.invoice-stamp-toggle { display: flex !important; grid-template-columns: auto 1fr; align-items: center; justify-content: start; gap: 8px !important; }
+.invoice-stamp-preview input,
+.invoice-stamp-toggle input { width: 18px; min-height: 18px; margin: 0; }
 .invoice-print-body { margin: 0; background: #eee; color: #111; }
 .invoice-print-toolbar { display: flex; position: sticky; top: 0; z-index: 10; gap: 10px; justify-content: center; padding: 12px; background: #222; }
 .invoice-print-toolbar a,
@@ -125,6 +132,9 @@
 .invoice-signatures { display: grid; grid-template-columns: 1fr 1fr; min-height: 75px; border-top: 1px solid #111; }
 .invoice-signatures div { display: flex; align-items: start; justify-content: center; padding-top: 7px; border-left: 1px solid #111; font-weight: 800; }
 .invoice-signatures div:last-child { border-left: 0; }
+.invoice-signatures .invoice-signature { position: relative; align-items: flex-start; overflow: visible; }
+.invoice-signatures .invoice-signature > span { position: relative; z-index: 2; }
+.invoice-stamp-image { position: absolute; right: 50%; bottom: 0; z-index: 1; width: auto; max-width: none; height: auto; max-height: none; transform: translateX(50%); object-fit: none; }
 .invoice-document--unofficial .invoice-document__header { border-top: 7px solid #1f4f9f; }
 .invoice-document--official .invoice-document__header { border-top: 7px solid #c89b3c; }
 
@@ -149,12 +159,12 @@
   .invoice-fields .is-wide { grid-column: auto; }
 }
 @media print {
-  @page { size: A4 landscape; margin: 5mm; }
+  @page { margin: 0; }
   .no-print,
   #wpadminbar { display: none !important; }
   html,
   body.invoice-print-body { margin: 0 !important; background: #fff !important; }
-  .invoice-print-sheet { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+  .invoice-print-sheet { width: 100% !important; margin: 0 !important; padding: 5mm !important; }
   .invoice-document { width: 100%; box-sizing: border-box; font-size: 8pt; page-break-inside: avoid; }
   .invoice-document__header { min-height: 18mm; }
   .invoice-brand { font-size: 17pt; }

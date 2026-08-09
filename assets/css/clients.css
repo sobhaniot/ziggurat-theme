@@ -48,12 +48,30 @@
   }
 }
 @media (max-width: 650px) {
+  .clients {
+    padding: 55px 0;
+  }
   .clients-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-top: 32px;
+  }
+  .client-item {
+    min-width: 0;
+    min-height: 150px;
+    padding: 18px 10px;
+  }
+  .client-item img {
+    max-width: 88px;
+    max-height: 58px;
+  }
+  .client-item span {
+    margin-top: 12px;
+    font-size: 14px;
   }
 }
 @media (max-width: 450px) {
   .clients-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

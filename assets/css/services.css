@@ -46,7 +46,23 @@
   }
 }
 @media (max-width: 600px) {
+  .services-section {
+    padding: 55px 0;
+  }
+  .section-header {
+    margin-bottom: 28px;
+  }
   .services-grid {
     grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .service-card {
+    padding: 24px 18px;
+  }
+  .service-card h3 {
+    font-size: 22px;
+  }
+  .service-description {
+    font-size: 15px;
   }
 }

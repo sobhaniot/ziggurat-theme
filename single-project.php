@@ -5,6 +5,7 @@ if (have_posts()) :
         $project_id = get_the_ID();
         // Meta fields
         $city = zigurat_get_project_term_name($project_id, 'project_city', '_project_city');
+        $neighborhood = trim((string) get_post_meta($project_id, '_project_neighborhood', true));
         $province = zigurat_get_project_term_name($project_id, 'project_province', '_project_province');
         $client = zigurat_get_project_term_name($project_id, 'project_client', '_project_client');
         $date = get_post_meta(get_the_ID(), '_project_date', true);
@@ -46,6 +47,12 @@ if (have_posts()) :
                         <strong>شهر اجرا:</strong>
                         <?php echo esc_html($city); ?>
                     </div>
+                    <?php if ($neighborhood !== '') : ?>
+                        <div class="info-item">
+                            <strong>محله اجرا:</strong>
+                            <?php echo esc_html($neighborhood); ?>
+                        </div>
+                    <?php endif; ?>
                     <div class="info-item">
                         <strong>استان اجرا:</strong>
                         <?php echo esc_html($province); ?>

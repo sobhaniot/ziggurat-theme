@@ -25,6 +25,7 @@ function zigurat_project_meta_callback($post)
     wp_nonce_field('zigurat_project_nonce', 'zigurat_project_nonce_field');
     $city     = get_post_meta($post->ID, '_project_city', true);
     $province = get_post_meta($post->ID, '_project_province', true);
+    $neighborhood = get_post_meta($post->ID, '_project_neighborhood', true);
     $client   = get_post_meta($post->ID, '_project_client', true);
     $date     = get_post_meta($post->ID, '_project_date', true);
     $type     = get_post_meta($post->ID, '_project_type', true);
@@ -39,6 +40,16 @@ function zigurat_project_meta_callback($post)
                     name="project_city"
                     value="<?php echo esc_attr($city); ?>"
                     class="regular-text">
+            </td>
+        </tr>
+        <tr>
+            <th><label for="project_neighborhood">محله اجرا</label></th>
+            <td>
+                <input type="text" id="project_neighborhood"
+                    name="project_neighborhood"
+                    value="<?php echo esc_attr($neighborhood); ?>"
+                    class="regular-text">
+                <p class="description">اختیاری است؛ اگر خالی بماند در صفحه پروژه نمایش داده نمی‌شود.</p>
             </td>
         </tr>
         <tr>

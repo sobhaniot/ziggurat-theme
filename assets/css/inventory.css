@@ -398,7 +398,7 @@
 }
 
 @media print {
-  @page { size: A4 landscape; margin: 9mm; }
+  @page { margin: 9mm; }
   #main-header,
   .site-footer,
   .no-print { display: none !important; }

@@ -31,6 +31,7 @@ function zigurat_save_project_meta($post_id)
     }
     $fields = array(
         'project_city',
+        'project_neighborhood',
         'project_province',
         'project_client',
         'project_date',

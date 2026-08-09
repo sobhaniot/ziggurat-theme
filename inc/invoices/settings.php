@@ -18,7 +18,9 @@ function zigurat_invoice_builtin_brand_settings($brand)
                 'address' => 'چهارباغ، قوهه، بلوار امام خمینی، پلاک ۹۱',
                 'phone' => '09125606941',
             ),
+            'notes' => 'اعتبار قیمت تا ۴۸ ساعت است.',
             'payment_info' => "شماره حساب: 80000611194000\nشماره کارت: 6221-0610-2723-6779\nشماره شبا: IR450540103480000611194000\nبانک پارسیان به نام سامان موثق",
+            'stamp_id' => 0,
             'tax_rate' => 10,
         );
     }
@@ -35,7 +37,9 @@ function zigurat_invoice_builtin_brand_settings($brand)
             'address' => '',
             'phone' => '',
         ),
+        'notes' => 'اعتبار قیمت تا ۴۸ ساعت است.',
         'payment_info' => '',
+        'stamp_id' => 0,
         'tax_rate' => 0,
     );
 }
@@ -98,7 +102,9 @@ function zigurat_invoice_save_initial_settings($data)
         $tax_rate = (float) zigurat_invoice_normalize_digits($data['setting_' . $brand . '_tax_rate'] ?? 0);
         $settings[$brand] = array(
             'seller' => $seller,
+            'notes' => sanitize_textarea_field(wp_unslash((string) ($data['setting_' . $brand . '_notes'] ?? ''))),
             'payment_info' => sanitize_textarea_field(wp_unslash((string) ($data['setting_' . $brand . '_payment_info'] ?? ''))),
+            'stamp_id' => absint($data['setting_' . $brand . '_stamp_id'] ?? 0),
             'tax_rate' => max(0, min(100, $tax_rate)),
         );
     }
@@ -122,6 +128,29 @@ function zigurat_invoice_save_initial_settings($data)
             }
             $requested_numbers[$key] = array('brand' => $brand, 'type' => $type, 'next' => $next);
         }
+    }
+
+    foreach (array('official', 'unofficial') as $brand) {
+        if (!empty($data['setting_' . $brand . '_remove_stamp'])) {
+            $settings[$brand]['stamp_id'] = 0;
+            continue;
+        }
+        $upload_key = 'setting_' . $brand . '_stamp_file';
+        if (empty($_FILES[$upload_key]['name']) || (int) ($_FILES[$upload_key]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            continue;
+        }
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        require_once ABSPATH . 'wp-admin/includes/media.php';
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+        $attachment_id = media_handle_upload($upload_key, 0);
+        if (is_wp_error($attachment_id)) {
+            return new WP_Error('stamp_upload', 'آپلود مهر انجام نشد: ' . $attachment_id->get_error_message());
+        }
+        if (strpos((string) get_post_mime_type($attachment_id), 'image/') !== 0) {
+            wp_delete_attachment($attachment_id, true);
+            return new WP_Error('stamp_type', 'فایل مهر باید تصویر باشد.');
+        }
+        $settings[$brand]['stamp_id'] = (int) $attachment_id;
     }
 
     update_option('zigurat_invoice_defaults', $settings, false);

@@ -13,20 +13,16 @@
         <div class="container">
             <!-- لوگو -->
             <div class="logo">
-                <a href="<?php echo esc_url(home_url('/')); ?>">
-                    <?php
-                    if (has_custom_logo()) {
-                        the_custom_logo();
-                    } else {
-                    ?>
+                <?php if (has_custom_logo()) : ?>
+                    <?php the_custom_logo(); ?>
+                <?php else : ?>
+                    <a href="<?php echo esc_url(home_url('/')); ?>" rel="home" aria-label="<?php echo esc_attr(get_bloginfo('name')); ?>">
                         <span>ZIGGURAT</span>
-                    <?php
-                    }
-                    ?>
-                </a>
+                    </a>
+                <?php endif; ?>
             </div>
             <!-- منوی اصلی -->
-            <nav id="main-menu" class="main-navigation">
+            <nav id="main-menu" class="main-navigation" aria-label="منوی اصلی">
                 <?php
                 wp_nav_menu(array(
                     'theme_location' => 'main-menu',
@@ -43,7 +39,7 @@
                 </a>
             </div>
             <!-- دکمه موبایل -->
-            <button id="mobile-menu-btn" aria-label="باز کردن منو">
+            <button id="mobile-menu-btn" type="button" aria-label="باز کردن منو" aria-controls="main-menu" aria-expanded="false">
                 <span></span>
                 <span></span>
                 <span></span>

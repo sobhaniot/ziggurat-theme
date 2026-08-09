@@ -61,6 +61,15 @@ function zigurat_invoice_default_payment_info($brand)
         : '';
 }
 
+function zigurat_invoice_default_notes($brand)
+{
+    if (function_exists('zigurat_invoice_get_brand_settings')) {
+        $settings = zigurat_invoice_get_brand_settings($brand);
+        return (string) ($settings['notes'] ?? '');
+    }
+    return 'اعتبار قیمت تا ۴۸ ساعت است.';
+}
+
 function zigurat_invoice_normalize_digits($value)
 {
     return strtr((string) $value, array(
@@ -146,11 +155,16 @@ function zigurat_invoice_get($invoice_id)
 function zigurat_invoice_clean_seller($data, $brand)
 {
     $defaults = zigurat_invoice_default_seller($brand);
+    $settings = function_exists('zigurat_invoice_get_brand_settings')
+        ? zigurat_invoice_get_brand_settings($brand)
+        : array('stamp_id' => 0);
     $seller = array();
     foreach (array('name','national_id','economic_no','province','county','city','postal_code','address','phone') as $key) {
         $raw = $data['seller_' . $key] ?? $defaults[$key];
         $seller[$key] = $key === 'address' ? sanitize_textarea_field(wp_unslash((string) $raw)) : sanitize_text_field(wp_unslash((string) $raw));
     }
+    $seller['stamp_id'] = absint($data['seller_stamp_id'] ?? ($settings['stamp_id'] ?? 0));
+    $seller['include_stamp'] = !empty($data['include_stamp']) ? 1 : 0;
     return $seller;
 }
 

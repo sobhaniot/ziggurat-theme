@@ -57,8 +57,8 @@ if (empty($excerpt)) {
                     <div class="stat-item">
                         <div class="stat-number">
                             <strong class="counter" data-count="<?php echo esc_attr($stat['value']); ?>">0</strong>
-                            <span><?php echo esc_html($stat['suffix']); ?></span>
                         </div>
+                        <span class="stat-label"><?php echo esc_html($stat['suffix']); ?></span>
                     </div>
                 <?php endforeach; ?>
             </div>

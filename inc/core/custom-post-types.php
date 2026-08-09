@@ -25,7 +25,8 @@ function zigurat_register_project_post_type()
             'title',
             'editor',
             'thumbnail',
-            'excerpt'
+            'excerpt',
+            'custom-fields'
         ),
         'show_in_rest' => true
     ));
@@ -57,7 +58,8 @@ function zigurat_register_article_post_type()
             'title',
             'editor',
             'thumbnail',
-            'excerpt'
+            'excerpt',
+            'custom-fields'
         ),
         'show_in_rest' => true
     ));
@@ -84,12 +86,14 @@ function zigurat_register_brand_post_type()
         'brand',
         array(
             'labels' => $labels,
-            'public' => true,
+            'public' => false,
+            'publicly_queryable' => false,
+            'exclude_from_search' => true,
+            'show_ui' => true,
+            'show_in_menu' => true,
             'menu_icon' => 'dashicons-groups',
             'has_archive' => false,
-            'rewrite' => array(
-                'slug' => 'brands'
-            ),
+            'rewrite' => false,
             'supports' => array(
                 'title',
                 'thumbnail',

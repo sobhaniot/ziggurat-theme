@@ -23,7 +23,7 @@ if (!$services->have_posts()) {
         <div class="services-grid">
             <?php while ($services->have_posts()) : ?>
                 <?php $services->the_post(); ?>
-                <article class="service-card">
+                <article id="service-<?php the_ID(); ?>" class="service-card">
                     <?php if (has_post_thumbnail()) : ?>
                         <div class="service-image">
                             <?php the_post_thumbnail('medium_large'); ?>

@@ -16,6 +16,7 @@ function zigurat_enqueue_theme_script($name, $dependencies = array())
     $path = get_template_directory() . '/assets/js/' . $name . '.js';
     if (is_file($path)) {
         wp_enqueue_script('zigurat-' . $name, get_template_directory_uri() . '/assets/js/' . $name . '.js', $dependencies, filemtime($path), true);
+        wp_script_add_data('zigurat-' . $name, 'strategy', 'defer');
     }
 }
 
@@ -65,6 +66,10 @@ function zigurat_enqueue_assets()
     } elseif (is_singular('project')) {
         zigurat_enqueue_theme_style('project-single');
         zigurat_enqueue_theme_script('lightbox');
+    }
+
+    if (is_tax() || is_search() || is_home() || is_404()) {
+        zigurat_enqueue_theme_style('archive-generic');
     }
 
     $inventory_pages = array('inventory-list', 'inventory-transactions', 'inventory-catalog', 'add-item', 'subtract-item');

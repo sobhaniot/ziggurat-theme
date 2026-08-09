@@ -29,13 +29,13 @@ function zigurat_register_taxonomy_helper(
     $args = array(
         'hierarchical' => $hierarchical,
         'labels' => $labels,
+        'public' => $show_ui,
+        'publicly_queryable' => $show_ui,
         'show_ui' => $show_ui,
         'show_admin_column' => $show_ui,
         'show_in_rest' => $show_ui,
         'query_var' => true,
-        'rewrite' => array(
-            'slug' => $slug
-        ),
+        'rewrite' => $show_ui ? array('slug' => $slug) : false,
     );
     if (!$show_meta_box) {
         $args['meta_box_cb'] = false;

@@ -1,0 +1,55 @@
+.invoice-admin-page,
+.inventory-page {
+  position: relative;
+}
+
+.invoice-admin-page.is-ajax-loading,
+.inventory-page.is-ajax-loading {
+  min-height: 70vh;
+}
+
+.invoice-admin-page.is-ajax-loading > .container,
+.inventory-page.is-ajax-loading > .container {
+  pointer-events: none;
+  user-select: none;
+  opacity: .55;
+  filter: grayscale(.15);
+  transition: opacity .15s ease;
+}
+
+.zigurat-panel-loader {
+  position: fixed;
+  z-index: 99999;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  min-width: 180px;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  padding: 15px 20px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(200, 155, 60, .55);
+  border-radius: 12px;
+  background: #fff;
+  color: #31240a;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, .18);
+}
+
+.zigurat-panel-loader span {
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  border: 3px solid #ead8ad;
+  border-top-color: #8a6418;
+  border-radius: 50%;
+  animation: zigurat-panel-spin .7s linear infinite;
+}
+
+@keyframes zigurat-panel-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zigurat-panel-loader span { animation-duration: 1.5s; }
+}

@@ -7,6 +7,9 @@ $brand = isset($_REQUEST['invoice_brand']) ? sanitize_key(wp_unslash($_REQUEST['
 $view = isset($_REQUEST['invoice_view']) ? sanitize_key(wp_unslash($_REQUEST['invoice_view'])) : (isset($_REQUEST['view']) ? sanitize_key(wp_unslash($_REQUEST['view'])) : '');
 $document_type = isset($_REQUEST['invoice_type']) ? sanitize_key(wp_unslash($_REQUEST['invoice_type'])) : (isset($_REQUEST['type']) ? sanitize_key(wp_unslash($_REQUEST['type'])) : 'proforma');
 $edit_id = isset($_REQUEST['invoice_edit']) ? absint($_REQUEST['invoice_edit']) : (isset($_REQUEST['edit']) ? absint($_REQUEST['edit']) : 0);
+$from_proforma_id = isset($_REQUEST['invoice_from_proforma'])
+    ? absint($_REQUEST['invoice_from_proforma'])
+    : absint($_REQUEST['source_proforma_id'] ?? 0);
 $form_error = null;
 $settings_error = null;
 
@@ -67,9 +70,31 @@ if ($view === 'print') {
 }
 
 $editing_invoice = $edit_id ? zigurat_invoice_get($edit_id) : null;
+$source_proforma = null;
 if ($editing_invoice) {
     $brand = $editing_invoice->brand;
     $document_type = $editing_invoice->document_type;
+} elseif ($from_proforma_id) {
+    $candidate_proforma = zigurat_invoice_get($from_proforma_id);
+    if ($candidate_proforma && $candidate_proforma->document_type === 'proforma') {
+        $previous_conversion = zigurat_invoice_get_conversion($from_proforma_id);
+        if ($previous_conversion && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+            wp_safe_redirect(zigurat_invoice_page_url(array(
+                'brand' => $previous_conversion->brand,
+                'view' => 'form',
+                'type' => 'invoice',
+                'edit' => $previous_conversion->id,
+                'invoice-status' => 'already-converted',
+            )));
+            exit;
+        }
+        $source_proforma = $candidate_proforma;
+        $brand = $source_proforma->brand;
+        $document_type = 'invoice';
+        $view = 'form';
+    } elseif (!$form_error) {
+        $form_error = new WP_Error('invalid_source_proforma', 'پیش‌فاکتور انتخاب‌شده معتبر نیست.');
+    }
 }
 if (!in_array($brand, array('official','unofficial'), true)) { $brand = ''; }
 if (!in_array($document_type, array('proforma','invoice'), true)) { $document_type = 'proforma'; }
@@ -132,25 +157,28 @@ get_header();
 
             <?php if ($view === 'form'): ?>
                 <?php
-                $seller = $editing_invoice ? (array)$editing_invoice->seller : zigurat_invoice_default_seller($brand);
+                $form_source = $editing_invoice ?: $source_proforma;
+                $seller = $form_source ? (array)$form_source->seller : zigurat_invoice_default_seller($brand);
                 $current_brand_settings = zigurat_invoice_get_brand_settings($brand);
                 $seller_stamp_id = absint($seller['stamp_id'] ?? ($current_brand_settings['stamp_id'] ?? 0));
-                $include_stamp = $_SERVER['REQUEST_METHOD']==='POST' ? !empty($_POST['include_stamp']) : ($editing_invoice && !empty($seller['include_stamp']));
-                $field = static function ($key, $default='') use ($editing_invoice) {
+                $include_stamp = $_SERVER['REQUEST_METHOD']==='POST' ? !empty($_POST['include_stamp']) : ($form_source && !empty($seller['include_stamp']));
+                $field = static function ($key, $default='') use ($editing_invoice, $source_proforma) {
                     if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST[$key])) return wp_unslash($_POST[$key]);
-                    return $editing_invoice && isset($editing_invoice->$key) ? $editing_invoice->$key : $default;
+                    if ($editing_invoice && isset($editing_invoice->$key)) return $editing_invoice->$key;
+                    if ($source_proforma && !in_array($key, array('issue_date','status'), true) && isset($source_proforma->$key)) return $source_proforma->$key;
+                    return $default;
                 };
                 if ($_SERVER['REQUEST_METHOD']==='POST') {
                     foreach ($seller as $seller_key=>$seller_value) if (isset($_POST['seller_'.$seller_key])) $seller[$seller_key]=wp_unslash($_POST['seller_'.$seller_key]);
                 }
                 if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['item_description']) && is_array($_POST['item_description'])) {
                     $form_items=array(); foreach($_POST['item_description'] as $i=>$description) $form_items[]=(object)array('description'=>wp_unslash($description),'quantity'=>wp_unslash($_POST['item_quantity'][$i]??1),'unit'=>wp_unslash($_POST['item_unit'][$i]??''),'unit_price'=>wp_unslash($_POST['item_unit_price'][$i]??0),'discount'=>wp_unslash($_POST['item_discount'][$i]??0));
-                } else { $form_items=$editing_invoice?$editing_invoice->items:array((object)array('description'=>'','quantity'=>1,'unit'=>'عدد','unit_price'=>0,'discount'=>0)); }
+                } else { $form_items=$form_source?$form_source->items:array((object)array('description'=>'','quantity'=>1,'unit'=>'عدد','unit_price'=>0,'discount'=>0)); }
                 ?>
-                <?php if ($form_error): ?><div class="invoice-notice is-error" role="alert"><?php echo esc_html($form_error->get_error_message()); ?></div><?php elseif (!empty($_GET['invoice-status']) && $_GET['invoice-status']==='saved'): ?><div class="invoice-notice is-success">فاکتور ذخیره شد. اکنون می‌توانید آن را چاپ یا دوباره اصلاح کنید.</div><?php endif; ?>
+                <?php if ($form_error): ?><div class="invoice-notice is-error" role="alert"><?php echo esc_html($form_error->get_error_message()); ?></div><?php elseif ($source_proforma): ?><div class="invoice-notice is-success">اطلاعات پیش‌فاکتور شماره <?php echo esc_html(zigurat_invoice_format_number($source_proforma->document_number)); ?> منتقل شد. تاریخ و اطلاعات را بررسی کنید؛ شماره فاکتور فقط پس از کلیک روی ذخیره ساخته می‌شود.</div><?php elseif (!empty($_GET['invoice-status']) && $_GET['invoice-status']==='already-converted'): ?><div class="invoice-notice is-success">این فاکتور قبلاً از پیش‌فاکتور انتخاب‌شده ساخته شده است.</div><?php elseif (!empty($_GET['invoice-status']) && $_GET['invoice-status']==='saved'): ?><div class="invoice-notice is-success">فاکتور ذخیره شد. اکنون می‌توانید آن را چاپ یا دوباره اصلاح کنید.</div><?php endif; ?>
                 <form class="invoice-editor" method="post" data-invoice-editor>
-                    <?php wp_nonce_field('zigurat_save_invoice','invoice_nonce'); ?><input type="hidden" name="save_invoice" value="1"><input type="hidden" name="invoice_id" value="<?php echo $editing_invoice?(int)$editing_invoice->id:0; ?>"><input type="hidden" name="invoice_form_brand" value="<?php echo esc_attr($brand); ?>"><input type="hidden" name="invoice_form_document_type" value="<?php echo esc_attr($document_type); ?>">
-                    <div class="invoice-editor__title"><div><span><?php echo $editing_invoice?'اصلاح سند':'سند جدید'; ?></span><h2><?php echo esc_html(zigurat_invoice_document_label($document_type)); ?></h2></div><strong>شماره: <?php echo $editing_invoice?esc_html(zigurat_invoice_format_number($editing_invoice->document_number)):'خودکار پس از ذخیره'; ?></strong></div>
+                    <?php wp_nonce_field('zigurat_save_invoice','invoice_nonce'); ?><input type="hidden" name="save_invoice" value="1"><input type="hidden" name="invoice_id" value="<?php echo $editing_invoice?(int)$editing_invoice->id:0; ?>"><input type="hidden" name="invoice_form_brand" value="<?php echo esc_attr($brand); ?>"><input type="hidden" name="invoice_form_document_type" value="<?php echo esc_attr($document_type); ?>"><?php if ($source_proforma): ?><input type="hidden" name="source_proforma_id" value="<?php echo (int) $source_proforma->id; ?>"><?php endif; ?>
+                    <div class="invoice-editor__title"><div><span><?php echo $editing_invoice?'اصلاح سند':($source_proforma?'تبدیل پیش‌فاکتور به فاکتور':'سند جدید'); ?></span><h2><?php echo esc_html(zigurat_invoice_document_label($document_type)); ?></h2></div><strong>شماره: <?php echo $editing_invoice?esc_html(zigurat_invoice_format_number($editing_invoice->document_number)):'خودکار پس از ذخیره'; ?></strong></div>
                     <fieldset><legend>اطلاعات سند</legend><div class="invoice-fields invoice-fields--4"><label>تاریخ شمسی *<input name="issue_date" value="<?php echo esc_attr($field('issue_date',zigurat_invoice_today_jalali())); ?>" pattern="[0-9۰-۹]{4}/[0-9۰-۹]{2}/[0-9۰-۹]{2}" required></label><label>وضعیت<select name="status"><option value="issued" <?php selected($field('status','issued'),'issued'); ?>>صادرشده</option><option value="draft" <?php selected($field('status','issued'),'draft'); ?>>پیش‌نویس</option></select></label><label class="is-wide">موضوع<input name="subject" value="<?php echo esc_attr($field('subject')); ?>" placeholder="مثلاً اجرای تابلو یا دکوراسیون آشپزخانه"></label></div></fieldset>
                     <details class="invoice-seller-settings"><summary>مشخصات فروشنده (<?php echo esc_html($brand==='official'?'زیگورات':'دیاموند'); ?>)</summary><div class="invoice-fields invoice-fields--3"><?php foreach(array('name'=>'نام فروشنده','national_id'=>'شماره ملی/ثبت','economic_no'=>'شماره اقتصادی','province'=>'استان','county'=>'شهرستان','city'=>'شهر','postal_code'=>'کدپستی','phone'=>'تلفن') as $key=>$label): ?><label><?php echo esc_html($label); ?><input name="seller_<?php echo esc_attr($key); ?>" value="<?php echo esc_attr($seller[$key]??''); ?>"></label><?php endforeach; ?><label class="is-full">نشانی<textarea name="seller_address" rows="2"><?php echo esc_textarea($seller['address']??''); ?></textarea></label></div></details>
                     <fieldset><legend>مشخصات خریدار</legend><div class="invoice-fields invoice-fields--3"><label class="is-wide">نام شخص حقیقی/حقوقی *<input name="customer_name" value="<?php echo esc_attr($field('customer_name')); ?>" required></label><label>شماره ملی/ثبت<input name="customer_national_id" value="<?php echo esc_attr($field('customer_national_id')); ?>"></label><label>شماره اقتصادی<input name="customer_economic_no" value="<?php echo esc_attr($field('customer_economic_no')); ?>"></label><label>استان<input name="customer_province" value="<?php echo esc_attr($field('customer_province')); ?>"></label><label>شهرستان<input name="customer_county" value="<?php echo esc_attr($field('customer_county')); ?>"></label><label>شهر<input name="customer_city" value="<?php echo esc_attr($field('customer_city')); ?>"></label><label>کدپستی<input name="customer_postal_code" value="<?php echo esc_attr($field('customer_postal_code')); ?>"></label><label>تلفن<input name="customer_phone" value="<?php echo esc_attr($field('customer_phone')); ?>"></label><label class="is-full">نشانی<textarea name="customer_address" rows="2"><?php echo esc_textarea($field('customer_address')); ?></textarea></label></div></fieldset>
@@ -166,7 +194,37 @@ get_header();
                 <?php $excel_url=wp_nonce_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'export','filter_type'=>$list_type,'filter_status'=>$list_status,'invoice_search'=>$list_search)),'zigurat_invoice_export'); ?>
                 <div class="invoice-list-heading"><h2>لیست فاکتورها</h2><div class="invoice-list-heading__actions no-print"><strong><?php echo esc_html(number_format_i18n($invoice_list['total'])); ?> سند</strong><a class="invoice-excel-button" href="<?php echo esc_url($excel_url); ?>">خروجی اکسل</a></div></div>
                 <form class="invoice-list-filters no-print" method="get"><input type="hidden" name="invoice_brand" value="<?php echo esc_attr($brand); ?>"><input type="hidden" name="invoice_view" value="list"><label>نوع سند<select name="filter_type"><option value="">همه</option><option value="proforma" <?php selected($list_type,'proforma'); ?>>پیش‌فاکتور</option><option value="invoice" <?php selected($list_type,'invoice'); ?>>فاکتور</option></select></label><label>وضعیت<select name="filter_status"><option value="">همه</option><option value="issued" <?php selected($list_status,'issued'); ?>>صادرشده</option><option value="draft" <?php selected($list_status,'draft'); ?>>پیش‌نویس</option></select></label><label>جستجو<input type="search" name="invoice_search" value="<?php echo esc_attr($list_search); ?>" placeholder="شماره، خریدار یا موضوع"></label><button type="submit">اعمال فیلتر</button><?php if($list_type||$list_status||$list_search): ?><a href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list'))); ?>">حذف فیلتر</a><?php endif; ?></form>
-                <div class="invoice-list-table-wrap"><table class="invoice-list-table"><thead><tr><th>شماره</th><th>نوع سند</th><th>تاریخ</th><th>خریدار</th><th>موضوع</th><th>جمع کل</th><th>مانده</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody><?php if($invoice_list['items']): foreach($invoice_list['items'] as $row): ?><tr><td><strong><?php echo esc_html(zigurat_invoice_format_number($row->document_number)); ?></strong></td><td><?php echo esc_html(zigurat_invoice_document_label($row->document_type)); ?></td><td><?php echo esc_html($row->issue_date); ?></td><td><?php echo esc_html($row->customer_name); ?></td><td><?php echo esc_html($row->subject?:'—'); ?></td><td><?php echo esc_html(zigurat_invoice_format_money($row->grand_total)); ?></td><td><?php echo esc_html(zigurat_invoice_format_money($row->balance)); ?></td><td><span class="invoice-status invoice-status--<?php echo esc_attr($row->status); ?>"><?php echo esc_html(zigurat_invoice_status_label($row->status)); ?></span></td><td><a href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$row->brand,'view'=>'form','type'=>$row->document_type,'edit'=>$row->id))); ?>">اصلاح</a><a href="<?php echo esc_url(zigurat_invoice_page_url(array('view'=>'print','id'=>$row->id))); ?>" target="_blank" rel="noopener">چاپ</a></td></tr><?php endforeach; else: ?><tr><td colspan="9">هنوز فاکتوری ثبت نشده است.</td></tr><?php endif; ?></tbody></table></div>
+                <div class="invoice-list-table-wrap">
+                    <table class="invoice-list-table">
+                        <thead><tr><th>شماره</th><th>نوع سند</th><th>تاریخ</th><th>خریدار</th><th>موضوع</th><th>جمع کل</th><th>مانده</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+                        <tbody>
+                        <?php if ($invoice_list['items']): foreach ($invoice_list['items'] as $row): ?>
+                            <?php $conversion = $row->document_type === 'proforma' ? zigurat_invoice_get_conversion($row->id) : null; ?>
+                            <tr>
+                                <td><strong><?php echo esc_html(zigurat_invoice_format_number($row->document_number)); ?></strong></td>
+                                <td><?php echo esc_html(zigurat_invoice_document_label($row->document_type)); ?></td>
+                                <td><?php echo esc_html($row->issue_date); ?></td>
+                                <td><?php echo esc_html($row->customer_name); ?></td>
+                                <td><?php echo esc_html($row->subject ?: '—'); ?></td>
+                                <td><?php echo esc_html(zigurat_invoice_format_money($row->grand_total)); ?></td>
+                                <td><?php echo esc_html(zigurat_invoice_format_money($row->balance)); ?></td>
+                                <td><span class="invoice-status invoice-status--<?php echo esc_attr($row->status); ?>"><?php echo esc_html(zigurat_invoice_status_label($row->status)); ?></span></td>
+                                <td>
+                                    <a href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$row->brand,'view'=>'form','type'=>$row->document_type,'edit'=>$row->id))); ?>">اصلاح</a>
+                                    <a href="<?php echo esc_url(zigurat_invoice_page_url(array('view'=>'print','id'=>$row->id))); ?>" target="_blank" rel="noopener">چاپ</a>
+                                    <?php if ($row->document_type === 'proforma' && !$conversion): ?>
+                                        <a class="invoice-convert-action" href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$row->brand,'view'=>'form','type'=>'invoice','from_proforma'=>$row->id))); ?>">تبدیل به فاکتور</a>
+                                    <?php elseif ($conversion): ?>
+                                        <a class="invoice-converted-link" href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$conversion->brand,'view'=>'form','type'=>'invoice','edit'=>$conversion->id))); ?>">فاکتور <?php echo esc_html(zigurat_invoice_format_number($conversion->document_number)); ?></a>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; else: ?>
+                            <tr><td colspan="9">هنوز فاکتوری ثبت نشده است.</td></tr>
+                        <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
                 <?php if ($invoice_list['pages'] > 1): ?>
                     <nav class="invoice-pagination no-print" aria-label="صفحه‌بندی فاکتورها">
                         <?php echo wp_kses_post(paginate_links(array(

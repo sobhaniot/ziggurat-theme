@@ -126,6 +126,7 @@ function zigurat_invoice_page_url($args = array())
         'type'  => 'invoice_type',
         'edit'  => 'invoice_edit',
         'id'    => 'invoice_id',
+        'from_proforma' => 'invoice_from_proforma',
     );
     foreach ($route_keys as $key => $invoice_key) {
         if (array_key_exists($key, $args)) {
@@ -150,6 +151,17 @@ function zigurat_invoice_get($invoice_id)
     $seller = json_decode((string) $invoice->seller_json, true);
     $invoice->seller = is_array($seller) ? $seller : zigurat_invoice_default_seller($invoice->brand);
     return $invoice;
+}
+
+/** فاکتوری که قبلاً از یک پیش‌فاکتور ساخته شده است. */
+function zigurat_invoice_get_conversion($proforma_id)
+{
+    global $wpdb;
+    return $wpdb->get_row($wpdb->prepare(
+        'SELECT id, brand, document_type, document_number, source_proforma_id FROM ' . zigurat_invoices_table_name() . ' WHERE document_type = %s AND source_proforma_id = %d ORDER BY id ASC LIMIT 1',
+        'invoice',
+        absint($proforma_id)
+    ));
 }
 
 function zigurat_invoice_clean_seller($data, $brand)
@@ -210,11 +222,30 @@ function zigurat_invoice_save($data)
     $existing = $invoice_id ? zigurat_invoice_get($invoice_id) : null;
     $brand = $existing ? $existing->brand : sanitize_key($data['invoice_form_brand'] ?? ($data['brand'] ?? ''));
     $type = $existing ? $existing->document_type : sanitize_key($data['invoice_form_document_type'] ?? ($data['document_type'] ?? ''));
+    $source_proforma_id = $existing
+        ? absint($existing->source_proforma_id ?? 0)
+        : absint($data['source_proforma_id'] ?? 0);
     if (!in_array($brand, array('official','unofficial'), true) || !in_array($type, array('proforma','invoice'), true)) {
         return new WP_Error('invalid_type', 'نوع فاکتور معتبر نیست.');
     }
     if ($invoice_id && !$existing) {
         return new WP_Error('not_found', 'فاکتور پیدا نشد.');
+    }
+    if ($source_proforma_id) {
+        $source_proforma = zigurat_invoice_get($source_proforma_id);
+        if (!$source_proforma || $source_proforma->document_type !== 'proforma') {
+            return new WP_Error('invalid_source_proforma', 'پیش‌فاکتور مبدأ معتبر نیست.');
+        }
+        if ($type !== 'invoice' || $source_proforma->brand !== $brand) {
+            return new WP_Error('invalid_conversion', 'پیش‌فاکتور فقط به فاکتور همان مجموعه قابل تبدیل است.');
+        }
+        $previous_conversion = zigurat_invoice_get_conversion($source_proforma_id);
+        if ($previous_conversion && (int) $previous_conversion->id !== $invoice_id) {
+            return new WP_Error(
+                'already_converted',
+                'این پیش‌فاکتور قبلاً به فاکتور شماره ' . zigurat_invoice_format_number($previous_conversion->document_number) . ' تبدیل شده است.'
+            );
+        }
     }
     $customer_name = sanitize_text_field(wp_unslash((string) ($data['customer_name'] ?? '')));
     $items = zigurat_invoice_clean_items($data);
@@ -254,7 +285,23 @@ function zigurat_invoice_save($data)
             return new WP_Error('not_found', 'فاکتور پیدا نشد.');
         }
         $document_number = (int) $locked->document_number;
+        $source_proforma_id = absint($locked->source_proforma_id ?? 0);
     } else {
+        if ($source_proforma_id) {
+            $locked_source = $wpdb->get_row($wpdb->prepare(
+                "SELECT id, brand, document_type FROM {$invoice_table} WHERE id = %d FOR UPDATE",
+                $source_proforma_id
+            ));
+            $converted_id = $wpdb->get_var($wpdb->prepare(
+                "SELECT id FROM {$invoice_table} WHERE document_type = %s AND source_proforma_id = %d LIMIT 1 FOR UPDATE",
+                'invoice',
+                $source_proforma_id
+            ));
+            if (!$locked_source || $locked_source->document_type !== 'proforma' || $locked_source->brand !== $brand || $converted_id) {
+                $wpdb->query('ROLLBACK');
+                return new WP_Error('already_converted', 'این پیش‌فاکتور معتبر نیست یا قبلاً به فاکتور تبدیل شده است.');
+            }
+        }
         $first_number = function_exists('zigurat_invoice_next_number') ? zigurat_invoice_next_number($brand, $type) : 1;
         $wpdb->query($wpdb->prepare(
             "INSERT IGNORE INTO {$sequence_table} (brand,document_type,last_number,updated_at) VALUES (%s,%s,%d,%s)",
@@ -280,6 +327,7 @@ function zigurat_invoice_save($data)
         'brand'=>$brand, 'document_type'=>$type, 'document_number'=>$document_number,
         'issue_date'=>$issue_date, 'status'=>$status,
         'subject'=>sanitize_text_field(wp_unslash((string) ($data['subject'] ?? ''))),
+        'source_proforma_id'=>$source_proforma_id,
         'seller_json'=>wp_json_encode($seller, JSON_UNESCAPED_UNICODE),
         'customer_name'=>$customer_name,
         'customer_national_id'=>sanitize_text_field(wp_unslash((string) ($data['customer_national_id'] ?? ''))),

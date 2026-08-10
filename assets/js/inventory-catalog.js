@@ -1,6 +1,9 @@
 (function () {
   'use strict';
-  document.querySelectorAll('[data-inventory-dependent]').forEach(function (group) {
+  function initializeInventory(root) {
+  (root || document).querySelectorAll('[data-inventory-dependent]').forEach(function (group) {
+    if (group.dataset.inventoryDependentReady === '1') return;
+    group.dataset.inventoryDependentReady = '1';
     var category = group.querySelector('[data-inventory-category]');
     var product = group.querySelector('[data-inventory-product]');
     if (!category || !product) return;
@@ -39,5 +42,7 @@
       syncProject();
     }
   });
-
+  }
+  initializeInventory(document);
+  document.addEventListener('zigurat:panel-updated', function (event) { initializeInventory(event.detail && event.detail.root ? event.detail.root : document); });
 }());

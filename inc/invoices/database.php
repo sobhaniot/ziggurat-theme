@@ -24,7 +24,7 @@ function zigurat_invoice_sequences_table_name()
 function zigurat_install_invoice_tables()
 {
     global $wpdb;
-    $version = '1';
+    $version = '2';
     $invoices = zigurat_invoices_table_name();
     $items = zigurat_invoice_items_table_name();
     $sequences = zigurat_invoice_sequences_table_name();
@@ -44,6 +44,7 @@ function zigurat_install_invoice_tables()
         issue_date varchar(10) NOT NULL,
         status varchar(20) NOT NULL DEFAULT 'issued',
         subject varchar(191) NOT NULL DEFAULT '',
+        source_proforma_id bigint(20) unsigned NOT NULL DEFAULT 0,
         seller_json longtext NULL,
         customer_name varchar(191) NOT NULL,
         customer_national_id varchar(50) NOT NULL DEFAULT '',
@@ -73,6 +74,7 @@ function zigurat_install_invoice_tables()
         KEY brand (brand),
         KEY document_type (document_type),
         KEY status (status),
+        KEY source_proforma_id (source_proforma_id),
         KEY issue_date (issue_date),
         KEY customer_name (customer_name(100))
     ) {$charset};");

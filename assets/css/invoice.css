@@ -77,6 +77,8 @@
 .invoice-list-filters label { display: grid; gap: 5px; font-weight: 700; }
 .invoice-list-table td:last-child { white-space: nowrap; }
 .invoice-list-table td:last-child a { display: inline-block; margin: 2px; padding: 5px 9px; border: 1px solid #c9ab67; border-radius: 6px; color: #684a0d; }
+.invoice-list-table td:last-child .invoice-convert-action { border-color: #237447; background: #edf8f1; color: #176238; font-weight: 800; }
+.invoice-list-table td:last-child .invoice-converted-link { border-color: #5a6f94; background: #f0f4fb; color: #344c74; font-weight: 800; }
 .invoice-pagination { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; margin-top: 20px; }
 .invoice-pagination .page-numbers { display: inline-flex; min-width: 38px; min-height: 38px; align-items: center; justify-content: center; padding: 5px 11px; border: 1px solid #d8d1c2; border-radius: 7px; background: #fff; color: #4f3a12; }
 .invoice-pagination .page-numbers.current { border-color: #c89b3c; background: #c89b3c; color: #171717; font-weight: 800; }
@@ -134,7 +136,19 @@
 .invoice-signatures div:last-child { border-left: 0; }
 .invoice-signatures .invoice-signature { position: relative; align-items: flex-start; overflow: visible; }
 .invoice-signatures .invoice-signature > span { position: relative; z-index: 2; }
-.invoice-stamp-image { position: absolute; right: 50%; bottom: 0; z-index: 1; width: auto; max-width: none; height: auto; max-height: none; transform: translateX(50%); object-fit: none; }
+.invoice-stamp-image {
+  position: absolute;
+  right: 50%;
+  bottom: 0;
+  z-index: 1;
+  width: auto !important;
+  max-width: min(240px, 80%) !important;
+  height: auto !important;
+  max-height: 150px !important;
+  transform: translateX(50%);
+  object-fit: contain;
+  contain-intrinsic-size: none !important;
+}
 .invoice-document--unofficial .invoice-document__header { border-top: 7px solid #1f4f9f; }
 .invoice-document--official .invoice-document__header { border-top: 7px solid #c89b3c; }
 

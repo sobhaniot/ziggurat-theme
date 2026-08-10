@@ -76,6 +76,8 @@ get_header();
                     get_template_part('template-parts/manager-applications');
                 } elseif ($manager_section === 'application-detail') {
                     get_template_part('template-parts/manager-application-resume');
+                } elseif ($manager_section === 'views') {
+                    get_template_part('template-parts/manager-views');
                 } else {
                     get_template_part('page-main');
                 }

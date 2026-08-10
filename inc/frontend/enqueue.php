@@ -75,14 +75,26 @@ function zigurat_enqueue_assets()
     $inventory_pages = array('inventory-list', 'inventory-transactions', 'inventory-catalog', 'add-item', 'subtract-item');
     if (is_page($inventory_pages)) {
         zigurat_enqueue_theme_style('inventory');
+        zigurat_enqueue_theme_style('panel-ajax');
         zigurat_enqueue_theme_script('inventory-catalog');
+        zigurat_enqueue_theme_script('panel-ajax', array('zigurat-inventory-catalog'));
+        wp_localize_script('zigurat-panel-ajax', 'ziguratPanelAjaxConfig', array(
+            'paths' => array_map(static function ($slug) {
+                return (string) wp_parse_url(zigurat_inventory_page_url($slug), PHP_URL_PATH);
+            }, $inventory_pages),
+        ));
     }
     if (is_page('invoices') || is_page_template('page-invoices.php')) {
         zigurat_enqueue_theme_style('invoice');
+        zigurat_enqueue_theme_style('panel-ajax');
         zigurat_enqueue_theme_script('invoice');
+        zigurat_enqueue_theme_script('panel-ajax', array('zigurat-invoice'));
         wp_localize_script('zigurat-invoice', 'ziguratInvoiceConfig', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'customerNonce' => wp_create_nonce('zigurat_invoice_customer_lookup'),
+        ));
+        wp_localize_script('zigurat-panel-ajax', 'ziguratPanelAjaxConfig', array(
+            'paths' => array((string) wp_parse_url(zigurat_invoice_page_url(), PHP_URL_PATH)),
         ));
     }
 }

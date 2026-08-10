@@ -1,7 +1,10 @@
-document.addEventListener('DOMContentLoaded', function () {
+(function () {
   'use strict';
-  var editor = document.querySelector('[data-invoice-editor]');
+  function initializeInvoice(root) {
+  var editor = (root || document).querySelector('[data-invoice-editor]');
   if (!editor) return;
+  if (editor.dataset.invoiceReady === '1') return;
+  editor.dataset.invoiceReady = '1';
   var submitWasClicked = false;
   editor.addEventListener('keydown', function (event) {
     if (event.key === 'Enter' && event.target.tagName !== 'TEXTAREA') {
@@ -118,4 +121,7 @@ document.addEventListener('DOMContentLoaded', function () {
   editor.querySelectorAll('input[name="discount"],input[name="shipping"],input[name="tax_rate"],input[name="paid_amount"]').forEach(function (input) { input.addEventListener('input', calculate); });
   setupCustomerLookup();
   calculate();
-});
+  }
+  document.addEventListener('DOMContentLoaded', function () { initializeInvoice(document); });
+  document.addEventListener('zigurat:panel-updated', function (event) { initializeInvoice(event.detail && event.detail.root ? event.detail.root : document); });
+}());

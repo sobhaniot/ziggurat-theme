@@ -34,9 +34,19 @@ function zigurat_render_social_links($class = '')
             }
             $label = !empty($link['label']) ? $link['label'] : 'شبکه اجتماعی';
         ?>
-            <a href="<?php echo esc_url($link['url']); ?>" target="_blank" rel="noopener noreferrer" aria-label="<?php echo esc_attr($label); ?>">
-                <?php if (!empty($link['icon_id'])): ?>
-                    <?php echo wp_get_attachment_image((int) $link['icon_id'], 'thumbnail', false, array('alt' => $label, 'loading' => 'lazy')); ?>
+            <?php
+            $icon_html = !empty($link['icon_id'])
+                ? wp_get_attachment_image((int) $link['icon_id'], 'thumbnail', false, array(
+                    'alt'      => $label,
+                    'class'    => 'social-link__icon',
+                    'loading'  => 'eager',
+                    'decoding' => 'async',
+                ))
+                : '';
+            ?>
+            <a class="social-link" href="<?php echo esc_url($link['url']); ?>" target="_blank" rel="noopener noreferrer" aria-label="<?php echo esc_attr($label); ?>" title="<?php echo esc_attr($label); ?>">
+                <?php if ($icon_html): ?>
+                    <?php echo wp_kses_post($icon_html); ?>
                 <?php else: ?>
                     <span><?php echo esc_html($label); ?></span>
                 <?php endif; ?>

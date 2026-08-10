@@ -10,6 +10,7 @@ $seller = (array) $invoice->seller;
 $logo_id = $invoice->brand === 'official' ? absint(get_theme_mod('custom_logo')) : 0;
 $logo_url = $logo_id ? wp_get_attachment_image_url($logo_id, 'medium') : '';
 $stamp_id = !empty($seller['include_stamp']) ? absint($seller['stamp_id'] ?? 0) : 0;
+$stamp_url = $stamp_id ? wp_get_attachment_image_url($stamp_id, 'full') : '';
 ?>
 <article class="invoice-document invoice-document--<?php echo esc_attr($invoice->brand); ?> <?php echo $invoice->status === 'draft' ? 'is-draft' : ''; ?>" dir="rtl">
     <?php if ($invoice->status === 'draft'): ?><div class="invoice-watermark">پیش‌نویس</div><?php endif; ?>
@@ -73,5 +74,5 @@ $stamp_id = !empty($seller['include_stamp']) ? absint($seller['stamp_id'] ?? 0) 
             <div><dt>مانده:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->balance)); ?></dd></div>
         </dl>
     </div>
-    <footer class="invoice-signatures"><div class="invoice-signature invoice-signature--seller"><span>مهر و امضای فروشنده</span><?php if ($stamp_id): ?><?php echo wp_get_attachment_image($stamp_id, 'full', false, array('class'=>'invoice-stamp-image','alt'=>'مهر فروشنده')); ?><?php endif; ?></div><div class="invoice-signature"><span>مهر و امضای خریدار</span></div></footer>
+    <footer class="invoice-signatures"><div class="invoice-signature invoice-signature--seller"><span>مهر و امضای فروشنده</span><?php if ($stamp_url): ?><img src="<?php echo esc_url($stamp_url); ?>" class="invoice-stamp-image" alt="مهر فروشنده" loading="eager" decoding="sync"><?php endif; ?></div><div class="invoice-signature"><span>مهر و امضای خریدار</span></div></footer>
 </article>

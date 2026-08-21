@@ -95,9 +95,19 @@ function zigurat_invoice_format_money($amount)
     return number_format_i18n((int) $amount) . ' ریال';
 }
 
-function zigurat_invoice_format_number($number)
+function zigurat_invoice_format_number($number, $suffix = 0)
 {
-    return str_pad((string) absint($number), 3, '0', STR_PAD_LEFT);
+    $formatted = str_pad((string) absint($number), 3, '0', STR_PAD_LEFT);
+    $suffix = absint($suffix);
+    return $suffix > 0 ? $formatted . '/' . $suffix : $formatted;
+}
+
+function zigurat_invoice_object_number($invoice)
+{
+    return zigurat_invoice_format_number(
+        $invoice->document_number ?? 0,
+        $invoice->number_suffix ?? 0
+    );
 }
 
 function zigurat_invoice_today_jalali()
@@ -127,6 +137,7 @@ function zigurat_invoice_page_url($args = array())
         'edit'  => 'invoice_edit',
         'id'    => 'invoice_id',
         'from_proforma' => 'invoice_from_proforma',
+        'branch_from' => 'invoice_branch_from',
     );
     foreach ($route_keys as $key => $invoice_key) {
         if (array_key_exists($key, $args)) {
@@ -153,12 +164,39 @@ function zigurat_invoice_get($invoice_id)
     return $invoice;
 }
 
+function zigurat_invoice_can_branch($invoice)
+{
+    if (!$invoice) {
+        return false;
+    }
+    if (empty($invoice->parent_invoice_id)) {
+        return !empty($invoice->allow_branches);
+    }
+    $root = zigurat_invoice_get($invoice->parent_invoice_id);
+    return $root && !empty($root->allow_branches);
+}
+
+function zigurat_invoice_next_branch_suffix($invoice)
+{
+    if (!$invoice) {
+        return 1;
+    }
+    global $wpdb;
+    $max_suffix = $wpdb->get_var($wpdb->prepare(
+        'SELECT MAX(number_suffix) FROM ' . zigurat_invoices_table_name() . ' WHERE brand = %s AND document_type = %s AND document_number = %d',
+        $invoice->brand,
+        $invoice->document_type,
+        $invoice->document_number
+    ));
+    return max(1, absint($max_suffix) + 1);
+}
+
 /** فاکتوری که قبلاً از یک پیش‌فاکتور ساخته شده است. */
 function zigurat_invoice_get_conversion($proforma_id)
 {
     global $wpdb;
     return $wpdb->get_row($wpdb->prepare(
-        'SELECT id, brand, document_type, document_number, source_proforma_id FROM ' . zigurat_invoices_table_name() . ' WHERE document_type = %s AND source_proforma_id = %d ORDER BY id ASC LIMIT 1',
+        'SELECT id, brand, document_type, document_number, number_suffix, source_proforma_id FROM ' . zigurat_invoices_table_name() . ' WHERE document_type = %s AND source_proforma_id = %d ORDER BY id ASC LIMIT 1',
         'invoice',
         absint($proforma_id)
     ));
@@ -225,11 +263,27 @@ function zigurat_invoice_save($data)
     $source_proforma_id = $existing
         ? absint($existing->source_proforma_id ?? 0)
         : absint($data['source_proforma_id'] ?? 0);
+    $branch_source_id = $existing ? 0 : absint($data['branch_source_id'] ?? 0);
     if (!in_array($brand, array('official','unofficial'), true) || !in_array($type, array('proforma','invoice'), true)) {
         return new WP_Error('invalid_type', 'نوع فاکتور معتبر نیست.');
     }
     if ($invoice_id && !$existing) {
         return new WP_Error('not_found', 'فاکتور پیدا نشد.');
+    }
+    if ($branch_source_id && $source_proforma_id) {
+        return new WP_Error('invalid_branch', 'یک سند هم‌زمان نمی‌تواند تبدیل و انشعاب باشد.');
+    }
+    if ($branch_source_id) {
+        $branch_source = zigurat_invoice_get($branch_source_id);
+        if (!$branch_source || $branch_source->brand !== $brand || $branch_source->document_type !== $type) {
+            return new WP_Error('invalid_branch', 'سند مبدأ انشعاب معتبر نیست.');
+        }
+        $branch_root = !empty($branch_source->parent_invoice_id)
+            ? zigurat_invoice_get($branch_source->parent_invoice_id)
+            : $branch_source;
+        if (!$branch_root || empty($branch_root->allow_branches)) {
+            return new WP_Error('branch_disabled', 'برای این سند امکان ایجاد انشعاب فعال نشده است.');
+        }
     }
     if ($source_proforma_id) {
         $source_proforma = zigurat_invoice_get($source_proforma_id);
@@ -243,7 +297,7 @@ function zigurat_invoice_save($data)
         if ($previous_conversion && (int) $previous_conversion->id !== $invoice_id) {
             return new WP_Error(
                 'already_converted',
-                'این پیش‌فاکتور قبلاً به فاکتور شماره ' . zigurat_invoice_format_number($previous_conversion->document_number) . ' تبدیل شده است.'
+                'این پیش‌فاکتور قبلاً به فاکتور شماره ' . zigurat_invoice_object_number($previous_conversion) . ' تبدیل شده است.'
             );
         }
     }
@@ -263,8 +317,16 @@ function zigurat_invoice_save($data)
     $subtotal = array_sum(wp_list_pluck($items, 'line_total'));
     $discount = min(zigurat_invoice_money($data['discount'] ?? 0), $subtotal);
     $shipping = zigurat_invoice_money($data['shipping'] ?? 0);
+    $overhead_rate = max(0, min(100, (float) zigurat_invoice_normalize_digits($data['overhead_rate'] ?? 0)));
+    $insurance_rate = $brand === 'official'
+        ? max(0, min(100, (float) zigurat_invoice_normalize_digits($data['insurance_rate'] ?? 0)))
+        : 0;
+    $base_amount = max(0, $subtotal - $discount + $shipping);
+    $overhead_amount = (int) round($base_amount * $overhead_rate / 100);
+    $amount_with_overhead = $base_amount + $overhead_amount;
+    $insurance_amount = (int) round($amount_with_overhead * $insurance_rate / 100);
     $tax_rate = max(0, min(100, (float) zigurat_invoice_normalize_digits($data['tax_rate'] ?? 0)));
-    $taxable = max(0, $subtotal - $discount + $shipping);
+    $taxable = $amount_with_overhead + $insurance_amount;
     $tax_amount = (int) round($taxable * $tax_rate / 100);
     $grand_total = $taxable + $tax_amount;
     $paid_amount = zigurat_invoice_money($data['paid_amount'] ?? 0);
@@ -278,6 +340,9 @@ function zigurat_invoice_save($data)
     $items_table = zigurat_invoice_items_table_name();
     $sequence_table = zigurat_invoice_sequences_table_name();
     $wpdb->query('START TRANSACTION');
+    $number_suffix = 0;
+    $parent_invoice_id = 0;
+    $allow_branches = !empty($data['allow_branches']) ? 1 : 0;
     if ($existing) {
         $locked = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$invoice_table} WHERE id = %d FOR UPDATE", $invoice_id));
         if (!$locked) {
@@ -285,6 +350,59 @@ function zigurat_invoice_save($data)
             return new WP_Error('not_found', 'فاکتور پیدا نشد.');
         }
         $document_number = (int) $locked->document_number;
+        $number_suffix = absint($locked->number_suffix ?? 0);
+        $parent_invoice_id = absint($locked->parent_invoice_id ?? 0);
+        $allow_branches = $parent_invoice_id ? 1 : (!empty($data['allow_branches']) ? 1 : 0);
+        if (!$parent_invoice_id && $allow_branches && $number_suffix === 0) {
+            $children = $wpdb->get_results($wpdb->prepare(
+                "SELECT id, number_suffix FROM {$invoice_table} WHERE parent_invoice_id = %d ORDER BY number_suffix DESC FOR UPDATE",
+                $invoice_id
+            ));
+            foreach ($children as $child) {
+                $shifted = $wpdb->update(
+                    $invoice_table,
+                    array('number_suffix' => absint($child->number_suffix) + 1),
+                    array('id' => absint($child->id)),
+                    array('%d'),
+                    array('%d')
+                );
+                if ($shifted === false) {
+                    $wpdb->query('ROLLBACK');
+                    return new WP_Error('database', 'شماره انشعاب‌های قبلی به‌روزرسانی نشد.');
+                }
+            }
+            $number_suffix = 1;
+        } elseif (!$parent_invoice_id && !$allow_branches && $number_suffix > 0) {
+            $children = $wpdb->get_results($wpdb->prepare(
+                "SELECT id, number_suffix FROM {$invoice_table} WHERE parent_invoice_id = %d ORDER BY number_suffix ASC FOR UPDATE",
+                $invoice_id
+            ));
+            $released = $wpdb->update(
+                $invoice_table,
+                array('number_suffix' => 0),
+                array('id' => $invoice_id),
+                array('%d'),
+                array('%d')
+            );
+            if ($released === false) {
+                $wpdb->query('ROLLBACK');
+                return new WP_Error('database', 'پسوند سند حذف نشد.');
+            }
+            foreach ($children as $child) {
+                $shifted = $wpdb->update(
+                    $invoice_table,
+                    array('number_suffix' => max(1, absint($child->number_suffix) - 1)),
+                    array('id' => absint($child->id)),
+                    array('%d'),
+                    array('%d')
+                );
+                if ($shifted === false) {
+                    $wpdb->query('ROLLBACK');
+                    return new WP_Error('database', 'شماره انشعاب‌های قبلی به‌روزرسانی نشد.');
+                }
+            }
+            $number_suffix = 0;
+        }
         $source_proforma_id = absint($locked->source_proforma_id ?? 0);
     } else {
         if ($source_proforma_id) {
@@ -302,29 +420,59 @@ function zigurat_invoice_save($data)
                 return new WP_Error('already_converted', 'این پیش‌فاکتور معتبر نیست یا قبلاً به فاکتور تبدیل شده است.');
             }
         }
-        $first_number = function_exists('zigurat_invoice_next_number') ? zigurat_invoice_next_number($brand, $type) : 1;
-        $wpdb->query($wpdb->prepare(
-            "INSERT IGNORE INTO {$sequence_table} (brand,document_type,last_number,updated_at) VALUES (%s,%s,%d,%s)",
-            $brand, $type, max(0, $first_number - 1), $now
-        ));
-        $last_number = $wpdb->get_var($wpdb->prepare(
-            "SELECT last_number FROM {$sequence_table} WHERE brand = %s AND document_type = %s FOR UPDATE",
-            $brand, $type
-        ));
-        if ($last_number === null) {
-            $wpdb->query('ROLLBACK');
-            return new WP_Error('database', 'شماره فاکتور ساخته نشد.');
-        }
-        $document_number = (int) $last_number + 1;
-        $sequence_updated = $wpdb->update($sequence_table, array('last_number'=>$document_number,'updated_at'=>$now), array('brand'=>$brand,'document_type'=>$type), array('%d','%s'), array('%s','%s'));
-        if ($sequence_updated === false) {
-            $wpdb->query('ROLLBACK');
-            return new WP_Error('database', 'شماره فاکتور ذخیره نشد.');
+        if ($branch_source_id) {
+            $locked_source = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM {$invoice_table} WHERE id = %d FOR UPDATE",
+                $branch_source_id
+            ));
+            $root_id = $locked_source ? absint($locked_source->parent_invoice_id ?: $locked_source->id) : 0;
+            $locked_root = $root_id ? $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM {$invoice_table} WHERE id = %d FOR UPDATE",
+                $root_id
+            )) : null;
+            if (!$locked_source || !$locked_root || empty($locked_root->allow_branches)
+                || $locked_root->brand !== $brand || $locked_root->document_type !== $type) {
+                $wpdb->query('ROLLBACK');
+                return new WP_Error('branch_disabled', 'امکان ایجاد انشعاب برای این سند فعال نیست.');
+            }
+            $suffixes = $wpdb->get_col($wpdb->prepare(
+                "SELECT number_suffix FROM {$invoice_table} WHERE brand = %s AND document_type = %s AND document_number = %d ORDER BY number_suffix ASC FOR UPDATE",
+                $brand,
+                $type,
+                $locked_root->document_number
+            ));
+            $document_number = (int) $locked_root->document_number;
+            $number_suffix = max(1, ($suffixes ? max(array_map('absint', $suffixes)) : 0) + 1);
+            $parent_invoice_id = $root_id;
+            $allow_branches = 1;
+        } else {
+            $first_number = function_exists('zigurat_invoice_next_number') ? zigurat_invoice_next_number($brand, $type) : 1;
+            $wpdb->query($wpdb->prepare(
+                "INSERT IGNORE INTO {$sequence_table} (brand,document_type,last_number,updated_at) VALUES (%s,%s,%d,%s)",
+                $brand, $type, max(0, $first_number - 1), $now
+            ));
+            $last_number = $wpdb->get_var($wpdb->prepare(
+                "SELECT last_number FROM {$sequence_table} WHERE brand = %s AND document_type = %s FOR UPDATE",
+                $brand, $type
+            ));
+            if ($last_number === null) {
+                $wpdb->query('ROLLBACK');
+                return new WP_Error('database', 'شماره فاکتور ساخته نشد.');
+            }
+            $document_number = (int) $last_number + 1;
+            $number_suffix = $allow_branches ? 1 : 0;
+            $sequence_updated = $wpdb->update($sequence_table, array('last_number'=>$document_number,'updated_at'=>$now), array('brand'=>$brand,'document_type'=>$type), array('%d','%s'), array('%s','%s'));
+            if ($sequence_updated === false) {
+                $wpdb->query('ROLLBACK');
+                return new WP_Error('database', 'شماره فاکتور ذخیره نشد.');
+            }
         }
     }
 
     $invoice_data = array(
         'brand'=>$brand, 'document_type'=>$type, 'document_number'=>$document_number,
+        'number_suffix'=>$number_suffix, 'parent_invoice_id'=>$parent_invoice_id,
+        'allow_branches'=>$allow_branches,
         'issue_date'=>$issue_date, 'status'=>$status,
         'subject'=>sanitize_text_field(wp_unslash((string) ($data['subject'] ?? ''))),
         'source_proforma_id'=>$source_proforma_id,
@@ -339,6 +487,8 @@ function zigurat_invoice_save($data)
         'customer_address'=>sanitize_textarea_field(wp_unslash((string) ($data['customer_address'] ?? ''))),
         'customer_phone'=>sanitize_text_field(wp_unslash((string) ($data['customer_phone'] ?? ''))),
         'subtotal'=>$subtotal, 'discount'=>$discount, 'shipping'=>$shipping,
+        'overhead_rate'=>$overhead_rate, 'overhead_amount'=>$overhead_amount,
+        'insurance_rate'=>$insurance_rate, 'insurance_amount'=>$insurance_amount,
         'tax_rate'=>$tax_rate, 'tax_amount'=>$tax_amount, 'grand_total'=>$grand_total,
         'paid_amount'=>$paid_amount, 'balance'=>$balance,
         'notes'=>sanitize_textarea_field(wp_unslash((string) ($data['notes'] ?? ''))),
@@ -386,7 +536,7 @@ function zigurat_invoice_list($args = array())
     if (in_array($args['status'], array('draft','issued'), true)) { $where[]='status=%s'; $values[]=$args['status']; }
     if ($args['search'] !== '') {
         $like = '%' . $wpdb->esc_like($args['search']) . '%';
-        $where[] = '(customer_name LIKE %s OR subject LIKE %s OR CAST(document_number AS CHAR) LIKE %s)';
+        $where[] = "(customer_name LIKE %s OR subject LIKE %s OR CONCAT(document_number, IF(number_suffix > 0, CONCAT('/', number_suffix), '')) LIKE %s)";
         array_push($values, $like, $like, $like);
     }
     $table = zigurat_invoices_table_name();
@@ -396,7 +546,7 @@ function zigurat_invoice_list($args = array())
     $per_page = max(1, min(100, absint($args['per_page'])));
     $page = max(1, absint($args['page']));
     $offset = ($page - 1) * $per_page;
-    $sql = "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY id DESC LIMIT %d OFFSET %d";
+    $sql = "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY COALESCE(NULLIF(parent_invoice_id,0),id) DESC, number_suffix DESC, id DESC LIMIT %d OFFSET %d";
     return array(
         'items'=>$wpdb->get_results($wpdb->prepare($sql, array_merge($values, array($per_page,$offset)))),
         'total'=>$total, 'pages'=>max(1,(int)ceil($total/$per_page)), 'page'=>$page,

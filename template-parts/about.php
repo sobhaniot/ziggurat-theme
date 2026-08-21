@@ -23,9 +23,12 @@ if (empty($excerpt)) {
                 if (has_post_thumbnail($about->ID)) {
                     echo get_the_post_thumbnail(
                         $about->ID,
-                        'large',
+                        zigurat_attachment_size_or_fallback(get_post_thumbnail_id($about->ID), 'zigurat-about-image'),
                         array(
-                            'loading' => 'lazy'
+                            'loading'       => 'lazy',
+                            'decoding'      => 'async',
+                            'fetchpriority' => 'low',
+                            'sizes'         => '(max-width: 900px) calc(100vw - 40px), 50vw',
                         )
                     );
                 }

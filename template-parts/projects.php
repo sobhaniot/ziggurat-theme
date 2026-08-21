@@ -17,6 +17,7 @@
                 'post_status'    => 'publish',
                 'post__in'       => $home_project_ids ?: array(0),
                 'orderby'        => 'post__in',
+                'no_found_rows'  => true,
             ));
             if ($projects->have_posts()) :
                 while ($projects->have_posts()) :
@@ -27,8 +28,15 @@
                             <div class="project-image">
                                 <?php
                                 if (has_post_thumbnail()) {
+                                    $project_thumbnail_id = get_post_thumbnail_id();
                                     the_post_thumbnail(
-                                        'large'
+                                        zigurat_attachment_size_or_fallback($project_thumbnail_id, 'zigurat-project-card'),
+                                        array(
+                                            'loading'       => 'lazy',
+                                            'decoding'      => 'async',
+                                            'fetchpriority' => 'low',
+                                            'sizes'         => '(max-width: 600px) calc(100vw - 40px), (max-width: 900px) calc(50vw - 45px), calc(25vw - 38px)',
+                                        )
                                     );
                                 }
                                 ?>

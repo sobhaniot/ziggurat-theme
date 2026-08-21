@@ -7,6 +7,9 @@ if (!defined('ABSPATH')) {
 }
 
 $login_error = '';
+$manager_section = isset($_REQUEST['manager-section']) && is_string($_REQUEST['manager-section'])
+    ? sanitize_key(wp_unslash($_REQUEST['manager-section']))
+    : '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['zigurat_manager_login'])) {
     $remote_address = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : 'unknown';
@@ -42,6 +45,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['zigurat_manager_login
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['zigurat_save_lightbox_rates']) && zigurat_is_manager()) {
+    $pricing_nonce = isset($_POST['zigurat_pricing_nonce'])
+        ? sanitize_text_field(wp_unslash($_POST['zigurat_pricing_nonce']))
+        : '';
+    $pricing_status = 'invalid';
+    if (wp_verify_nonce($pricing_nonce, 'zigurat_save_lightbox_rates')) {
+        $pricing_result = zigurat_save_lightbox_pricing_settings($_POST);
+        $pricing_status = is_wp_error($pricing_result) ? $pricing_result->get_error_code() : 'saved';
+    }
+    wp_safe_redirect(add_query_arg(array(
+        'manager-section' => 'pricing',
+        'calculator' => 'lightbox',
+        'pricing-status' => sanitize_key($pricing_status),
+    ), zigurat_manager_login_url()));
+    exit;
+}
+
 get_header();
 ?>
 <main class="manager-area">
@@ -69,15 +89,14 @@ get_header();
                     </div>
                 </div>
                 <?php
-                $manager_section = isset($_GET['manager-section']) && is_string($_GET['manager-section'])
-                    ? sanitize_key(wp_unslash($_GET['manager-section']))
-                    : '';
                 if ($manager_section === 'applications') {
                     get_template_part('template-parts/manager-applications');
                 } elseif ($manager_section === 'application-detail') {
                     get_template_part('template-parts/manager-application-resume');
                 } elseif ($manager_section === 'views') {
                     get_template_part('template-parts/manager-views');
+                } elseif ($manager_section === 'pricing') {
+                    get_template_part('template-parts/manager-pricing');
                 } else {
                     get_template_part('page-main');
                 }

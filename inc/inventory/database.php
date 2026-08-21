@@ -43,13 +43,9 @@ function zigurat_install_inventory_tables()
     $products_table = zigurat_inventory_products_table_name();
     $schema_version = '5';
 
-    if (
-        get_option('zigurat_inventory_schema_version') === $schema_version
-        && zigurat_inventory_table_exists($inventory_table)
-        && zigurat_inventory_table_exists($transactions_table)
-        && zigurat_inventory_table_exists($categories_table)
-        && zigurat_inventory_table_exists($products_table)
-    ) {
+    // نسخه جدول‌ها فقط هنگام تغییر ساختار بررسی می‌شود؛ اجرای چهار SHOW TABLES
+    // در تمام بازدیدهای سایت، حتی صفحات عمومی، زمان پاسخ را بی‌دلیل افزایش می‌داد.
+    if (get_option('zigurat_inventory_schema_version') === $schema_version) {
         return;
     }
 

@@ -253,7 +253,7 @@ function zigurat_invoice_export_rows($args)
     $search = (string) ($args['search'] ?? '');
     if ($search !== '') {
         $like = '%' . $wpdb->esc_like($search) . '%';
-        $where[] = '(customer_name LIKE %s OR subject LIKE %s OR CAST(document_number AS CHAR) LIKE %s)';
+        $where[] = "(customer_name LIKE %s OR subject LIKE %s OR CONCAT(document_number, IF(number_suffix > 0, CONCAT('/', number_suffix), '')) LIKE %s)";
         array_push($values, $like, $like, $like);
     }
     $sql = 'SELECT * FROM ' . zigurat_invoices_table_name() . ' WHERE ' . implode(' AND ', $where) . ' ORDER BY id DESC LIMIT 10000';
@@ -267,13 +267,13 @@ function zigurat_invoice_build_xlsx($args)
     }
 
     $rows = zigurat_invoice_export_rows($args);
-    $headers = array('نوع مجموعه', 'نوع سند', 'شماره', 'تاریخ', 'وضعیت', 'موضوع', 'خریدار', 'شناسه/ثبت', 'شماره اقتصادی', 'استان', 'شهر', 'تلفن', 'جمع اقلام', 'تخفیف', 'حمل', 'مالیات', 'جمع کل', 'پرداختی', 'مانده');
+    $headers = array('نوع مجموعه', 'نوع سند', 'شماره', 'تاریخ', 'وضعیت', 'موضوع', 'خریدار', 'شناسه/ثبت', 'شماره اقتصادی', 'استان', 'شهر', 'تلفن', 'جمع اقلام', 'تخفیف', 'حمل', 'ضریب بالاسری/سود (%)', 'مبلغ بالاسری/سود', 'ضریب بیمه (%)', 'مبلغ بیمه', 'مالیات', 'جمع کل', 'پرداختی', 'مانده');
     $sheet_rows = array($headers);
     foreach ($rows as $row) {
         $sheet_rows[] = array(
             $row->brand === 'official' ? 'زیگورات (رسمی)' : 'فروشگاه دیاموند (غیررسمی)',
             zigurat_invoice_document_label($row->document_type),
-            zigurat_invoice_format_number($row->document_number),
+            zigurat_invoice_object_number($row),
             $row->issue_date,
             zigurat_invoice_status_label($row->status),
             $row->subject,
@@ -286,6 +286,10 @@ function zigurat_invoice_build_xlsx($args)
             (int) $row->subtotal,
             (int) $row->discount,
             (int) $row->shipping,
+            (float) ($row->overhead_rate ?? 0),
+            (int) ($row->overhead_amount ?? 0),
+            (float) ($row->insurance_rate ?? 0),
+            (int) ($row->insurance_amount ?? 0),
             (int) $row->tax_amount,
             (int) $row->grand_total,
             (int) $row->paid_amount,
@@ -293,7 +297,7 @@ function zigurat_invoice_build_xlsx($args)
         );
     }
 
-    $numeric_columns = array(12, 13, 14, 15, 16, 17, 18);
+    $numeric_columns = range(12, 22);
     $sheet_data = '';
     foreach ($sheet_rows as $row_index => $cells) {
         $excel_row = $row_index + 1;

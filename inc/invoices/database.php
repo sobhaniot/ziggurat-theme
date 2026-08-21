@@ -24,14 +24,13 @@ function zigurat_invoice_sequences_table_name()
 function zigurat_install_invoice_tables()
 {
     global $wpdb;
-    $version = '2';
+    $version = '5';
     $invoices = zigurat_invoices_table_name();
     $items = zigurat_invoice_items_table_name();
     $sequences = zigurat_invoice_sequences_table_name();
-    if (get_option('zigurat_invoice_schema_version') === $version
-        && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $invoices)) === $invoices
-        && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $items)) === $items
-        && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $sequences)) === $sequences) {
+    // در حالت عادی نسخه ذخیره‌شده کافی است. بررسی سه جدول در هر درخواست
+    // باعث کندشدن همه صفحات، حتی برای بازدیدکنندگان عمومی، می‌شد.
+    if (get_option('zigurat_invoice_schema_version') === $version) {
         return;
     }
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -41,6 +40,9 @@ function zigurat_install_invoice_tables()
         brand varchar(20) NOT NULL,
         document_type varchar(20) NOT NULL,
         document_number bigint(20) unsigned NOT NULL,
+        number_suffix smallint(5) unsigned NOT NULL DEFAULT 0,
+        parent_invoice_id bigint(20) unsigned NOT NULL DEFAULT 0,
+        allow_branches tinyint(1) unsigned NOT NULL DEFAULT 0,
         issue_date varchar(10) NOT NULL,
         status varchar(20) NOT NULL DEFAULT 'issued',
         subject varchar(191) NOT NULL DEFAULT '',
@@ -58,6 +60,10 @@ function zigurat_install_invoice_tables()
         subtotal bigint(20) unsigned NOT NULL DEFAULT 0,
         discount bigint(20) unsigned NOT NULL DEFAULT 0,
         shipping bigint(20) unsigned NOT NULL DEFAULT 0,
+        overhead_rate decimal(5,2) NOT NULL DEFAULT 0,
+        overhead_amount bigint(20) unsigned NOT NULL DEFAULT 0,
+        insurance_rate decimal(5,2) NOT NULL DEFAULT 0,
+        insurance_amount bigint(20) unsigned NOT NULL DEFAULT 0,
         tax_rate decimal(5,2) NOT NULL DEFAULT 0,
         tax_amount bigint(20) unsigned NOT NULL DEFAULT 0,
         grand_total bigint(20) unsigned NOT NULL DEFAULT 0,
@@ -70,11 +76,12 @@ function zigurat_install_invoice_tables()
         created_at datetime NOT NULL,
         updated_at datetime NOT NULL,
         PRIMARY KEY  (id),
-        UNIQUE KEY brand_type_number (brand,document_type,document_number),
+        UNIQUE KEY brand_type_number_suffix (brand,document_type,document_number,number_suffix),
         KEY brand (brand),
         KEY document_type (document_type),
         KEY status (status),
         KEY source_proforma_id (source_proforma_id),
+        KEY parent_invoice_id (parent_invoice_id),
         KEY issue_date (issue_date),
         KEY customer_name (customer_name(100))
     ) {$charset};");
@@ -99,9 +106,20 @@ function zigurat_install_invoice_tables()
         updated_at datetime NOT NULL,
         PRIMARY KEY  (brand,document_type)
     ) {$charset};");
+    if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $invoices)) === $invoices) {
+        $old_number_index = $wpdb->get_var("SHOW INDEX FROM {$invoices} WHERE Key_name = 'brand_type_number'");
+        if ($old_number_index) {
+            $wpdb->query("ALTER TABLE {$invoices} DROP INDEX brand_type_number");
+        }
+        $new_number_index = $wpdb->get_var("SHOW INDEX FROM {$invoices} WHERE Key_name = 'brand_type_number_suffix'");
+        if (!$new_number_index) {
+            $wpdb->query("ALTER TABLE {$invoices} ADD UNIQUE KEY brand_type_number_suffix (brand,document_type,document_number,number_suffix)");
+        }
+    }
     if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $invoices)) === $invoices
         && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $items)) === $items
-        && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $sequences)) === $sequences) {
+        && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $sequences)) === $sequences
+        && $wpdb->get_var("SHOW INDEX FROM {$invoices} WHERE Key_name = 'brand_type_number_suffix'")) {
         update_option('zigurat_invoice_schema_version', $version, false);
     }
 }

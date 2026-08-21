@@ -3,7 +3,8 @@ $query = new WP_Query(array(
     'post_type' => 'brand',
     'posts_per_page' => -1,
     'orderby' => 'menu_order',
-    'order' => 'ASC'
+    'order' => 'ASC',
+    'no_found_rows' => true,
 ));
 ?>
 <section class="clients">
@@ -32,9 +33,12 @@ $query = new WP_Query(array(
                                 rel="noopener noreferrer">
                             <?php endif; ?>
                             <?php the_post_thumbnail(
-                                'medium',
+                                zigurat_attachment_size_or_fallback(get_post_thumbnail_id(), 'zigurat-brand-card', 'medium'),
                                 array(
-                                    'loading' => 'lazy'
+                                    'loading'       => 'lazy',
+                                    'decoding'      => 'async',
+                                    'fetchpriority' => 'low',
+                                    'sizes'         => '(max-width: 600px) calc(50vw - 35px), 220px',
                                 )
                             ); ?>
                             <span>

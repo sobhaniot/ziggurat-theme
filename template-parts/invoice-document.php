@@ -20,7 +20,7 @@ $stamp_url = $stamp_id ? wp_get_attachment_image_url($stamp_id, 'full') : '';
             <strong><?php echo esc_html($brand_title); ?></strong>
         </div>
         <h1><?php echo esc_html(zigurat_invoice_document_label($invoice->document_type)); ?></h1>
-        <dl><div><dt>شماره سریال:</dt><dd><?php echo esc_html(zigurat_invoice_format_number($invoice->document_number)); ?></dd></div><div><dt>تاریخ:</dt><dd><?php echo esc_html($invoice->issue_date); ?></dd></div></dl>
+        <dl><div><dt>شماره سریال:</dt><dd><bdi class="invoice-number" dir="ltr"><?php echo esc_html(zigurat_invoice_object_number($invoice)); ?></bdi></dd></div><div><dt>تاریخ:</dt><dd><?php echo esc_html($invoice->issue_date); ?></dd></div></dl>
     </header>
 
     <section class="invoice-party">
@@ -68,6 +68,8 @@ $stamp_url = $stamp_id ? wp_get_attachment_image_url($stamp_id, 'full') : '';
             <div><dt>جمع اقلام:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->subtotal)); ?></dd></div>
             <div><dt>تخفیف:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->discount)); ?></dd></div>
             <div><dt>هزینه حمل و بسته‌بندی:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->shipping)); ?></dd></div>
+            <div><dt>بالاسری/سود پیمانکار <?php echo esc_html(rtrim(rtrim(number_format((float) ($invoice->overhead_rate ?? 0), 2, '.', ''), '0'), '.')); ?>٪:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->overhead_amount ?? 0)); ?></dd></div>
+            <?php if ($invoice->brand === 'official'): ?><div><dt>بیمه <?php echo esc_html(rtrim(rtrim(number_format((float) ($invoice->insurance_rate ?? 0), 2, '.', ''), '0'), '.')); ?>٪:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->insurance_amount ?? 0)); ?></dd></div><?php endif; ?>
             <div><dt>مالیات ارزش افزوده <?php echo esc_html(rtrim(rtrim(number_format((float) $invoice->tax_rate, 2, '.', ''), '0'), '.')); ?>٪:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->tax_amount)); ?></dd></div>
             <div class="is-grand"><dt>جمع کل:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->grand_total)); ?></dd></div>
             <div><dt>پرداختی:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->paid_amount)); ?></dd></div>

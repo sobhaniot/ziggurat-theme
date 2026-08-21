@@ -10,7 +10,7 @@ $phone_url = preg_replace('/[^0-9+]/', '', $contact_details['phone']);
                 <div class="footer-logo">
                     <?php
                     if (has_custom_logo()) {
-                        the_custom_logo();
+                        zigurat_site_logo('lazy');
                     } else {
                         echo get_bloginfo('name');
                     }

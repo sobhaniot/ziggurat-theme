@@ -4,6 +4,7 @@
   var config = window.ziguratPanelAjaxConfig || {};
   var rootSelectors = ['main.invoice-admin-page', 'main.inventory-page'];
   var requestController = null;
+  var restoringHistory = false;
 
   function currentRoot() {
     return document.querySelector(rootSelectors.join(','));
@@ -166,8 +167,22 @@
   });
 
   window.addEventListener('popstate', function () {
+    if (restoringHistory) {
+      restoringHistory = false;
+      return;
+    }
     var root = currentRoot();
     var url = new URL(window.location.href);
-    if (isPanelUrl(url, root)) loadPanel(url.href, { method: 'GET', historyMode: 'none', focus: false });
+    if (!isPanelUrl(url, root)) return;
+    var navigationEvent = new CustomEvent('zigurat:panel-before-navigate', {
+      cancelable: true,
+      detail: { url: url.href, reason: 'history' }
+    });
+    if (!document.dispatchEvent(navigationEvent)) {
+      restoringHistory = true;
+      window.history.forward();
+      return;
+    }
+    loadPanel(url.href, { method: 'GET', historyMode: 'none', focus: false });
   });
 }());

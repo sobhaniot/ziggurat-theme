@@ -15,6 +15,10 @@ function zigurat_theme_setup()
     ));
     // تصویر شاخص
     add_theme_support('post-thumbnails');
+    add_image_size('zigurat-project-card', 720, 560, true);
+    add_image_size('zigurat-article-card', 720, 450, true);
+    add_image_size('zigurat-about-image', 900, 720, false);
+    add_image_size('zigurat-brand-card', 360, 240, false);
     // HTML5
     add_theme_support('html5', array(
         'search-form',

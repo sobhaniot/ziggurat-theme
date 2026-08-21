@@ -13,7 +13,9 @@
             $latest_posts = new WP_Query(array(
                 'post_type' => 'article',
                 'posts_per_page' => 3,
-                'post_status'    => 'publish'
+                'post_status'    => 'publish',
+                'ignore_sticky_posts' => true,
+                'no_found_rows'  => true,
             ));
             if ($latest_posts->have_posts()) :
                 while ($latest_posts->have_posts()) :
@@ -24,8 +26,15 @@
                             <div class="post-image">
                                 <a href="<?php the_permalink(); ?>">
                                     <?php
+                                    $article_thumbnail_id = get_post_thumbnail_id();
                                     the_post_thumbnail(
-                                        'medium_large'
+                                        zigurat_attachment_size_or_fallback($article_thumbnail_id, 'zigurat-article-card'),
+                                        array(
+                                            'loading'       => 'lazy',
+                                            'decoding'      => 'async',
+                                            'fetchpriority' => 'low',
+                                            'sizes'         => '(max-width: 600px) calc(100vw - 40px), (max-width: 900px) calc(50vw - 45px), calc(33vw - 40px)',
+                                        )
                                     );
                                     ?>
                                 </a>

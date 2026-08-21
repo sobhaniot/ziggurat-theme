@@ -14,7 +14,7 @@
             <!-- لوگو -->
             <div class="logo">
                 <?php if (has_custom_logo()) : ?>
-                    <?php the_custom_logo(); ?>
+                    <?php zigurat_site_logo('eager'); ?>
                 <?php else : ?>
                     <a href="<?php echo esc_url(home_url('/')); ?>" rel="home" aria-label="<?php echo esc_attr(get_bloginfo('name')); ?>">
                         <span>ZIGGURAT</span>

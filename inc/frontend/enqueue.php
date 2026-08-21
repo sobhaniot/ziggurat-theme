@@ -22,16 +22,17 @@ function zigurat_enqueue_theme_script($name, $dependencies = array())
 
 function zigurat_enqueue_assets()
 {
-    zigurat_enqueue_theme_style('main', array());
-    zigurat_enqueue_theme_style('header');
-    zigurat_enqueue_theme_style('footer');
-    zigurat_enqueue_theme_style('responsive');
+    if (is_front_page()) {
+        zigurat_enqueue_theme_style('front-page', array());
+    } else {
+        zigurat_enqueue_theme_style('main', array());
+        zigurat_enqueue_theme_style('header');
+        zigurat_enqueue_theme_style('footer');
+        zigurat_enqueue_theme_style('responsive');
+    }
     zigurat_enqueue_theme_script('header');
 
     if (is_front_page()) {
-        foreach (array('hero', 'about', 'services', 'projects', 'latest-posts', 'clients') as $style) {
-            zigurat_enqueue_theme_style($style);
-        }
         zigurat_enqueue_theme_script('about-counter');
     }
 
@@ -52,6 +53,7 @@ function zigurat_enqueue_assets()
     if (is_page('login') || is_page_template('page-login.php')) {
         zigurat_enqueue_theme_style('manager');
         zigurat_enqueue_theme_script('manager-login');
+        zigurat_enqueue_theme_script('pricing-calculator');
     }
 
     if (is_post_type_archive('article')) {
@@ -88,10 +90,16 @@ function zigurat_enqueue_assets()
         zigurat_enqueue_theme_style('invoice');
         zigurat_enqueue_theme_style('panel-ajax');
         zigurat_enqueue_theme_script('invoice');
-        zigurat_enqueue_theme_script('panel-ajax', array('zigurat-invoice'));
+        zigurat_enqueue_theme_script('invoice-calculator', array('zigurat-invoice'));
+        zigurat_enqueue_theme_script('panel-ajax', array('zigurat-invoice', 'zigurat-invoice-calculator'));
         wp_localize_script('zigurat-invoice', 'ziguratInvoiceConfig', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'customerNonce' => wp_create_nonce('zigurat_invoice_customer_lookup'),
+            'managerName' => (static function () {
+                $user = wp_get_current_user();
+                $name = trim((string) $user->display_name);
+                return $name !== '' ? $name : (string) $user->user_login;
+            })(),
         ));
         wp_localize_script('zigurat-panel-ajax', 'ziguratPanelAjaxConfig', array(
             'paths' => array((string) wp_parse_url(zigurat_invoice_page_url(), PHP_URL_PATH)),

@@ -67,12 +67,23 @@
   });
 
   function setupInvoiceListAutoFilters(root) {
-    (root || document).querySelectorAll('.invoice-list-filters select[name="filter_type"], .invoice-list-filters select[name="filter_status"]').forEach(function (select) {
+    (root || document).querySelectorAll('.invoice-list-filters select[name="filter_type"], .invoice-list-filters select[name="filter_status"], .invoice-list-filters select[name="tax_year"]').forEach(function (select) {
       if (select.dataset.autoFilterReady === '1') return;
       select.dataset.autoFilterReady = '1';
       select.addEventListener('change', function () {
         var form = select.form;
         if (!form) return;
+        var typeSelect = form.querySelector('select[name="filter_type"]');
+        var yearSelect = form.querySelector('select[name="tax_year"]');
+        var quarterInput = form.querySelector('input[name="tax_quarter"]');
+        if (select.name === 'filter_type' && select.value !== 'invoice') {
+          if (yearSelect) yearSelect.value = '0';
+          if (quarterInput) quarterInput.value = '0';
+        }
+        if (select.name === 'tax_year') {
+          if (select.value !== '0' && typeSelect) typeSelect.value = 'invoice';
+          if (quarterInput) quarterInput.value = '0';
+        }
         if (typeof form.requestSubmit === 'function') {
           form.requestSubmit();
         } else {
@@ -383,7 +394,7 @@
     var tax = Math.round(taxable * taxRate / 100);
     var grand = taxable + tax;
     var balance = Math.max(0, grand - money(editor.querySelector('[name="paid_amount"]')));
-    editor.querySelector('[data-subtotal]').textContent = format(subtotal);
+    editor.querySelector('[data-subtotal]').textContent = format(baseAmount);
     var overheadOutput = editor.querySelector('[data-overhead]');
     var insuranceOutput = editor.querySelector('[data-insurance]');
     if (overheadOutput) overheadOutput.textContent = format(overhead);

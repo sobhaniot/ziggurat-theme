@@ -120,6 +120,81 @@ function zigurat_invoice_today_jalali()
     return $tehran->format('Y/m/d');
 }
 
+function zigurat_invoice_tax_period($brand, $type, $issue_date)
+{
+    if ($brand !== 'official' || $type !== 'invoice') {
+        return array('year'=>0, 'quarter'=>0);
+    }
+    $issue_date = zigurat_invoice_normalize_digits($issue_date);
+    if (!preg_match('/^(\d{4})\/(\d{2})\/\d{2}$/', $issue_date, $matches)) {
+        return array('year'=>0, 'quarter'=>0);
+    }
+    $month = (int) $matches[2];
+    if ($month < 1 || $month > 12) {
+        return array('year'=>0, 'quarter'=>0);
+    }
+    return array(
+        'year'=>(int) $matches[1],
+        'quarter'=>(int) ceil($month / 3),
+    );
+}
+
+function zigurat_invoice_tax_quarter_label($quarter)
+{
+    $labels = array(1=>'بهار', 2=>'تابستان', 3=>'پاییز', 4=>'زمستان');
+    return $labels[absint($quarter)] ?? 'نامشخص';
+}
+
+function zigurat_invoice_tax_years()
+{
+    global $wpdb;
+    $years = array_map('absint', $wpdb->get_col(
+        "SELECT DISTINCT tax_year FROM " . zigurat_invoices_table_name() . "
+         WHERE brand='official' AND document_type='invoice' AND tax_year > 0
+         ORDER BY tax_year DESC"
+    ));
+    $current_year = (int) substr(zigurat_invoice_today_jalali(), 0, 4);
+    if ($current_year > 0 && !in_array($current_year, $years, true)) {
+        array_unshift($years, $current_year);
+    }
+    rsort($years, SORT_NUMERIC);
+    return $years;
+}
+
+function zigurat_invoice_tax_summary($year)
+{
+    global $wpdb;
+    $summary = array();
+    for ($quarter = 1; $quarter <= 4; $quarter++) {
+        $summary[$quarter] = (object) array(
+            'tax_quarter'=>$quarter,
+            'invoice_count'=>0,
+            'grand_total'=>0,
+            'tax_amount'=>0,
+            'paid_amount'=>0,
+            'balance'=>0,
+        );
+    }
+    $year = absint($year);
+    if (!$year) {
+        return $summary;
+    }
+    $rows = $wpdb->get_results($wpdb->prepare(
+        "SELECT tax_quarter, COUNT(*) invoice_count,
+                SUM(grand_total) grand_total, SUM(tax_amount) tax_amount,
+                SUM(paid_amount) paid_amount, SUM(balance) balance
+         FROM " . zigurat_invoices_table_name() . "
+         WHERE brand='official' AND document_type='invoice' AND status='issued'
+           AND tax_year=%d AND tax_quarter BETWEEN 1 AND 4
+         GROUP BY tax_quarter",
+        $year
+    ));
+    foreach ($rows as $row) {
+        $summary[(int) $row->tax_quarter] = $row;
+    }
+    return $summary;
+}
+
 function zigurat_invoice_page_url($args = array())
 {
     $page = get_page_by_path('invoices');
@@ -314,6 +389,7 @@ function zigurat_invoice_save($data)
         return new WP_Error('invalid_date', 'تاریخ را به‌شکل ۱۴۰۵/۰۵/۱۲ وارد کنید.');
     }
     $status = ($data['status'] ?? '') === 'draft' ? 'draft' : 'issued';
+    $tax_period = zigurat_invoice_tax_period($brand, $type, $issue_date);
     $subtotal = array_sum(wp_list_pluck($items, 'line_total'));
     $discount = min(zigurat_invoice_money($data['discount'] ?? 0), $subtotal);
     $shipping = zigurat_invoice_money($data['shipping'] ?? 0);
@@ -473,7 +549,8 @@ function zigurat_invoice_save($data)
         'brand'=>$brand, 'document_type'=>$type, 'document_number'=>$document_number,
         'number_suffix'=>$number_suffix, 'parent_invoice_id'=>$parent_invoice_id,
         'allow_branches'=>$allow_branches,
-        'issue_date'=>$issue_date, 'status'=>$status,
+        'issue_date'=>$issue_date, 'tax_year'=>$tax_period['year'],
+        'tax_quarter'=>$tax_period['quarter'], 'status'=>$status,
         'subject'=>sanitize_text_field(wp_unslash((string) ($data['subject'] ?? ''))),
         'source_proforma_id'=>$source_proforma_id,
         'seller_json'=>wp_json_encode($seller, JSON_UNESCAPED_UNICODE),
@@ -528,12 +605,14 @@ function zigurat_invoice_save($data)
 function zigurat_invoice_list($args = array())
 {
     global $wpdb;
-    $args = wp_parse_args($args, array('brand'=>'','type'=>'','status'=>'','search'=>'','page'=>1,'per_page'=>30));
+    $args = wp_parse_args($args, array('brand'=>'','type'=>'','status'=>'','search'=>'','tax_year'=>0,'tax_quarter'=>0,'page'=>1,'per_page'=>30));
     $where = array('1=1');
     $values = array();
     if (in_array($args['brand'], array('official','unofficial'), true)) { $where[]='brand=%s'; $values[]=$args['brand']; }
     if (in_array($args['type'], array('invoice','proforma'), true)) { $where[]='document_type=%s'; $values[]=$args['type']; }
     if (in_array($args['status'], array('draft','issued'), true)) { $where[]='status=%s'; $values[]=$args['status']; }
+    if (absint($args['tax_year'])) { $where[]='tax_year=%d'; $values[]=absint($args['tax_year']); }
+    if (absint($args['tax_quarter']) >= 1 && absint($args['tax_quarter']) <= 4) { $where[]='tax_quarter=%d'; $values[]=absint($args['tax_quarter']); }
     if ($args['search'] !== '') {
         $like = '%' . $wpdb->esc_like($args['search']) . '%';
         $where[] = "(customer_name LIKE %s OR subject LIKE %s OR CONCAT(document_number, IF(number_suffix > 0, CONCAT('/', number_suffix), '')) LIKE %s)";

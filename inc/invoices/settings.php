@@ -250,6 +250,16 @@ function zigurat_invoice_export_rows($args)
         $where[] = 'status = %s';
         $values[] = $args['status'];
     }
+    $tax_year = absint($args['tax_year'] ?? 0);
+    $tax_quarter = absint($args['tax_quarter'] ?? 0);
+    if ($tax_year > 0) {
+        $where[] = 'tax_year = %d';
+        $values[] = $tax_year;
+    }
+    if ($tax_quarter >= 1 && $tax_quarter <= 4) {
+        $where[] = 'tax_quarter = %d';
+        $values[] = $tax_quarter;
+    }
     $search = (string) ($args['search'] ?? '');
     if ($search !== '') {
         $like = '%' . $wpdb->esc_like($search) . '%';
@@ -267,7 +277,7 @@ function zigurat_invoice_build_xlsx($args)
     }
 
     $rows = zigurat_invoice_export_rows($args);
-    $headers = array('نوع مجموعه', 'نوع سند', 'شماره', 'تاریخ', 'وضعیت', 'موضوع', 'خریدار', 'شناسه/ثبت', 'شماره اقتصادی', 'استان', 'شهر', 'تلفن', 'جمع اقلام', 'تخفیف', 'حمل', 'ضریب بالاسری/سود (%)', 'مبلغ بالاسری/سود', 'ضریب بیمه (%)', 'مبلغ بیمه', 'مالیات', 'جمع کل', 'پرداختی', 'مانده');
+    $headers = array('نوع مجموعه', 'نوع سند', 'شماره', 'تاریخ', 'سال مالیاتی', 'فصل مالیاتی', 'وضعیت', 'موضوع', 'خریدار', 'شناسه/ثبت', 'شماره اقتصادی', 'استان', 'شهر', 'تلفن', 'جمع اقلام', 'تخفیف', 'حمل', 'ضریب بالاسری/سود (%)', 'مبلغ بالاسری/سود', 'ضریب بیمه (%)', 'مبلغ بیمه', 'مالیات', 'جمع کل', 'پرداختی', 'مانده');
     $sheet_rows = array($headers);
     foreach ($rows as $row) {
         $sheet_rows[] = array(
@@ -275,6 +285,8 @@ function zigurat_invoice_build_xlsx($args)
             zigurat_invoice_document_label($row->document_type),
             zigurat_invoice_object_number($row),
             $row->issue_date,
+            !empty($row->tax_year) ? (int) $row->tax_year : '',
+            !empty($row->tax_quarter) ? zigurat_invoice_tax_quarter_label($row->tax_quarter) : '',
             zigurat_invoice_status_label($row->status),
             $row->subject,
             $row->customer_name,
@@ -297,7 +309,7 @@ function zigurat_invoice_build_xlsx($args)
         );
     }
 
-    $numeric_columns = range(12, 22);
+    $numeric_columns = range(14, 24);
     $sheet_data = '';
     foreach ($sheet_rows as $row_index => $cells) {
         $excel_row = $row_index + 1;
@@ -319,11 +331,11 @@ function zigurat_invoice_build_xlsx($args)
         . '<sheetViews><sheetView workbookViewId="0" rightToLeft="1"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
         . '<sheetFormatPr defaultRowHeight="20"/><cols>'
         . '<col min="1" max="1" width="22" customWidth="1"/><col min="2" max="2" width="24" customWidth="1"/>'
-        . '<col min="3" max="5" width="14" customWidth="1"/><col min="6" max="6" width="30" customWidth="1"/>'
-        . '<col min="7" max="7" width="24" customWidth="1"/><col min="8" max="9" width="18" customWidth="1"/>'
-        . '<col min="10" max="12" width="16" customWidth="1"/><col min="13" max="19" width="16" customWidth="1"/>'
+        . '<col min="3" max="7" width="14" customWidth="1"/><col min="8" max="8" width="30" customWidth="1"/>'
+        . '<col min="9" max="9" width="24" customWidth="1"/><col min="10" max="11" width="18" customWidth="1"/>'
+        . '<col min="12" max="14" width="16" customWidth="1"/><col min="15" max="25" width="16" customWidth="1"/>'
         . '</cols><sheetData>' . $sheet_data . '</sheetData>'
-        . '<autoFilter ref="A1:S' . max(1, count($sheet_rows)) . '"/><pageSetup orientation="landscape"/></worksheet>';
+        . '<autoFilter ref="A1:Y' . max(1, count($sheet_rows)) . '"/><pageSetup orientation="landscape"/></worksheet>';
     $workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView rightToLeft="1"/></bookViews><sheets><sheet name="فاکتورها" sheetId="1" r:id="rId1"/></sheets></workbook>';
     $styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2D2D2D"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>';
 
@@ -356,7 +368,14 @@ function zigurat_invoice_download_xlsx($args)
         wp_die(esc_html($temp->get_error_message()), 'خطا', array('response' => 500));
     }
 
-    $filename = 'zigurat-invoices-' . wp_date('Ymd-His') . '.xlsx';
+    $period = '';
+    if (!empty($args['tax_year'])) {
+        $period .= '-' . absint($args['tax_year']);
+        if (!empty($args['tax_quarter'])) {
+            $period .= '-q' . absint($args['tax_quarter']);
+        }
+    }
+    $filename = 'zigurat-invoices' . $period . '-' . wp_date('Ymd-His') . '.xlsx';
     nocache_headers();
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     header('Content-Disposition: attachment; filename="' . $filename . '"');

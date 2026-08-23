@@ -64,9 +64,34 @@
     container.insertBefore(notice, container.firstChild);
   }
 
+  function syncStylesheets(parsed, finalUrl) {
+    var currentLinks = Array.prototype.slice.call(document.querySelectorAll('link[rel~="stylesheet"][href]'));
+    parsed.querySelectorAll('link[rel~="stylesheet"][href]').forEach(function (source) {
+      var nextHref;
+      try { nextHref = new URL(source.getAttribute('href'), finalUrl).href; } catch (error) { return; }
+      if (currentLinks.some(function (link) { return link.href === nextHref; })) return;
+
+      var nextPath;
+      try { nextPath = new URL(nextHref).pathname; } catch (error) { return; }
+      var staleLinks = currentLinks.filter(function (link) {
+        try { return new URL(link.href).pathname === nextPath; } catch (error) { return false; }
+      });
+      var replacement = document.createElement('link');
+      Array.prototype.slice.call(source.attributes).forEach(function (attribute) {
+        replacement.setAttribute(attribute.name, attribute.name === 'href' ? nextHref : attribute.value);
+      });
+      replacement.addEventListener('load', function () {
+        staleLinks.forEach(function (link) { if (link.parentNode) link.parentNode.removeChild(link); });
+      }, { once: true });
+      document.head.appendChild(replacement);
+      currentLinks.push(replacement);
+    });
+  }
+
   function updatePage(parsed, newRoot, finalUrl, historyMode, shouldFocus) {
     var oldRoot = currentRoot();
     if (!oldRoot) return false;
+    syncStylesheets(parsed, finalUrl);
     oldRoot.replaceWith(document.importNode(newRoot, true));
     if (parsed.title) document.title = parsed.title;
     if (parsed.body) document.body.className = parsed.body.className;

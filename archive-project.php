@@ -12,7 +12,7 @@ get_header();
                 دکوراسیون و تبلیغات محیطی
             </p>
         </div>
-        <form class="project-filters" method="get" action="<?php echo esc_url(get_post_type_archive_link('project')); ?>">
+        <form class="project-filters" method="get" action="<?php echo esc_url(get_post_type_archive_link('project')); ?>" data-auto-filter-form>
             <?php
             $filter_taxonomies = array(
                 'project_client'    => 'همه کارفرماها',

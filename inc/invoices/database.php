@@ -24,7 +24,7 @@ function zigurat_invoice_sequences_table_name()
 function zigurat_install_invoice_tables()
 {
     global $wpdb;
-    $version = '5';
+    $version = '6';
     $invoices = zigurat_invoices_table_name();
     $items = zigurat_invoice_items_table_name();
     $sequences = zigurat_invoice_sequences_table_name();
@@ -44,6 +44,8 @@ function zigurat_install_invoice_tables()
         parent_invoice_id bigint(20) unsigned NOT NULL DEFAULT 0,
         allow_branches tinyint(1) unsigned NOT NULL DEFAULT 0,
         issue_date varchar(10) NOT NULL,
+        tax_year smallint(5) unsigned NOT NULL DEFAULT 0,
+        tax_quarter tinyint(1) unsigned NOT NULL DEFAULT 0,
         status varchar(20) NOT NULL DEFAULT 'issued',
         subject varchar(191) NOT NULL DEFAULT '',
         source_proforma_id bigint(20) unsigned NOT NULL DEFAULT 0,
@@ -82,6 +84,7 @@ function zigurat_install_invoice_tables()
         KEY status (status),
         KEY source_proforma_id (source_proforma_id),
         KEY parent_invoice_id (parent_invoice_id),
+        KEY tax_period (brand,document_type,tax_year,tax_quarter),
         KEY issue_date (issue_date),
         KEY customer_name (customer_name(100))
     ) {$charset};");
@@ -115,11 +118,28 @@ function zigurat_install_invoice_tables()
         if (!$new_number_index) {
             $wpdb->query("ALTER TABLE {$invoices} ADD UNIQUE KEY brand_type_number_suffix (brand,document_type,document_number,number_suffix)");
         }
+        $has_tax_year = $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'tax_year'");
+        $has_tax_quarter = $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'tax_quarter'");
+        if ($has_tax_year && $has_tax_quarter) {
+            $wpdb->query("UPDATE {$invoices}
+                SET tax_year = CAST(SUBSTRING(issue_date,1,4) AS UNSIGNED),
+                    tax_quarter = CASE
+                        WHEN CAST(SUBSTRING(issue_date,6,2) AS UNSIGNED) BETWEEN 1 AND 3 THEN 1
+                        WHEN CAST(SUBSTRING(issue_date,6,2) AS UNSIGNED) BETWEEN 4 AND 6 THEN 2
+                        WHEN CAST(SUBSTRING(issue_date,6,2) AS UNSIGNED) BETWEEN 7 AND 9 THEN 3
+                        WHEN CAST(SUBSTRING(issue_date,6,2) AS UNSIGNED) BETWEEN 10 AND 12 THEN 4
+                        ELSE 0 END
+                WHERE brand = 'official' AND document_type = 'invoice'
+                  AND issue_date REGEXP '^[0-9]{4}/[0-9]{2}/[0-9]{2}$'");
+        }
     }
     if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $invoices)) === $invoices
         && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $items)) === $items
         && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $sequences)) === $sequences
-        && $wpdb->get_var("SHOW INDEX FROM {$invoices} WHERE Key_name = 'brand_type_number_suffix'")) {
+        && $wpdb->get_var("SHOW INDEX FROM {$invoices} WHERE Key_name = 'brand_type_number_suffix'")
+        && $wpdb->get_var("SHOW INDEX FROM {$invoices} WHERE Key_name = 'tax_period'")
+        && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'tax_year'")
+        && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'tax_quarter'")) {
         update_option('zigurat_invoice_schema_version', $version, false);
     }
 }

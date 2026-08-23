@@ -65,6 +65,7 @@ function zigurat_enqueue_assets()
 
     if (is_post_type_archive('project')) {
         zigurat_enqueue_theme_style('projects');
+        zigurat_enqueue_theme_script('archive-filters');
     } elseif (is_singular('project')) {
         zigurat_enqueue_theme_style('project-single');
         zigurat_enqueue_theme_script('lightbox');

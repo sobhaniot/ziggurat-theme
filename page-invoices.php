@@ -56,6 +56,8 @@ if ($view === 'export') {
         'type' => isset($_GET['filter_type']) ? sanitize_key(wp_unslash($_GET['filter_type'])) : '',
         'status' => isset($_GET['filter_status']) ? sanitize_key(wp_unslash($_GET['filter_status'])) : '',
         'search' => isset($_GET['invoice_search']) ? sanitize_text_field(wp_unslash($_GET['invoice_search'])) : '',
+        'tax_year' => isset($_GET['tax_year']) ? absint($_GET['tax_year']) : 0,
+        'tax_quarter' => isset($_GET['tax_quarter']) ? absint($_GET['tax_quarter']) : 0,
     ));
 }
 
@@ -210,12 +212,78 @@ get_header();
                 </form>
             <?php else: ?>
                 <?php
-                $list_type=isset($_GET['filter_type'])?sanitize_key(wp_unslash($_GET['filter_type'])):''; $list_status=isset($_GET['filter_status'])?sanitize_key(wp_unslash($_GET['filter_status'])):''; $list_search=isset($_GET['invoice_search'])?sanitize_text_field(wp_unslash($_GET['invoice_search'])):''; $list_page=isset($_GET['invoice_page'])?max(1,absint($_GET['invoice_page'])):1;
-                $invoice_list=zigurat_invoice_list(array('brand'=>$brand,'type'=>$list_type,'status'=>$list_status,'search'=>$list_search,'page'=>$list_page));
+                $has_type_filter = array_key_exists('filter_type', $_GET);
+                $has_tax_year_filter = array_key_exists('tax_year', $_GET);
+                $list_type = $has_type_filter ? sanitize_key(wp_unslash($_GET['filter_type'])) : '';
+                $list_status = isset($_GET['filter_status']) ? sanitize_key(wp_unslash($_GET['filter_status'])) : '';
+                $list_search = isset($_GET['invoice_search']) ? sanitize_text_field(wp_unslash($_GET['invoice_search'])) : '';
+                $list_page = isset($_GET['invoice_page']) ? max(1, absint($_GET['invoice_page'])) : 1;
+                $current_tax_year = (int) substr(zigurat_invoice_today_jalali(), 0, 4);
+                $list_tax_year = $brand === 'official' && $has_tax_year_filter ? absint($_GET['tax_year']) : 0;
+                $list_tax_quarter = $brand === 'official' && isset($_GET['tax_quarter']) ? absint($_GET['tax_quarter']) : 0;
+                if ($brand === 'official' && !$has_type_filter && !$has_tax_year_filter) {
+                    $list_type = 'invoice';
+                    $list_tax_year = $current_tax_year;
+                }
+                if ($brand === 'official' && $list_tax_year > 0) {
+                    $list_type = 'invoice';
+                }
+                if ($list_type !== 'invoice' || $list_tax_year < 1) {
+                    $list_tax_year = $list_type === 'invoice' ? $list_tax_year : 0;
+                    $list_tax_quarter = 0;
+                }
+                if ($list_tax_quarter < 1 || $list_tax_quarter > 4) {
+                    $list_tax_quarter = 0;
+                }
+                $tax_years = $brand === 'official' ? zigurat_invoice_tax_years() : array();
+                $tax_summary = $brand === 'official' && $list_type === 'invoice' && $list_tax_year
+                    ? zigurat_invoice_tax_summary($list_tax_year)
+                    : array();
+                $invoice_list = zigurat_invoice_list(array(
+                    'brand'=>$brand,
+                    'type'=>$list_type,
+                    'status'=>$list_status,
+                    'search'=>$list_search,
+                    'tax_year'=>$list_tax_year,
+                    'tax_quarter'=>$list_tax_quarter,
+                    'page'=>$list_page,
+                ));
                 ?>
-                <?php $excel_url=wp_nonce_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'export','filter_type'=>$list_type,'filter_status'=>$list_status,'invoice_search'=>$list_search)),'zigurat_invoice_export'); ?>
+                <?php $excel_url=wp_nonce_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'export','filter_type'=>$list_type,'filter_status'=>$list_status,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>$list_tax_quarter)),'zigurat_invoice_export'); ?>
                 <div class="invoice-list-heading"><h2>لیست فاکتورها</h2><div class="invoice-list-heading__actions no-print"><strong><?php echo esc_html(number_format_i18n($invoice_list['total'])); ?> سند</strong><a class="invoice-excel-button" href="<?php echo esc_url($excel_url); ?>">خروجی اکسل</a></div></div>
-                <form class="invoice-list-filters no-print" method="get"><input type="hidden" name="invoice_brand" value="<?php echo esc_attr($brand); ?>"><input type="hidden" name="invoice_view" value="list"><label>نوع سند<select name="filter_type"><option value="">همه</option><option value="proforma" <?php selected($list_type,'proforma'); ?>>پیش‌فاکتور</option><option value="invoice" <?php selected($list_type,'invoice'); ?>>فاکتور</option></select></label><label>وضعیت<select name="filter_status"><option value="">همه</option><option value="issued" <?php selected($list_status,'issued'); ?>>صادرشده</option><option value="draft" <?php selected($list_status,'draft'); ?>>پیش‌نویس</option></select></label><label>جستجو<input type="search" name="invoice_search" value="<?php echo esc_attr($list_search); ?>" placeholder="شماره، خریدار یا موضوع"></label><button type="submit">اعمال فیلتر</button><?php if($list_type||$list_status||$list_search): ?><a href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list'))); ?>">حذف فیلتر</a><?php endif; ?></form>
+                <form class="invoice-list-filters no-print" method="get">
+                    <input type="hidden" name="invoice_brand" value="<?php echo esc_attr($brand); ?>">
+                    <input type="hidden" name="invoice_view" value="list">
+                    <input type="hidden" name="tax_quarter" value="<?php echo esc_attr($list_tax_quarter); ?>">
+                    <label>نوع سند<select name="filter_type"><option value="">همه</option><option value="proforma" <?php selected($list_type,'proforma'); ?>>پیش‌فاکتور</option><option value="invoice" <?php selected($list_type,'invoice'); ?>>فاکتور</option></select></label>
+                    <label>وضعیت<select name="filter_status"><option value="">همه</option><option value="issued" <?php selected($list_status,'issued'); ?>>صادرشده</option><option value="draft" <?php selected($list_status,'draft'); ?>>پیش‌نویس</option></select></label>
+                    <?php if ($brand === 'official'): ?><label>سال مالیاتی<select name="tax_year"><option value="0">همه سال‌ها</option><?php foreach ($tax_years as $tax_year): ?><option value="<?php echo esc_attr($tax_year); ?>" <?php selected($list_tax_year, $tax_year); ?>><?php echo esc_html($tax_year); ?></option><?php endforeach; ?></select></label><?php endif; ?>
+                    <label>جستجو<input type="search" name="invoice_search" value="<?php echo esc_attr($list_search); ?>" placeholder="شماره، خریدار یا موضوع"></label>
+                    <button type="submit">اعمال فیلتر</button>
+                    <?php if($list_type||$list_status||$list_search||$list_tax_year||$list_tax_quarter): ?><a href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>'','tax_year'=>0))); ?>">حذف فیلتر</a><?php endif; ?>
+                </form>
+                <?php if ($tax_summary): ?>
+                    <section class="invoice-tax-period no-print" aria-labelledby="invoice-tax-period-title">
+                        <div class="invoice-tax-period__heading">
+                            <div><span>دوره‌های مالیاتی سال <?php echo esc_html($list_tax_year); ?></span><h3 id="invoice-tax-period-title">خلاصه فصلی فاکتورهای رسمی</h3></div>
+                            <a class="<?php echo $list_tax_quarter === 0 ? 'is-active' : ''; ?>" href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>'invoice','filter_status'=>$list_status,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>0))); ?>">نمایش کل سال</a>
+                        </div>
+                        <div class="invoice-tax-cards">
+                            <?php foreach ($tax_summary as $quarter=>$quarter_summary): ?>
+                                <a class="invoice-tax-card <?php echo $list_tax_quarter === (int) $quarter ? 'is-active' : ''; ?>" href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>'invoice','filter_status'=>$list_status,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>$quarter))); ?>">
+                                    <header><strong><?php echo esc_html(zigurat_invoice_tax_quarter_label($quarter)); ?></strong><span><?php echo esc_html(number_format_i18n((int) $quarter_summary->invoice_count)); ?> فاکتور</span></header>
+                                    <dl>
+                                        <div><dt>فروش کل</dt><dd><?php echo esc_html(zigurat_invoice_format_money($quarter_summary->grand_total)); ?></dd></div>
+                                        <div><dt>مالیات</dt><dd><?php echo esc_html(zigurat_invoice_format_money($quarter_summary->tax_amount)); ?></dd></div>
+                                        <div><dt>پرداختی</dt><dd><?php echo esc_html(zigurat_invoice_format_money($quarter_summary->paid_amount)); ?></dd></div>
+                                        <div><dt>مانده</dt><dd><?php echo esc_html(zigurat_invoice_format_money($quarter_summary->balance)); ?></dd></div>
+                                    </dl>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
+                        <p>آمار هر فصل فقط از فاکتورهای رسمیِ صادرشده محاسبه می‌شود؛ پیش‌نویس‌ها و پیش‌فاکتورها در جمع مالیاتی وارد نمی‌شوند.</p>
+                    </section>
+                <?php endif; ?>
                 <div class="invoice-list-table-wrap">
                     <table class="invoice-list-table">
                         <thead><tr><th>شماره</th><th>نوع سند</th><th>تاریخ</th><th>خریدار</th><th>موضوع</th><th>جمع کل</th><th>مانده</th><th>وضعیت</th><th>عملیات</th></tr></thead>
@@ -253,7 +321,7 @@ get_header();
                 <?php if ($invoice_list['pages'] > 1): ?>
                     <nav class="invoice-pagination no-print" aria-label="صفحه‌بندی فاکتورها">
                         <?php echo wp_kses_post(paginate_links(array(
-                            'base'      => esc_url_raw(add_query_arg('invoice_page', '%#%', zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>$list_type,'filter_status'=>$list_status,'invoice_search'=>$list_search)))),
+                            'base'      => esc_url_raw(add_query_arg('invoice_page', '%#%', zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>$list_type,'filter_status'=>$list_status,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>$list_tax_quarter)))),
                             'format'    => '',
                             'current'   => $invoice_list['page'],
                             'total'     => $invoice_list['pages'],

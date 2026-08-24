@@ -145,8 +145,11 @@ h3 {
   color: var(--primary-color);
 }
 .logo img {
-  max-height: 70px;
-  width: auto;
+  width: 70px;
+  height: 70px;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
 }
 /* =========================
    Menu
@@ -240,8 +243,10 @@ h3 {
     flex: 0 0 auto;
   }
   .logo img {
-    max-height: 58px;
-    max-width: 82px;
+    width: 58px;
+    height: 58px;
+    max-width: none;
+    max-height: none;
   }
   .header-buttons {
     margin-right: auto;
@@ -310,7 +315,9 @@ h3 {
     gap: 7px;
   }
   .logo img {
-    max-width: 70px;
+    width: 56px;
+    height: 56px;
+    max-width: none;
   }
   .header-buttons .btn-login {
     padding: 6px 8px;
@@ -329,7 +336,8 @@ h3 {
   box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
 }
 .site-header.scrolled .logo img {
-  max-height: 60px;
+  width: 60px;
+  height: 60px;
 }
 .logo img {
   transition: 0.3s;
@@ -752,6 +760,182 @@ body.home .hero {
   font-size: 15px;
   line-height: 1.65;
 }
+
+/* =========================
+   Project coverage map
+========================= */
+.iran-project-map {
+  padding: 0 0 85px;
+  background: #fff;
+}
+.iran-project-map__card {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(360px, 1.1fr);
+  align-items: center;
+  gap: clamp(28px, 5vw, 72px);
+  padding: clamp(28px, 4.5vw, 62px);
+  overflow: hidden;
+  border: 1px solid #eadfca;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 78% 34%, rgba(212, 154, 36, .14), transparent 32%),
+    linear-gradient(145deg, #fffdf8, #fff 70%);
+  box-shadow: 0 22px 60px rgba(38, 30, 15, .08);
+}
+.iran-project-map__content {
+  position: relative;
+  z-index: 2;
+}
+.iran-project-map__eyebrow {
+  display: inline-block;
+  margin-bottom: 10px;
+  color: #a87612;
+  font-size: 14px;
+  font-weight: 800;
+}
+.iran-project-map h2 {
+  margin: 0 0 14px;
+  color: #171717;
+  font-size: clamp(29px, 3vw, 43px);
+  line-height: 1.35;
+}
+.iran-project-map__content > p {
+  max-width: 590px;
+  margin: 0;
+  color: #5f5a51;
+  font-size: 16px;
+  line-height: 2;
+}
+.iran-project-map__status {
+  display: grid;
+  gap: 4px;
+  min-height: 76px;
+  margin-top: 22px;
+  padding: 13px 16px;
+  border-right: 4px solid #d49a24;
+  border-radius: 12px;
+  background: rgba(255, 250, 239, .88);
+}
+.iran-project-map__status strong {
+  color: #171717;
+  font-size: 18px;
+}
+.iran-project-map__status span {
+  color: #716958;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.iran-project-map__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin-top: 18px;
+  color: #5e5a52;
+  font-size: 13px;
+}
+.iran-project-map__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.iran-project-map__legend i {
+  width: 14px;
+  height: 14px;
+  border: 1px solid #d7d9dc;
+  border-radius: 4px;
+  background: #e8eaed;
+}
+.iran-project-map__legend i.is-active {
+  border-color: #c38a1d;
+  background: #d49a24;
+}
+.iran-project-map__active-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 142px;
+  margin-top: 20px;
+  padding: 2px 0 6px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.iran-project-map__active-list a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border: 1px solid #eadfca;
+  border-radius: 999px;
+  background: #fff;
+  color: #312b20;
+  font-size: 13px;
+  text-decoration: none;
+  transition: transform .2s ease, border-color .2s ease, color .2s ease;
+}
+.iran-project-map__active-list a:hover {
+  transform: translateY(-2px);
+  border-color: #d49a24;
+  color: #96680e;
+}
+.iran-project-map__active-list small {
+  color: #8a8170;
+  font-size: 11px;
+}
+.iran-project-map__visual {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+.iran-project-map__visual svg {
+  display: block;
+  width: min(100%, 490px);
+  height: auto;
+  overflow: visible;
+  direction: ltr;
+  filter: drop-shadow(0 16px 18px rgba(48, 37, 15, .11));
+}
+.iran-project-map__province {
+  fill: #e5e7ea;
+  stroke: #fff;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  transition: fill .22s ease, stroke .22s ease, filter .22s ease;
+}
+.iran-project-map__province.is-active {
+  fill: #d49a24;
+  stroke: #fff8e8;
+  cursor: pointer;
+}
+.iran-project-map__province-link:hover .iran-project-map__province,
+.iran-project-map__province-link:focus .iran-project-map__province {
+  fill: #171717;
+  stroke: #d49a24;
+  stroke-width: 5;
+  filter: drop-shadow(0 5px 7px rgba(0, 0, 0, .24));
+}
+.iran-project-map__province-link:focus {
+  outline: none;
+}
+
+@media (max-width: 980px) {
+  .iran-project-map__card {
+    grid-template-columns: 1fr;
+  }
+  .iran-project-map__visual {
+    grid-row: 1;
+  }
+  .iran-project-map__content {
+    text-align: center;
+  }
+  .iran-project-map__content > p {
+    margin-inline: auto;
+  }
+  .iran-project-map__legend,
+  .iran-project-map__active-list {
+    justify-content: center;
+  }
+}
+
 @media (max-width: 768px) {
   .about {
     padding: 55px 0;
@@ -783,6 +967,35 @@ body.home .hero {
   }
   .about-button {
     margin-top: 24px;
+  }
+  .iran-project-map {
+    padding: 0 0 58px;
+  }
+  .iran-project-map__card {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding: 25px 18px 22px;
+    border-radius: 20px;
+  }
+  .iran-project-map__visual {
+    grid-row: 1;
+  }
+  .iran-project-map__visual svg {
+    width: min(88vw, 390px);
+  }
+  .iran-project-map__content {
+    text-align: center;
+  }
+  .iran-project-map__content > p {
+    font-size: 14px;
+    line-height: 1.9;
+  }
+  .iran-project-map__status {
+    text-align: right;
+  }
+  .iran-project-map__legend,
+  .iran-project-map__active-list {
+    justify-content: center;
   }
 }
 
@@ -1129,4 +1342,3 @@ body.home .hero {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-

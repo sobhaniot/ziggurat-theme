@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1600" viewBox="0 0 1600 1600" role="img" aria-labelledby="zigurat-logo-title zigurat-logo-desc">
+  <title id="zigurat-logo-title">Ziggurat Architecture Group</title>
+  <desc id="zigurat-logo-desc">نشان گروه معماری زیگورات</desc>
+
+  <g class="zigurat-logo__color">
+    <circle cx="800" cy="800" r="775" fill="#fff" stroke="#d49a24" stroke-width="30"/>
+
+    <g fill="#050505">
+      <path d="M590 500 632 425h78l-20 75z"/>
+      <path d="m910 500-20-75h78l42 75z"/>
+      <path d="m510 585 45-78h133l-21 78z"/>
+      <path d="m933 585-21-78h133l45 78z"/>
+      <path d="m428 665 42-74h195l-20 74z"/>
+      <path d="m955 665-20-74h195l42 74z"/>
+      <path d="m347 749 43-78h253l-21 78z"/>
+      <path d="m978 749-21-78h253l43 78z"/>
+      <path d="m266 828 42-73h312l-20 73z"/>
+      <path d="m1000 828-20-73h312l42 73z"/>
+      <path d="m184 911 43-77h371l-21 77z"/>
+      <path d="m1023 911-21-77h371l43 77z"/>
+    </g>
+
+    <path d="M595 911 715 417h170l120 494h-47L849 458h-98L642 911z" fill="#d49a24"/>
+    <g fill="#d49a24">
+      <rect x="747" y="438" width="106" height="8" rx="2"/>
+      <rect x="740" y="461" width="120" height="8" rx="2"/>
+      <rect x="735" y="484" width="130" height="8" rx="2"/>
+      <rect x="728" y="509" width="144" height="8" rx="2"/>
+      <rect x="722" y="535" width="156" height="8" rx="2"/>
+      <rect x="716" y="561" width="168" height="8" rx="2"/>
+      <rect x="709" y="588" width="182" height="8" rx="2"/>
+      <rect x="702" y="616" width="196" height="8" rx="2"/>
+      <rect x="695" y="645" width="210" height="8" rx="2"/>
+      <rect x="688" y="675" width="224" height="8" rx="2"/>
+      <rect x="680" y="706" width="240" height="8" rx="2"/>
+      <rect x="672" y="738" width="256" height="8" rx="2"/>
+      <rect x="664" y="771" width="272" height="8" rx="2"/>
+      <rect x="656" y="805" width="288" height="8" rx="2"/>
+      <rect x="648" y="840" width="304" height="8" rx="2"/>
+      <rect x="639" y="876" width="322" height="8" rx="2"/>
+    </g>
+
+    <text x="800" y="1078" fill="#050505" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="132" font-weight="700" letter-spacing="50">ZIGGURAT</text>
+    <text x="800" y="1170" fill="#050505" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="65" font-weight="400" letter-spacing="28">ArchitectureGroup</text>
+  </g>
+
+  <g class="zigurat-logo__outline" style="display:none" fill="none" stroke-linejoin="round" stroke-linecap="round">
+    <circle class="zigurat-logo__trace zigurat-logo__trace--gold" pathLength="1" cx="800" cy="800" r="775" stroke-width="22"/>
+
+    <path class="zigurat-logo__trace zigurat-logo__trace--dark" pathLength="1" d="M590 500 632 425h78l-20 75z M910 500l-20-75h78l42 75z" stroke-width="11"/>
+    <path class="zigurat-logo__trace zigurat-logo__trace--dark" pathLength="1" d="M510 585l45-78h133l-21 78z M933 585l-21-78h133l45 78z" stroke-width="11"/>
+    <path class="zigurat-logo__trace zigurat-logo__trace--dark" pathLength="1" d="M428 665l42-74h195l-20 74z M955 665l-20-74h195l42 74z" stroke-width="11"/>
+    <path class="zigurat-logo__trace zigurat-logo__trace--dark" pathLength="1" d="M347 749l43-78h253l-21 78z M978 749l-21-78h253l43 78z" stroke-width="11"/>
+    <path class="zigurat-logo__trace zigurat-logo__trace--dark" pathLength="1" d="M266 828l42-73h312l-20 73z M1000 828l-20-73h312l42 73z" stroke-width="11"/>
+    <path class="zigurat-logo__trace zigurat-logo__trace--dark" pathLength="1" d="M184 911l43-77h371l-21 77z M1023 911l-21-77h371l43 77z" stroke-width="11"/>
+
+    <path class="zigurat-logo__trace zigurat-logo__trace--gold" pathLength="1" d="M595 911 715 417h170l120 494h-47L849 458h-98L642 911z" stroke-width="14"/>
+    <path class="zigurat-logo__trace zigurat-logo__trace--gold" pathLength="1" d="M747 442h106 M740 465h120 M735 488h130 M728 513h144 M722 539h156 M716 565h168 M709 592h182 M702 620h196 M695 649h210 M688 679h224 M680 710h240 M672 742h256 M664 775h272 M656 809h288 M648 844h304 M639 880h322" stroke-width="9"/>
+
+    <path class="zigurat-logo__trace zigurat-logo__trace--dark zigurat-logo__trace--word" pathLength="1" d="M190 982h122 M355 982h82 M488 982h112 M645 982h112 M803 982h91 M942 982h132 M1118 982h116 M1275 982h122" stroke-width="13"/>
+  </g>
+</svg>

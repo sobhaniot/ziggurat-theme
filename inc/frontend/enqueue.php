@@ -32,8 +32,14 @@ function zigurat_enqueue_assets()
     }
     zigurat_enqueue_theme_script('header');
 
+    if (function_exists('zigurat_should_show_site_intro') && zigurat_should_show_site_intro()) {
+        zigurat_enqueue_theme_style('site-intro', array());
+        zigurat_enqueue_theme_script('site-intro');
+    }
+
     if (is_front_page()) {
         zigurat_enqueue_theme_script('about-counter');
+        zigurat_enqueue_theme_script('iran-project-map');
     }
 
     if (is_page('about') || is_page_template('page-about.php')) {

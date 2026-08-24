@@ -218,13 +218,8 @@ get_header();
                 $list_status = isset($_GET['filter_status']) ? sanitize_key(wp_unslash($_GET['filter_status'])) : '';
                 $list_search = isset($_GET['invoice_search']) ? sanitize_text_field(wp_unslash($_GET['invoice_search'])) : '';
                 $list_page = isset($_GET['invoice_page']) ? max(1, absint($_GET['invoice_page'])) : 1;
-                $current_tax_year = (int) substr(zigurat_invoice_today_jalali(), 0, 4);
                 $list_tax_year = $brand === 'official' && $has_tax_year_filter ? absint($_GET['tax_year']) : 0;
                 $list_tax_quarter = $brand === 'official' && isset($_GET['tax_quarter']) ? absint($_GET['tax_quarter']) : 0;
-                if ($brand === 'official' && !$has_type_filter && !$has_tax_year_filter) {
-                    $list_type = 'invoice';
-                    $list_tax_year = $current_tax_year;
-                }
                 if ($brand === 'official' && $list_tax_year > 0) {
                     $list_type = 'invoice';
                 }

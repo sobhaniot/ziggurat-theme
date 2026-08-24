@@ -17,3 +17,30 @@
   height: 100%;
   object-fit: cover;
 }
+
+.zigurat-seo-editor { display: grid; gap: 18px; direction: rtl; }
+.zigurat-seo-intro { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 15px 17px; border: 1px solid #d9c48c; border-radius: 10px; background: linear-gradient(135deg,#fffaf0,#fff); }
+.zigurat-seo-intro strong { display: block; margin-bottom: 4px; color: #76530d; font-size: 17px; }
+.zigurat-seo-intro p { margin: 0; color: #665d4b; }
+.zigurat-seo-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 15px; }
+.zigurat-seo-grid label { display: grid; align-content: start; gap: 7px; margin: 0; }
+.zigurat-seo-grid label.is-full { grid-column: 1/-1; }
+.zigurat-seo-grid input,
+.zigurat-seo-grid textarea { box-sizing: border-box; }
+.zigurat-seo-grid small { color: #706b62; line-height: 1.7; }
+.zigurat-seo-slug-control { display: flex; min-height: 38px; overflow: hidden; border: 1px solid #8c8f94; border-radius: 4px; background: #fff; direction: ltr; }
+.zigurat-seo-slug-control span { display: inline-flex; align-items: center; padding: 0 9px; background: #f0f0f1; color: #646970; font-size: 12px; white-space: nowrap; }
+.zigurat-seo-slug-control input { flex: 1; min-width: 100px; border: 0 !important; box-shadow: none !important; }
+.zigurat-google-preview { display: grid; gap: 5px; padding: 17px 19px; border: 1px solid #dfe1e5; border-radius: 10px; background: #fff; direction: rtl; }
+.zigurat-google-preview > span { margin-bottom: 7px; color: #5f6368; font-size: 12px; }
+.zigurat-google-preview cite { overflow: hidden; color: #202124; font-style: normal; direction: ltr; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.zigurat-google-preview strong { color: #1a0dab; font-size: 20px; font-weight: 400; line-height: 1.45; }
+.zigurat-google-preview p { max-width: 760px; margin: 0; color: #4d5156; font-size: 14px; line-height: 1.8; }
+.zigurat-seo-taxonomy-note { margin: 0; padding: 11px 13px; border-right: 4px solid #2271b1; background: #f0f6fc; color: #3c434a; line-height: 1.8; }
+@media (max-width: 782px) {
+  .zigurat-seo-intro { align-items: stretch; flex-direction: column; }
+  .zigurat-seo-grid { grid-template-columns: 1fr; }
+  .zigurat-seo-grid label.is-full { grid-column: auto; }
+  .zigurat-seo-slug-control { display: grid; }
+  .zigurat-seo-slug-control span { min-height: 32px; overflow: hidden; text-overflow: ellipsis; }
+}

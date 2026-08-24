@@ -55,10 +55,18 @@ function zigurat_project_meta_callback($post)
         <tr>
             <th><label for="project_province">استان اجرا</label></th>
             <td>
-                <input type="text" id="project_province"
-                    name="project_province"
-                    value="<?php echo esc_attr($province); ?>"
-                    class="regular-text">
+                <select id="project_province" name="project_province" class="regular-text">
+                    <option value="">انتخاب استان</option>
+                    <?php if ($province !== '' && !in_array($province, zigurat_project_province_options(), true)): ?>
+                        <option value="<?php echo esc_attr($province); ?>" selected><?php echo esc_html($province); ?> (مقدار قدیمی)</option>
+                    <?php endif; ?>
+                    <?php foreach (zigurat_project_province_options() as $province_option): ?>
+                        <option value="<?php echo esc_attr($province_option); ?>" <?php selected($province, $province_option); ?>>
+                            <?php echo esc_html($province_option); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">استان‌های دارای پروژه به‌صورت خودکار روی نقشه صفحه اصلی رنگی می‌شوند.</p>
             </td>
         </tr>
         <tr>

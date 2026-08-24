@@ -49,6 +49,75 @@ function zigurat_count_used_project_terms($taxonomy)
     return is_wp_error($terms) ? 0 : count($terms);
 }
 
+/** فهرست ثابت استان‌ها برای فرم پروژه و نقشه صفحه اصلی. */
+function zigurat_project_province_options()
+{
+    return array(
+        'آذربایجان شرقی', 'آذربایجان غربی', 'اردبیل', 'اصفهان', 'البرز',
+        'ایلام', 'بوشهر', 'تهران', 'چهارمحال و بختیاری', 'خراسان جنوبی',
+        'خراسان رضوی', 'خراسان شمالی', 'خوزستان', 'زنجان', 'سمنان',
+        'سیستان و بلوچستان', 'فارس', 'قزوین', 'قم', 'کردستان',
+        'کرمان', 'کرمانشاه', 'کهگیلویه و بویراحمد', 'گلستان', 'گیلان',
+        'لرستان', 'مازندران', 'مرکزی', 'هرمزگان', 'همدان', 'یزد',
+    );
+}
+
+/** یکسان‌سازی اختلاف‌های رایج نوشتاری استان‌ها بدون تغییر داده اصلی پروژه. */
+function zigurat_normalize_project_province($province)
+{
+    $province = trim(strtr((string) $province, array(
+        'ي' => 'ی',
+        'ك' => 'ک',
+        'ة' => 'ه',
+        'ۀ' => 'ه',
+    )));
+    $province = preg_replace('/^استان\s+/u', '', $province);
+    $key = preg_replace('/[\s\x{200c}\x{200e}\x{200f}_-]+/u', '', $province);
+
+    static $lookup = null;
+    if ($lookup === null) {
+        $lookup = array();
+        foreach (zigurat_project_province_options() as $name) {
+            $lookup[preg_replace('/[\s\x{200c}\x{200e}\x{200f}_-]+/u', '', $name)] = $name;
+        }
+        $lookup['چهارمحالوبختیاری'] = 'چهارمحال و بختیاری';
+        $lookup['کهگیلویهوبویراحمد'] = 'کهگیلویه و بویراحمد';
+        $lookup['سیستانوبلوچستان'] = 'سیستان و بلوچستان';
+        $lookup['بندرعباس'] = 'هرمزگان';
+        $lookup['بنرعباس'] = 'هرمزگان';
+    }
+
+    return isset($lookup[$key]) ? $lookup[$key] : '';
+}
+
+/** تعداد پروژه و slugهای واقعی taxonomy برای هر استان استاندارد. */
+function zigurat_build_project_province_activity()
+{
+    $terms = get_terms(array(
+        'taxonomy'   => 'project_province',
+        'hide_empty' => true,
+    ));
+    if (is_wp_error($terms)) {
+        return array();
+    }
+
+    $activity = array();
+    foreach ($terms as $term) {
+        $province = zigurat_normalize_project_province($term->name);
+        if ($province === '') {
+            continue;
+        }
+        if (!isset($activity[$province])) {
+            $activity[$province] = array('count' => 0, 'slugs' => array());
+        }
+        $activity[$province]['count'] += (int) $term->count;
+        $activity[$province]['slugs'][] = (string) $term->slug;
+        $activity[$province]['slugs'] = array_values(array_unique($activity[$province]['slugs']));
+    }
+
+    return $activity;
+}
+
 /**
  * آمار و پروژه‌های صفحه اول را یک بار محاسبه و در wp_options ذخیره می‌کند.
  */
@@ -102,11 +171,13 @@ function zigurat_rebuild_project_cache()
         return get_post_time('U', true, $second) <=> get_post_time('U', true, $first);
     });
 
+    $province_activity = zigurat_build_project_province_activity();
     $stats = array(
-        'cache_version'    => 3,
+        'cache_version'    => 4,
         'projects'         => count($project_ids),
         'cities'           => zigurat_count_used_project_terms('project_city'),
-        'provinces'        => zigurat_count_used_project_terms('project_province'),
+        'provinces'        => count($province_activity),
+        'province_activity'=> $province_activity,
         'home_project_ids' => $home_ids,
         'updated_at'       => time(),
     );
@@ -120,7 +191,7 @@ function zigurat_get_project_stats()
     $stats = get_option('zigurat_project_stats');
     if (
         !is_array($stats)
-        || ($stats['cache_version'] ?? 0) !== 3
+        || ($stats['cache_version'] ?? 0) !== 4
         || !isset($stats['projects'], $stats['cities'], $stats['provinces'])
     ) {
         $stats = zigurat_rebuild_project_cache();
@@ -277,10 +348,11 @@ add_action('pre_get_posts', function ($query) {
     $tax_query = array();
     foreach (array('project_client', 'project_city', 'project_province', 'project_sign_type') as $taxonomy) {
         if (!empty($_GET[$taxonomy]) && is_string($_GET[$taxonomy])) {
+            $terms = array_values(array_filter(array_map('sanitize_title', preg_split('/\s*,\s*/', wp_unslash($_GET[$taxonomy])))));
             $tax_query[] = array(
                 'taxonomy' => $taxonomy,
                 'field'    => 'slug',
-                'terms'    => sanitize_title(wp_unslash($_GET[$taxonomy])),
+                'terms'    => $terms,
             );
         }
     }

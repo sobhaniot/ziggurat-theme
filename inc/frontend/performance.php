@@ -3,30 +3,21 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/** Render a right-sized site logo instead of downloading the full attachment. */
+/** Render the fixed vector brand mark used throughout the public site. */
 function zigurat_site_logo($loading = 'eager')
 {
-    $logo_id = absint(get_theme_mod('custom_logo'));
-    if (!$logo_id) {
-        return;
+    $logo_path = get_template_directory() . '/assets/images/zigurat-logo.svg';
+    $logo_url = get_template_directory_uri() . '/assets/images/zigurat-logo.svg';
+    if (is_file($logo_path)) {
+        $logo_url = add_query_arg('ver', (string) filemtime($logo_path), $logo_url);
     }
-
-    $image = wp_get_attachment_image($logo_id, 'medium', false, array(
-        'class'         => 'custom-logo',
-        'loading'       => $loading,
-        'decoding'      => 'async',
-        'fetchpriority' => $loading === 'eager' ? 'auto' : 'low',
-        'sizes'         => '140px',
-        'alt'           => get_bloginfo('name'),
-    ));
-
-    if ($image) {
-        printf(
-            '<a href="%1$s" class="custom-logo-link" rel="home" aria-current="page">%2$s</a>',
-            esc_url(home_url('/')),
-            $image // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-        );
-    }
+    printf(
+        '<a href="%1$s" class="custom-logo-link" rel="home" aria-current="page"><img src="%2$s" class="custom-logo" width="1600" height="1600" loading="%3$s" decoding="async" alt="%4$s"></a>',
+        esc_url(home_url('/')),
+        esc_url($logo_url),
+        esc_attr($loading),
+        esc_attr(get_bloginfo('name'))
+    );
 }
 
 /** Use a generated optimized size when it exists and a safe core size while it is being built. */

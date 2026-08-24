@@ -239,7 +239,20 @@ function zigurat_seo_image()
         return array();
     }
     $image = wp_get_attachment_image_src($attachment_id, 'full');
-    return $image ? array('url' => $image[0], 'width' => $image[1], 'height' => $image[2]) : array();
+    if (!$image) {
+        return array();
+    }
+    $alt = '';
+    if (is_singular(array('project', 'article'))) {
+        $alt = trim((string) get_post_meta(get_queried_object_id(), '_zigurat_seo_image_alt', true));
+    }
+    if ($alt === '') {
+        $alt = trim((string) get_post_meta($attachment_id, '_wp_attachment_image_alt', true));
+    }
+    if ($alt === '') {
+        $alt = trim((string) get_the_title($attachment_id));
+    }
+    return array('url' => $image[0], 'width' => $image[1], 'height' => $image[2], 'alt' => $alt);
 }
 
 function zigurat_seo_organization_schema()
@@ -337,6 +350,9 @@ function zigurat_output_seo_head()
         echo '<meta property="og:image" content="' . esc_url($image['url']) . '">' . "\n";
         echo '<meta property="og:image:width" content="' . absint($image['width']) . '">' . "\n";
         echo '<meta property="og:image:height" content="' . absint($image['height']) . '">' . "\n";
+        if (!empty($image['alt'])) {
+            echo '<meta property="og:image:alt" content="' . esc_attr($image['alt']) . '">' . "\n";
+        }
     }
     echo '<meta name="twitter:card" content="' . ($image ? 'summary_large_image' : 'summary') . '">' . "\n";
     echo '<meta name="twitter:title" content="' . esc_attr($title) . '">' . "\n";
@@ -345,6 +361,9 @@ function zigurat_output_seo_head()
     }
     if ($image) {
         echo '<meta name="twitter:image" content="' . esc_url($image['url']) . '">' . "\n";
+        if (!empty($image['alt'])) {
+            echo '<meta name="twitter:image:alt" content="' . esc_attr($image['alt']) . '">' . "\n";
+        }
     }
 
     if (!$canonical) {
@@ -376,7 +395,7 @@ function zigurat_output_seo_head()
         $page['description'] = $description;
     }
     if ($image) {
-        $page['primaryImageOfPage'] = array('@type' => 'ImageObject', 'url' => $image['url'], 'width' => $image['width'], 'height' => $image['height']);
+        $page['primaryImageOfPage'] = array_filter(array('@type' => 'ImageObject', 'url' => $image['url'], 'width' => $image['width'], 'height' => $image['height'], 'caption' => $image['alt'] ?? ''));
     }
     $graph[] = $page;
 
@@ -504,6 +523,20 @@ add_action('template_redirect', 'zigurat_redirect_hero_source_page', 1);
 /** برای تصاویر محتوایی فاقد متن جایگزین، عنوان رسانه را به‌عنوان fallback قرار می‌دهد. */
 function zigurat_image_alt_fallback($attr, $attachment)
 {
+    $current_post_id = get_the_ID();
+    if (
+        !is_admin()
+        && $attachment instanceof WP_Post
+        && $current_post_id
+        && in_array(get_post_type($current_post_id), array('project', 'article'), true)
+        && get_post_thumbnail_id($current_post_id) === $attachment->ID
+    ) {
+        $project_alt = trim((string) get_post_meta($current_post_id, '_zigurat_seo_image_alt', true));
+        if ($project_alt !== '') {
+            $attr['alt'] = $project_alt;
+            return $attr;
+        }
+    }
     if (empty($attr['alt']) && $attachment instanceof WP_Post) {
         $alt = trim((string) get_post_meta($attachment->ID, '_wp_attachment_image_alt', true));
         if ($alt === '') {

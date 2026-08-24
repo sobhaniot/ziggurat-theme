@@ -1,0 +1,133 @@
+html.zigurat-intro-pending,
+html.zigurat-intro-pending body { overflow: hidden !important; }
+
+.zigurat-site-intro {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  place-items: center;
+  align-content: center;
+  gap: 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 43%, rgba(201,157,56,.1), transparent 31%),
+    #fff;
+  color: #171717;
+  opacity: 1;
+  transition: background-color .6s ease, opacity .4s ease, visibility .4s ease;
+  perspective: 1200px;
+}
+.zigurat-intro-pending .zigurat-site-intro,
+.zigurat-intro-finishing .zigurat-site-intro { display: grid; }
+.zigurat-intro-finishing .zigurat-site-intro { visibility: hidden; opacity: 0; }
+.zigurat-intro-pending #main-header .logo { opacity: 0; }
+.zigurat-intro-pending.zigurat-intro-finishing #main-header .logo { opacity: 1; }
+#main-header .logo { transition: opacity .35s ease; }
+
+.zigurat-site-intro__stage {
+  position: relative;
+  width: min(360px, 62vw);
+  transform-origin: center;
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+}
+.zigurat-site-intro__stage > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  backface-visibility: visible;
+  transform-origin: center;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.zigurat-site-intro .zigurat-logo__color {
+  opacity: 0;
+  transition: opacity .55s ease;
+}
+.zigurat-site-intro .zigurat-logo__outline {
+  display: block !important;
+  opacity: 1;
+  transition: opacity .45s ease;
+}
+.zigurat-site-intro .zigurat-logo__trace {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.zigurat-site-intro .zigurat-logo__trace--gold { stroke: #d49a24; }
+.zigurat-site-intro .zigurat-logo__trace--dark { stroke: #171717; }
+.zigurat-site-intro.is-drawing .zigurat-logo__trace {
+  animation: zigurat-intro-draw 1.45s cubic-bezier(.55,.05,.25,1) forwards;
+}
+.zigurat-site-intro.is-drawing .zigurat-logo__trace:nth-child(2),
+.zigurat-site-intro.is-drawing .zigurat-logo__trace:nth-child(6) { animation-delay: .08s; }
+.zigurat-site-intro.is-drawing .zigurat-logo__trace:nth-child(3),
+.zigurat-site-intro.is-drawing .zigurat-logo__trace:nth-child(8) { animation-delay: .16s; }
+.zigurat-site-intro.is-drawing .zigurat-logo__trace:nth-child(4),
+.zigurat-site-intro.is-drawing .zigurat-logo__trace:nth-child(9) { animation-delay: .24s; }
+.zigurat-site-intro.is-drawing .zigurat-logo__trace:nth-child(5),
+.zigurat-site-intro.is-drawing .zigurat-logo__trace:nth-child(7) { animation-delay: .32s; }
+.zigurat-site-intro .zigurat-logo__trace--word {
+  animation-duration: 1s !important;
+  animation-delay: .5s !important;
+}
+.zigurat-site-intro__shine {
+  position: absolute;
+  inset: -15%;
+  opacity: 0;
+  transform: translateX(70%) rotate(-18deg);
+  background: linear-gradient(90deg,transparent 40%,rgba(255,255,255,.8) 50%,transparent 60%);
+  pointer-events: none;
+}
+.zigurat-site-intro.is-coloring .zigurat-logo__color { opacity: 1; }
+.zigurat-site-intro.is-coloring .zigurat-logo__outline { opacity: 0; }
+.zigurat-site-intro.is-coloring .zigurat-site-intro__shine { animation: zigurat-intro-shine .65s ease .12s both; }
+.zigurat-site-intro.is-landing { background-color: #fff; }
+.zigurat-site-intro.is-landing > p,
+.zigurat-site-intro.is-landing > button { opacity: 0; transform: translateY(8px); }
+
+.zigurat-site-intro > p {
+  margin: 0;
+  color: #80601b;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 5px;
+  transition: opacity .3s ease, transform .3s ease;
+}
+.zigurat-site-intro > button {
+  position: absolute;
+  right: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  transform: translateX(50%);
+  padding: 8px 14px;
+  border: 1px solid rgba(0,0,0,.12);
+  border-radius: 999px;
+  background: rgba(255,255,255,.7);
+  color: #62573e;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(7px);
+  transition: opacity .3s ease, color .2s ease, border-color .2s ease;
+}
+.zigurat-site-intro > button:hover { border-color: #b78a28; color: #76530d; }
+
+@keyframes zigurat-intro-shine {
+  0% { opacity: 0; transform: translateX(70%) rotate(-18deg); }
+  35% { opacity: .8; }
+  100% { opacity: 0; transform: translateX(-70%) rotate(-18deg); }
+}
+
+@keyframes zigurat-intro-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@media (max-width: 600px) {
+  .zigurat-site-intro__stage { width: min(300px, 68vw); }
+  .zigurat-site-intro > p { font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .zigurat-site-intro { display: none !important; }
+  .zigurat-intro-pending #main-header .logo { opacity: 1; }
+}

@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
  */
 function zigurat_sync_main_navigation($force = false)
 {
-    $version = '1';
+    $version = '2';
     if (!$force && get_option('zigurat_main_navigation_version') === $version) {
         return;
     }
@@ -32,6 +32,7 @@ function zigurat_sync_main_navigation($force = false)
         array('title' => 'خانه', 'slug' => 'home'),
         array('title' => 'پروژه‌ها', 'url' => get_post_type_archive_link('project') ?: home_url('/projects/')),
         array('title' => 'مطالب', 'url' => get_post_type_archive_link('article') ?: home_url('/articles/')),
+        array('title' => 'دانلودها', 'url' => get_post_type_archive_link('zig_download') ?: home_url('/downloads/')),
         array('title' => 'همکاری با ما', 'slug' => 'cooperation'),
         array('title' => 'تماس با ما', 'slug' => 'contact'),
     );

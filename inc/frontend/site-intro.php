@@ -31,7 +31,12 @@ function zigurat_site_intro_boot_script()
       try {
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         document.documentElement.classList.add('zigurat-intro-pending');
-        window.ziguratIntroFailsafe = window.setTimeout(function(){ document.documentElement.classList.remove('zigurat-intro-pending'); }, 6500);
+        /* فقط زمانی اجرا می‌شود که فایل اصلی انیمیشن اصلاً بارگذاری نشود. */
+        window.ziguratIntroFailsafe = window.setTimeout(function(){
+          document.documentElement.classList.remove('zigurat-intro-pending', 'zigurat-intro-finishing');
+          var intro = document.getElementById('zigurat-site-intro');
+          if (intro) intro.remove();
+        }, 12000);
       } catch (error) {}
     }());
     </script>

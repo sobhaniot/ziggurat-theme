@@ -59,6 +59,7 @@ function zigurat_enqueue_assets()
     if (is_page('login') || is_page_template('page-login.php')) {
         zigurat_enqueue_theme_style('manager');
         zigurat_enqueue_theme_script('manager-login');
+        zigurat_enqueue_theme_script('manager-views');
         zigurat_enqueue_theme_script('pricing-calculator');
     }
 
@@ -75,6 +76,13 @@ function zigurat_enqueue_assets()
     } elseif (is_singular('project')) {
         zigurat_enqueue_theme_style('project-single');
         zigurat_enqueue_theme_script('lightbox');
+    }
+
+    if (is_post_type_archive('zig_download') || is_singular('zig_download')) {
+        zigurat_enqueue_theme_style('downloads');
+        if (is_post_type_archive('zig_download')) {
+            zigurat_enqueue_theme_script('archive-filters');
+        }
     }
 
     if (is_tax() || is_search() || is_home() || is_404()) {
@@ -102,6 +110,7 @@ function zigurat_enqueue_assets()
         wp_localize_script('zigurat-invoice', 'ziguratInvoiceConfig', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'customerNonce' => wp_create_nonce('zigurat_invoice_customer_lookup'),
+            'stampLayoutNonce' => wp_create_nonce('zigurat_invoice_stamp_layout'),
             'managerName' => (static function () {
                 $user = wp_get_current_user();
                 $name = trim((string) $user->display_name);

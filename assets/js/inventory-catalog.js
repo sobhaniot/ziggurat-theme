@@ -41,6 +41,19 @@
       action.addEventListener('change', syncProject);
       syncProject();
     }
+
+    if (group.matches('form[data-inventory-auto-filter]')) {
+      var filterTimer = null;
+      group.addEventListener('change', function (event) {
+        if (!event.target.matches('select, input[type="checkbox"], input[type="radio"]')) return;
+        window.clearTimeout(filterTimer);
+        filterTimer = window.setTimeout(function () {
+          if (!group.isConnected) return;
+          if (typeof group.requestSubmit === 'function') group.requestSubmit();
+          else group.submit();
+        }, 80);
+      });
+    }
   });
   }
   initializeInventory(document);

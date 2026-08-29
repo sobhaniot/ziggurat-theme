@@ -222,11 +222,11 @@
   gap: 15px;
   align-items: start;
 }
-.inventory-report-toolbar .inventory-filters {
-  grid-template-columns: repeat(4, minmax(130px, 1fr)) auto;
+.inventory-report-toolbar .inventory-filters--transactions {
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
 }
-.inventory-filters--stock {
-  grid-template-columns: repeat(2, minmax(150px, 1fr)) auto auto;
+.inventory-report-toolbar .inventory-filters--stock {
+  grid-template-columns: repeat(2, minmax(150px, 1fr)) auto;
 }
 .inventory-catalog-forms {
   display: grid;

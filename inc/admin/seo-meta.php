@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
  */
 function zigurat_register_seo_rest_meta()
 {
-    foreach (array('page', 'project', 'article') as $post_type) {
+    foreach (array('page', 'project', 'article', 'zig_download') as $post_type) {
         foreach (array('_zigurat_seo_title', '_zigurat_seo_description') as $meta_key) {
             register_post_meta($post_type, $meta_key, array(
                 'type'              => 'string',
@@ -23,7 +23,7 @@ function zigurat_register_seo_rest_meta()
             ));
         }
     }
-    foreach (array('project', 'article') as $post_type) {
+    foreach (array('project', 'article', 'zig_download') as $post_type) {
         foreach (array(
             '_zigurat_seo_focus_keyword'    => 'sanitize_text_field',
             '_zigurat_seo_related_keywords' => 'sanitize_textarea_field',
@@ -45,7 +45,7 @@ add_action('init', 'zigurat_register_seo_rest_meta');
 
 function zigurat_add_seo_meta_box()
 {
-    foreach (array('page', 'project', 'article') as $post_type) {
+    foreach (array('page', 'project', 'article', 'zig_download') as $post_type) {
         add_meta_box('zigurat-seo-settings', 'تنظیمات سئو', 'zigurat_render_seo_meta_box', $post_type, 'normal', 'default');
     }
 }
@@ -112,6 +112,29 @@ function zigurat_article_seo_suggestions($post_id)
     );
 }
 
+function zigurat_download_seo_suggestions($post_id)
+{
+    $name = trim((string) get_the_title($post_id));
+    $version = function_exists('zigurat_download_meta') ? trim((string) zigurat_download_meta($post_id, 'version')) : '';
+    $type = function_exists('zigurat_download_primary_type') ? zigurat_download_primary_type($post_id) : 'فایل';
+    $title = trim('دانلود ' . $name . ($version !== '' ? ' نسخه ' . $version : '') . ' | زیگورات');
+    $excerpt = trim((string) get_post_field('post_excerpt', $post_id));
+    $description = $excerpt !== ''
+        ? zigurat_seo_trim_description($excerpt)
+        : zigurat_seo_trim_description('دانلود ' . $name . ' همراه با مشخصات نسخه، سازگاری، پیش‌نیازها و راهنمای نصب از مرکز دانلود زیگورات.');
+    $related = array_filter(array_merge(
+        function_exists('zigurat_download_term_names') ? zigurat_download_term_names($post_id, 'download_category') : array(),
+        function_exists('zigurat_download_term_names') ? zigurat_download_term_names($post_id, 'sketchup_version') : array()
+    ));
+    return array(
+        'title' => wp_html_excerpt($title, 70, '…'),
+        'description' => $description,
+        'focus' => trim('دانلود ' . $name),
+        'image_alt' => trim('تصویر ' . $type . ' ' . $name),
+        'related' => implode('، ', $related),
+    );
+}
+
 function zigurat_render_seo_meta_box($post)
 {
     wp_nonce_field('zigurat_save_seo_meta', 'zigurat_seo_nonce');
@@ -119,33 +142,38 @@ function zigurat_render_seo_meta_box($post)
     $description = get_post_meta($post->ID, '_zigurat_seo_description', true);
     $is_project = $post->post_type === 'project';
     $is_article = $post->post_type === 'article';
-    $is_extended = $is_project || $is_article;
-    $suggestions = $is_project ? zigurat_project_seo_suggestions($post->ID) : ($is_article ? zigurat_article_seo_suggestions($post->ID) : array());
+    $is_download = $post->post_type === 'zig_download';
+    $is_extended = $is_project || $is_article || $is_download;
+    $suggestions = $is_project ? zigurat_project_seo_suggestions($post->ID) : ($is_article ? zigurat_article_seo_suggestions($post->ID) : ($is_download ? zigurat_download_seo_suggestions($post->ID) : array()));
     $focus_keyword = $is_extended ? get_post_meta($post->ID, '_zigurat_seo_focus_keyword', true) : '';
     $related_keywords = $is_extended ? get_post_meta($post->ID, '_zigurat_seo_related_keywords', true) : '';
+    if ($related_keywords === '' && $is_download && !empty($suggestions['related'])) {
+        $related_keywords = $suggestions['related'];
+    }
     $image_alt = $is_extended ? get_post_meta($post->ID, '_zigurat_seo_image_alt', true) : '';
     $slug = $is_extended ? (string) $post->post_name : '';
     $base_url = $is_project
         ? home_url('/projects/')
-        : ($is_article ? (get_post_type_archive_link('article') ?: home_url('/articles/')) : '');
+        : ($is_article ? (get_post_type_archive_link('article') ?: home_url('/articles/')) : ($is_download ? (get_post_type_archive_link('zig_download') ?: home_url('/downloads/')) : ''));
+    $content_label = $is_project ? 'پروژه' : ($is_download ? 'فایل دانلودی' : 'مطلب');
     ?>
     <div class="zigurat-seo-editor <?php echo $is_extended ? 'is-' . esc_attr($post->post_type) : ''; ?>"<?php if ($is_extended): ?> data-content-type="<?php echo esc_attr($post->post_type); ?>" data-suggested-title="<?php echo esc_attr($suggestions['title']); ?>" data-suggested-description="<?php echo esc_attr($suggestions['description']); ?>" data-suggested-focus="<?php echo esc_attr($suggestions['focus']); ?>" data-suggested-alt="<?php echo esc_attr($suggestions['image_alt']); ?>" data-content-base-url="<?php echo esc_attr(trailingslashit($base_url)); ?>"<?php endif; ?>>
         <?php if ($is_extended): ?>
-            <div class="zigurat-seo-intro"><div><strong><?php echo $is_project ? 'سئوی پروژه' : 'سئوی مطلب'; ?></strong><p><?php echo $is_project ? 'پیشنهادها از عنوان پروژه، کارفرما، شهر و نوع اجرا ساخته می‌شوند.' : 'پیشنهادها از عنوان، خلاصه و محتوای مطلب ساخته می‌شوند.'; ?> همه مقادیر قابل ویرایش هستند.</p></div><button type="button" class="button button-primary" data-zigurat-seo-generate>ساخت پیشنهاد خودکار</button></div>
+            <div class="zigurat-seo-intro"><div><strong>سئوی <?php echo esc_html($content_label); ?></strong><p><?php echo $is_project ? 'پیشنهادها از عنوان پروژه، کارفرما، شهر و نوع اجرا ساخته می‌شوند.' : ($is_download ? 'پیشنهادها از نام فایل، نسخه، نوع محتوا و اطلاعات سازگاری ساخته می‌شوند.' : 'پیشنهادها از عنوان، خلاصه و محتوای مطلب ساخته می‌شوند.'); ?> همه مقادیر قابل ویرایش هستند.</p></div><button type="button" class="button button-primary" data-zigurat-seo-generate>ساخت پیشنهاد خودکار</button></div>
             <div class="zigurat-seo-grid">
-                <label><strong>عبارت کلیدی اصلی</strong><input id="zigurat-seo-focus" name="zigurat_seo_focus_keyword" type="text" class="widefat" value="<?php echo esc_attr($focus_keyword); ?>" placeholder="<?php echo esc_attr($is_project ? 'مثلاً اجرای تابلو کامپوزیت در لاهیجان' : 'مثلاً راهنمای انتخاب تابلو فروشگاهی'); ?>"><small>فقط راهنمای نگارش است و به‌صورت meta keywords منتشر نمی‌شود.</small></label>
-                <label><strong>نامک انگلیسی صفحه</strong><span class="zigurat-seo-slug-control"><span><?php echo esc_html(trailingslashit($base_url)); ?></span><input id="zigurat-seo-slug" name="zigurat_seo_slug" type="text" dir="ltr" inputmode="url" value="<?php echo esc_attr($slug); ?>" placeholder="<?php echo esc_attr($is_project ? 'xpoint-lahijan-composite-sign' : 'store-sign-buying-guide'); ?>"></span><small>فقط حروف انگلیسی کوچک، عدد و خط تیره؛ پس از انتشار بی‌دلیل تغییر ندهید.</small></label>
-                <label class="is-full"><strong>عبارت‌های مرتبط</strong><textarea id="zigurat-seo-related" name="zigurat_seo_related_keywords" class="widefat" rows="3" placeholder="<?php echo esc_attr($is_project ? 'تابلو سازی در لاهیجان، حروف برجسته، تابلو فروشگاهی' : 'تابلو سردر، حروف برجسته، طراحی تابلو تجاری'); ?>"><?php echo esc_textarea($related_keywords); ?></textarea><small>برای استفاده طبیعی در متن <?php echo $is_project ? 'پروژه' : 'مطلب'; ?>؛ این فهرست مستقیماً در صفحه یا متادیتا نمایش داده نمی‌شود.</small></label>
+                <label><strong>عبارت کلیدی اصلی</strong><input id="zigurat-seo-focus" name="zigurat_seo_focus_keyword" type="text" class="widefat" value="<?php echo esc_attr($focus_keyword); ?>" placeholder="<?php echo esc_attr($is_project ? 'مثلاً اجرای تابلو کامپوزیت در لاهیجان' : ($is_download ? 'مثلاً دانلود پلاگین SketchUp' : 'مثلاً راهنمای انتخاب تابلو فروشگاهی')); ?>"><small>فقط راهنمای نگارش است و به‌صورت meta keywords منتشر نمی‌شود.</small></label>
+                <label><strong>نامک انگلیسی صفحه</strong><span class="zigurat-seo-slug-control"><span><?php echo esc_html(trailingslashit($base_url)); ?></span><input id="zigurat-seo-slug" name="zigurat_seo_slug" type="text" dir="ltr" inputmode="url" value="<?php echo esc_attr($slug); ?>" placeholder="<?php echo esc_attr($is_project ? 'xpoint-lahijan-composite-sign' : ($is_download ? 'plugin-name-version' : 'store-sign-buying-guide')); ?>"></span><small>فقط حروف انگلیسی کوچک، عدد و خط تیره؛ پس از انتشار بی‌دلیل تغییر ندهید.</small></label>
+                <label class="is-full"><strong>عبارت‌های مرتبط</strong><textarea id="zigurat-seo-related" name="zigurat_seo_related_keywords" class="widefat" rows="3" placeholder="<?php echo esc_attr($is_project ? 'تابلو سازی در لاهیجان، حروف برجسته، تابلو فروشگاهی' : ($is_download ? 'پلاگین اسکچ‌آپ، ابزار طراحی، SketchUp 2026' : 'تابلو سردر، حروف برجسته، طراحی تابلو تجاری')); ?>"><?php echo esc_textarea($related_keywords); ?></textarea><small>برای استفاده طبیعی در متن <?php echo esc_html($content_label); ?>؛ این فهرست مستقیماً در صفحه یا متادیتا نمایش داده نمی‌شود.</small></label>
             </div>
         <?php endif; ?>
         <div class="zigurat-seo-grid">
             <label class="is-full"><strong>عنوان سئو</strong><input id="zigurat-seo-title" name="zigurat_seo_title" type="text" class="widefat" maxlength="70" value="<?php echo esc_attr($title); ?>" placeholder="اگر خالی باشد، عنوان استاندارد وردپرس استفاده می‌شود."><small><span data-seo-title-count>۰</span> نویسه؛ عنوانی روشن، منحصربه‌فرد و کوتاه بنویسید.</small></label>
             <label class="is-full"><strong>توضیحات متا</strong><textarea id="zigurat-seo-description" name="zigurat_seo_description" class="widefat" rows="3" maxlength="170" placeholder="خلاصه‌ای روشن و ترغیب‌کننده از محتوای صفحه"><?php echo esc_textarea($description); ?></textarea><small><span data-seo-description-count>۰</span> نویسه؛ حدود ۱۴۰ تا ۱۶۰ نویسه معمولاً مناسب است.</small></label>
-            <?php if ($is_extended): ?><label class="is-full"><strong>متن جایگزین تصویر شاخص</strong><input id="zigurat-seo-image-alt" name="zigurat_seo_image_alt" type="text" class="widefat" value="<?php echo esc_attr($image_alt); ?>" placeholder="توصیف واقعی تصویر شاخص <?php echo $is_project ? 'پروژه' : 'مطلب'; ?>"><small>تصویر را توصیف کنید؛ عبارت کلیدی را فقط در صورت مرتبط‌بودن به تصویر استفاده کنید.</small></label><?php endif; ?>
+            <?php if ($is_extended): ?><label class="is-full"><strong>متن جایگزین تصویر شاخص</strong><input id="zigurat-seo-image-alt" name="zigurat_seo_image_alt" type="text" class="widefat" value="<?php echo esc_attr($image_alt); ?>" placeholder="توصیف واقعی تصویر شاخص <?php echo esc_attr($content_label); ?>"><small>تصویر را توصیف کنید؛ عبارت کلیدی را فقط در صورت مرتبط‌بودن به تصویر استفاده کنید.</small></label><?php endif; ?>
         </div>
         <?php if ($is_extended): ?>
-            <section class="zigurat-google-preview" aria-label="پیش‌نمایش تقریبی نتیجه گوگل"><span>پیش‌نمایش تقریبی نتیجه گوگل</span><cite data-seo-preview-url><?php echo esc_html(trailingslashit($base_url) . ($slug ?: ($is_project ? 'project-slug' : 'article-slug')) . '/'); ?></cite><strong data-seo-preview-title><?php echo esc_html($title ?: ($suggestions['title'] ?: get_the_title($post))); ?></strong><p data-seo-preview-description><?php echo esc_html($description ?: $suggestions['description']); ?></p></section>
-            <p class="zigurat-seo-taxonomy-note"><?php echo $is_project ? 'برای دسته‌بندی پروژه از فیلدهای کارفرما، شهر، استان، نوع اجرا و باکس‌های «خدمات» و «متریال» استفاده کنید؛ نیازی به برچسب تکراری نیست.' : 'موضوع اصلی را در «دسته‌بندی مطالب» و عبارت‌های جزئی‌تر را در «برچسب‌های مطالب» ثبت کنید؛ برچسب‌های زیاد و تکراری نسازید.'; ?></p>
+            <section class="zigurat-google-preview" aria-label="پیش‌نمایش تقریبی نتیجه گوگل"><span>پیش‌نمایش تقریبی نتیجه گوگل</span><cite data-seo-preview-url><?php echo esc_html(trailingslashit($base_url) . ($slug ?: ($is_project ? 'project-slug' : ($is_download ? 'download-slug' : 'article-slug'))) . '/'); ?></cite><strong data-seo-preview-title><?php echo esc_html($title ?: ($suggestions['title'] ?: get_the_title($post))); ?></strong><p data-seo-preview-description><?php echo esc_html($description ?: $suggestions['description']); ?></p></section>
+            <p class="zigurat-seo-taxonomy-note"><?php echo $is_project ? 'برای دسته‌بندی پروژه از فیلدهای کارفرما، شهر، استان، نوع اجرا و باکس‌های «خدمات» و «متریال» استفاده کنید؛ نیازی به برچسب تکراری نیست.' : ($is_download ? 'نوع فایل، دسته دانلود، سیستم‌عامل و نسخه‌های سازگار SketchUp را دقیق انتخاب کنید؛ از عبارت‌های تکراری پرهیز کنید.' : 'موضوع اصلی را در «دسته‌بندی مطالب» و عبارت‌های جزئی‌تر را در «برچسب‌های مطالب» ثبت کنید؛ برچسب‌های زیاد و تکراری نسازید.'); ?></p>
         <?php endif; ?>
     </div>
     <?php
@@ -171,7 +199,7 @@ function zigurat_save_seo_meta($post_id)
             update_post_meta($post_id, '_zigurat_seo_' . $key, $value);
         }
     }
-    if (!in_array(get_post_type($post_id), array('project', 'article'), true)) {
+    if (!in_array(get_post_type($post_id), array('project', 'article', 'zig_download'), true)) {
         return;
     }
     $content_fields = array(

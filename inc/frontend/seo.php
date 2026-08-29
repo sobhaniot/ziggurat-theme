@@ -82,6 +82,12 @@ function zigurat_seo_has_archive_filters()
         'project_city',
         'project_province',
         'project_sign_type',
+        'download_search',
+        'download_type',
+        'download_category',
+        'sketchup_version',
+        'download_os',
+        'download_sort',
     );
     foreach ($filter_keys as $key) {
         if (isset($_GET[$key]) && $_GET[$key] !== '') {
@@ -131,6 +137,9 @@ function zigurat_seo_document_title($title)
     if (is_post_type_archive('article')) {
         return 'مطالب و مقالات تخصصی تابلو و دکوراسیون | زیگورات';
     }
+    if (is_post_type_archive('zig_download')) {
+        return 'دانلود نرم‌افزار، پلاگین SketchUp و مستندات | زیگورات';
+    }
     return $title;
 }
 add_filter('pre_get_document_title', 'zigurat_seo_document_title', 100);
@@ -155,6 +164,9 @@ function zigurat_seo_description()
     }
     if (is_post_type_archive('article')) {
         return 'مقالات و راهنماهای تخصصی زیگورات درباره تابلو سازی، چاپ، دکوراسیون، بازسازی و اجرای فضاهای تجاری.';
+    }
+    if (is_post_type_archive('zig_download')) {
+        return 'مرکز دانلود زیگورات؛ دریافت نرم‌افزارهای کاربردی، پلاگین‌های SketchUp، مستندات و فایل‌های آموزشی همراه با نسخه، سازگاری و راهنمای نصب.';
     }
     if (is_page('cooperation') || is_page_template('page-cooperation.php')) {
         return 'ثبت‌نام نصاب، بنا، نقاش، برقکار، ام‌دی‌اف‌کار و تأمین‌کنندگان سراسر ایران برای دریافت پروژه و همکاری با زیگورات.';
@@ -243,7 +255,7 @@ function zigurat_seo_image()
         return array();
     }
     $alt = '';
-    if (is_singular(array('project', 'article'))) {
+    if (is_singular(array('project', 'article', 'zig_download'))) {
         $alt = trim((string) get_post_meta(get_queried_object_id(), '_zigurat_seo_image_alt', true));
     }
     if ($alt === '') {
@@ -302,12 +314,13 @@ function zigurat_seo_breadcrumb_schema($canonical)
     $items = array(
         array('@type' => 'ListItem', 'position' => 1, 'name' => 'خانه', 'item' => home_url('/')),
     );
-    if (is_singular(array('project', 'article'))) {
+    if (is_singular(array('project', 'article', 'zig_download'))) {
         $post_type = get_post_type();
+        $archive_names = array('project' => 'پروژه‌ها', 'article' => 'مطالب', 'zig_download' => 'مرکز دانلود');
         $items[] = array(
             '@type' => 'ListItem',
             'position' => 2,
-            'name' => $post_type === 'project' ? 'پروژه‌ها' : 'مطالب',
+            'name' => $archive_names[$post_type] ?? 'آرشیو',
             'item' => get_post_type_archive_link($post_type),
         );
     }
@@ -430,6 +443,42 @@ function zigurat_output_seo_head()
             'creator' => array('@id' => home_url('/#organization')),
             'dateCreated' => get_post_time(DATE_W3C, true, $post_id),
         ));
+    } elseif (is_singular('zig_download')) {
+        $post_id = get_queried_object_id();
+        $type = function_exists('zigurat_download_primary_type') ? zigurat_download_primary_type($post_id) : '';
+        $is_software = preg_match('/نرم.?افزار|پلاگین|SketchUp|اسکچ/u', $type . ' ' . get_the_title($post_id));
+        $download_schema = array(
+            '@type' => $is_software ? 'SoftwareApplication' : 'DigitalDocument',
+            '@id' => $canonical . '#download',
+            'name' => get_the_title($post_id),
+            'description' => $description,
+            'url' => $canonical,
+            'datePublished' => get_post_time(DATE_W3C, true, $post_id),
+            'dateModified' => get_post_modified_time(DATE_W3C, true, $post_id),
+            'publisher' => array('@id' => home_url('/#organization')),
+        );
+        if ($image) {
+            $download_schema['image'] = $image['url'];
+        }
+        if (function_exists('zigurat_download_source_url') && zigurat_download_source_url($post_id)) {
+            $download_schema['downloadUrl'] = zigurat_download_action_url($post_id);
+        }
+        if ($is_software) {
+            $version = zigurat_download_meta($post_id, 'version');
+            $os = zigurat_download_term_names($post_id, 'download_os');
+            $license = zigurat_download_meta($post_id, 'license');
+            $download_schema['applicationCategory'] = strpos($type, 'پلاگین') !== false ? 'DesignApplication' : 'UtilitiesApplication';
+            if ($version) {
+                $download_schema['softwareVersion'] = $version;
+            }
+            if ($os) {
+                $download_schema['operatingSystem'] = implode(', ', $os);
+            }
+            if ($license && preg_match('/رایگان|free/i', $license)) {
+                $download_schema['offers'] = array('@type' => 'Offer', 'price' => '0', 'priceCurrency' => 'IRR');
+            }
+        }
+        $graph[] = array_filter($download_schema);
     }
     $breadcrumb = zigurat_seo_breadcrumb_schema($canonical);
     if ($breadcrumb) {
@@ -528,7 +577,7 @@ function zigurat_image_alt_fallback($attr, $attachment)
         !is_admin()
         && $attachment instanceof WP_Post
         && $current_post_id
-        && in_array(get_post_type($current_post_id), array('project', 'article'), true)
+        && in_array(get_post_type($current_post_id), array('project', 'article', 'zig_download'), true)
         && get_post_thumbnail_id($current_post_id) === $attachment->ID
     ) {
         $project_alt = trim((string) get_post_meta($current_post_id, '_zigurat_seo_image_alt', true));

@@ -88,7 +88,7 @@
     });
   }
 
-  function updatePage(parsed, newRoot, finalUrl, historyMode, shouldFocus) {
+  function updatePage(parsed, newRoot, finalUrl, historyMode, shouldFocus, scrollPosition) {
     var oldRoot = currentRoot();
     if (!oldRoot) return false;
     syncStylesheets(parsed, finalUrl);
@@ -100,7 +100,14 @@
 
     var insertedRoot = currentRoot();
     document.dispatchEvent(new CustomEvent('zigurat:panel-updated', { detail: { root: insertedRoot, url: finalUrl } }));
-    if (shouldFocus && insertedRoot) {
+    if (scrollPosition) {
+      var restoreScroll = function () {
+        var maximum = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        window.scrollTo(scrollPosition.x, Math.min(scrollPosition.y, maximum));
+      };
+      restoreScroll();
+      window.requestAnimationFrame(restoreScroll);
+    } else if (shouldFocus && insertedRoot) {
       window.scrollTo({ top: Math.max(0, insertedRoot.getBoundingClientRect().top + window.scrollY - 110), behavior: 'smooth' });
       var heading = insertedRoot.querySelector('h1');
       if (heading) {
@@ -116,6 +123,7 @@
     var root = currentRoot();
     if (!root) return;
     var expectedSelector = selectorFor(root);
+    var scrollPosition = options.preserveScroll ? { x: window.scrollX, y: window.scrollY } : null;
     if (requestController) requestController.abort();
     var controller = new AbortController();
     requestController = controller;
@@ -140,7 +148,7 @@
         window.location.assign(response.url || url);
         return;
       }
-      updatePage(parsed, newRoot, response.url || url, options.historyMode || 'push', options.focus !== false);
+      updatePage(parsed, newRoot, response.url || url, options.historyMode || 'push', options.focus !== false, scrollPosition);
     } catch (error) {
       if (error.name !== 'AbortError') {
         setBusy(currentRoot() || root, false);
@@ -187,7 +195,13 @@
       });
       loadPanel(url.href, { method: 'GET', historyMode: 'push' });
     } else {
-      loadPanel(url.href, { method: method, body: data, historyMode: 'replace' });
+      loadPanel(url.href, {
+        method: method,
+        body: data,
+        historyMode: 'replace',
+        focus: !root.matches('main.invoice-admin-page'),
+        preserveScroll: root.matches('main.invoice-admin-page')
+      });
     }
   });
 

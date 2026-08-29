@@ -544,6 +544,13 @@ body.home .hero {
 .hero-overlay {
   position: absolute;
   inset: 0;
+  background: linear-gradient(
+    to left,
+    rgba(8, 8, 8, .9) 0%,
+    rgba(8, 8, 8, .74) 34%,
+    rgba(8, 8, 8, .34) 58%,
+    rgba(8, 8, 8, 0) 82%
+  );
 }
 .hero .container {
   position: absolute;
@@ -554,12 +561,13 @@ body.home .hero {
 }
 .hero-content {
   max-width: 650px;
-  color: rgb(0, 0, 0);
+  color: #fff;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, .38);
 }
 .hero-content h1 {
   font-size: 55px;
   line-height: 1.4;
-  color: rgb(0, 0, 0);
+  color: #fff;
   margin-bottom: 25px;
 }
 .hero-content h1 span {
@@ -567,7 +575,7 @@ body.home .hero {
 }
 .hero-content p {
   font-size: 20px;
-  color: rgb(0, 0, 0);
+  color: rgba(255, 255, 255, .92);
   margin-bottom: 40px;
 }
 /* Buttons */
@@ -610,7 +618,12 @@ body.home .hero {
     object-position: center;
   }
   .hero-overlay {
-    background: rgba(255, 255, 255, .5);
+    background: linear-gradient(
+      to left,
+      rgba(8, 8, 8, .9) 0%,
+      rgba(8, 8, 8, .78) 58%,
+      rgba(8, 8, 8, .58) 100%
+    );
   }
   .hero .container {
     padding: 28px 20px;

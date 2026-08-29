@@ -18,6 +18,57 @@ function zigurat_invoice_status_label($status)
     return $status === 'draft' ? 'پیش‌نویس' : 'صادرشده';
 }
 
+function zigurat_invoice_payment_status_label($status)
+{
+    $labels = array(
+        'not_applicable' => 'بدون وضعیت پرداخت',
+        'unpaid' => 'پرداخت‌نشده',
+        'partial' => 'پرداخت‌نشده',
+        'settled' => 'تسویه کامل',
+    );
+    return $labels[$status] ?? $labels['unpaid'];
+}
+
+function zigurat_invoice_tax_status_label($status)
+{
+    $labels = array(
+        'not_submitted' => 'ثبت‌نشده',
+        'ready' => 'آماده ارسال',
+        'submitted' => 'ثبت‌شده',
+        'confirmed' => 'تأییدشده در مؤدیان',
+        'rejected' => 'خطا / ردشده',
+        'corrected' => 'اصلاح‌شده',
+        'voided' => 'باطل‌شده',
+    );
+    return $labels[$status] ?? $labels['not_submitted'];
+}
+
+function zigurat_invoice_tax_subject_label($subject)
+{
+    return $subject === 'correction' ? 'اصلاحیه' : 'اصلی';
+}
+
+function zigurat_invoice_is_locked($invoice)
+{
+    if (!$invoice || ($invoice->document_type ?? '') !== 'invoice' || ($invoice->status ?? '') !== 'issued') {
+        return false;
+    }
+    return ($invoice->payment_status ?? '') === 'settled'
+        || ((int) ($invoice->grand_total ?? 0) > 0 && (int) ($invoice->paid_amount ?? 0) >= (int) $invoice->grand_total);
+}
+
+function zigurat_invoice_lock_reason_label($invoice)
+{
+    if (!$invoice) {
+        return '';
+    }
+    $reason = (string) ($invoice->locked_reason ?? '');
+    if ($reason === 'settled' || ($invoice->payment_status ?? '') === 'settled') {
+        return 'این فاکتور تسویه کامل شده و برای حفظ سابقه مالی قابل ویرایش نیست.';
+    }
+    return 'این سند قفل شده و قابل ویرایش نیست.';
+}
+
 function zigurat_invoice_default_seller($brand)
 {
     if (function_exists('zigurat_invoice_get_brand_settings')) {
@@ -86,7 +137,8 @@ function zigurat_invoice_money($value)
 
 function zigurat_invoice_quantity($value)
 {
-    $value = str_replace(',', '.', zigurat_invoice_normalize_digits($value));
+    $value = str_replace(array(',', '،', '٫'), '.', zigurat_invoice_normalize_digits($value));
+    $value = preg_replace('/[^0-9.]/', '', $value);
     return max(0, round((float) $value, 3));
 }
 
@@ -183,9 +235,15 @@ function zigurat_invoice_tax_summary($year)
         "SELECT tax_quarter, COUNT(*) invoice_count,
                 SUM(grand_total) grand_total, SUM(tax_amount) tax_amount,
                 SUM(paid_amount) paid_amount, SUM(balance) balance
-         FROM " . zigurat_invoices_table_name() . "
-         WHERE brand='official' AND document_type='invoice' AND status='issued'
-           AND tax_year=%d AND tax_quarter BETWEEN 1 AND 4
+         FROM " . zigurat_invoices_table_name() . " i
+         WHERE i.brand='official' AND i.document_type='invoice' AND i.status='issued'
+           AND i.tax_status <> 'voided'
+           AND NOT EXISTS (
+               SELECT 1 FROM " . zigurat_invoices_table_name() . " child
+               WHERE child.reference_invoice_id = i.id AND child.tax_subject = 'correction'
+                 AND child.status = 'issued' AND child.tax_status IN ('submitted','confirmed','corrected')
+           )
+           AND i.tax_year=%d AND i.tax_quarter BETWEEN 1 AND 4
          GROUP BY tax_quarter",
         $year
     ));
@@ -213,6 +271,7 @@ function zigurat_invoice_page_url($args = array())
         'id'    => 'invoice_id',
         'from_proforma' => 'invoice_from_proforma',
         'branch_from' => 'invoice_branch_from',
+        'correction_from' => 'invoice_correction_from',
     );
     foreach ($route_keys as $key => $invoice_key) {
         if (array_key_exists($key, $args)) {
@@ -237,6 +296,128 @@ function zigurat_invoice_get($invoice_id)
     $seller = json_decode((string) $invoice->seller_json, true);
     $invoice->seller = is_array($seller) ? $seller : zigurat_invoice_default_seller($invoice->brand);
     return $invoice;
+}
+
+function zigurat_invoice_get_latest_correction($invoice_id)
+{
+    global $wpdb;
+    return $wpdb->get_row($wpdb->prepare(
+        "SELECT * FROM " . zigurat_invoices_table_name() . " WHERE reference_invoice_id = %d AND tax_subject = 'correction' ORDER BY id DESC LIMIT 1",
+        absint($invoice_id)
+    ));
+}
+
+function zigurat_invoice_set_payment_status($invoice_id, $status)
+{
+    if (!zigurat_is_manager()) {
+        return new WP_Error('forbidden', 'دسترسی به وضعیت پرداخت مجاز نیست.');
+    }
+    $status = sanitize_key($status);
+    if (!in_array($status, array('unpaid','settled'), true)) {
+        return new WP_Error('invalid_status', 'وضعیت پرداخت معتبر نیست.');
+    }
+    $invoice = zigurat_invoice_get($invoice_id);
+    if (!$invoice || $invoice->document_type !== 'invoice') {
+        return new WP_Error('invalid_invoice', 'این سند، فاکتور معتبر نیست.');
+    }
+    if ($invoice->status !== 'issued') {
+        return new WP_Error('draft_invoice', 'ابتدا فاکتور را از حالت پیش‌نویس خارج کنید.');
+    }
+    $now = current_time('mysql', true);
+    global $wpdb;
+    $wpdb->query('START TRANSACTION');
+    $locked_invoice = $wpdb->get_row($wpdb->prepare(
+        'SELECT * FROM ' . zigurat_invoices_table_name() . ' WHERE id = %d FOR UPDATE',
+        absint($invoice_id)
+    ));
+    if (!$locked_invoice) {
+        $wpdb->query('ROLLBACK');
+        return new WP_Error('not_found', 'فاکتور پیدا نشد.');
+    }
+    $update = array(
+        'paid_amount'=>$status === 'settled' ? (int) $locked_invoice->grand_total : 0,
+        'balance'=>$status === 'settled' ? 0 : (int) $locked_invoice->grand_total,
+        'payment_status'=>$status,
+        'settled_at'=>$status === 'settled' ? $now : null,
+        'updated_by'=>get_current_user_id(),
+        'updated_at'=>$now,
+    );
+    if ($status === 'settled') {
+        $update['locked_at'] = $locked_invoice->locked_at ?: $now;
+        $update['locked_reason'] = 'settled';
+    } else {
+        $update['locked_at'] = null;
+        $update['locked_reason'] = '';
+    }
+    $saved = $wpdb->update(zigurat_invoices_table_name(), $update, array('id'=>absint($invoice_id)));
+    if ($saved === false) {
+        $wpdb->query('ROLLBACK');
+        return new WP_Error('database', 'وضعیت پرداخت ذخیره نشد.');
+    }
+    $wpdb->query('COMMIT');
+    return zigurat_invoice_get($invoice_id);
+}
+
+function zigurat_invoice_set_tax_status($invoice_id, $status)
+{
+    if (!zigurat_is_manager()) {
+        return new WP_Error('forbidden', 'دسترسی به وضعیت مؤدیان مجاز نیست.');
+    }
+    $status = sanitize_key($status);
+    if (!in_array($status, array('not_submitted','submitted'), true)) {
+        return new WP_Error('invalid_status', 'وضعیت مؤدیان معتبر نیست.');
+    }
+    $invoice = zigurat_invoice_get($invoice_id);
+    if (!$invoice || $invoice->brand !== 'official' || $invoice->document_type !== 'invoice') {
+        return new WP_Error('invalid_invoice', 'این سند، فاکتور رسمی معتبر نیست.');
+    }
+    if ($invoice->status !== 'issued') {
+        return new WP_Error('draft_invoice', 'ابتدا فاکتور را از حالت پیش‌نویس خارج کنید.');
+    }
+    if (in_array(($invoice->tax_status ?? ''), array('confirmed','corrected','voided'), true)) {
+        return new WP_Error('terminal_status', 'وضعیت این سند نهایی شده و قابل بازگشت نیست.');
+    }
+    $now = current_time('mysql', true);
+    global $wpdb;
+    $wpdb->query('START TRANSACTION');
+    $locked_invoice = $wpdb->get_row($wpdb->prepare(
+        'SELECT * FROM ' . zigurat_invoices_table_name() . ' WHERE id = %d FOR UPDATE',
+        absint($invoice_id)
+    ));
+    if (!$locked_invoice) {
+        $wpdb->query('ROLLBACK');
+        return new WP_Error('not_found', 'فاکتور پیدا نشد.');
+    }
+    $update = array(
+        'tax_status'=>$status,
+        'tax_submitted_at'=>$status === 'submitted' ? $now : null,
+        'updated_by'=>get_current_user_id(),
+        'updated_at'=>$now,
+    );
+    if (($locked_invoice->locked_reason ?? '') === 'tax_submitted') {
+        $payment_locked = ($locked_invoice->payment_status ?? '') === 'settled';
+        $update['locked_at'] = $payment_locked ? ($locked_invoice->locked_at ?: $now) : null;
+        $update['locked_reason'] = $payment_locked ? 'settled' : '';
+    }
+    $saved = $wpdb->update(zigurat_invoices_table_name(), $update, array('id'=>absint($invoice_id)));
+    if ($saved === false) {
+        $wpdb->query('ROLLBACK');
+        return new WP_Error('database', 'وضعیت مؤدیان ذخیره نشد.');
+    }
+    if (($locked_invoice->tax_subject ?? 'original') === 'correction' && !empty($locked_invoice->reference_invoice_id)) {
+        $parent_status = $status === 'submitted' ? 'corrected' : 'submitted';
+        $parent_saved = $wpdb->update(zigurat_invoices_table_name(), array(
+            'tax_status'=>$parent_status,
+            'updated_by'=>get_current_user_id(),
+            'updated_at'=>$now,
+        ), array('id'=>absint($locked_invoice->reference_invoice_id)), array('%s','%d','%s'), array('%d'));
+        if ($parent_saved === false) {
+            $wpdb->query('ROLLBACK');
+            return new WP_Error('database', 'وضعیت فاکتور مرجع اصلاحیه ذخیره نشد.');
+        }
+    }
+    $wpdb->query('COMMIT');
+    return zigurat_invoice_get($invoice_id);
 }
 
 function zigurat_invoice_can_branch($invoice)
@@ -339,14 +520,42 @@ function zigurat_invoice_save($data)
         ? absint($existing->source_proforma_id ?? 0)
         : absint($data['source_proforma_id'] ?? 0);
     $branch_source_id = $existing ? 0 : absint($data['branch_source_id'] ?? 0);
+    $reference_invoice_id = $existing
+        ? absint($existing->reference_invoice_id ?? 0)
+        : absint($data['reference_invoice_id'] ?? 0);
+    $tax_subject = $existing
+        ? sanitize_key($existing->tax_subject ?? 'original')
+        : sanitize_key($data['tax_subject'] ?? 'original');
+    if (!in_array($tax_subject, array('original','correction'), true)) {
+        $tax_subject = 'original';
+    }
     if (!in_array($brand, array('official','unofficial'), true) || !in_array($type, array('proforma','invoice'), true)) {
         return new WP_Error('invalid_type', 'نوع فاکتور معتبر نیست.');
     }
     if ($invoice_id && !$existing) {
         return new WP_Error('not_found', 'فاکتور پیدا نشد.');
     }
+    if ($existing && zigurat_invoice_is_locked($existing)) {
+        return new WP_Error('invoice_locked', zigurat_invoice_lock_reason_label($existing));
+    }
     if ($branch_source_id && $source_proforma_id) {
         return new WP_Error('invalid_branch', 'یک سند هم‌زمان نمی‌تواند تبدیل و انشعاب باشد.');
+    }
+    if ($tax_subject === 'correction') {
+        $reference = zigurat_invoice_get($reference_invoice_id);
+        if (!$reference || $brand !== 'official' || $type !== 'invoice'
+            || $reference->brand !== 'official' || $reference->document_type !== 'invoice') {
+            return new WP_Error('invalid_reference', 'فاکتور مرجع اصلاحیه معتبر نیست.');
+        }
+        $previous_correction = zigurat_invoice_get_latest_correction($reference_invoice_id);
+        if (!$existing && $previous_correction) {
+            return new WP_Error('correction_exists', 'برای این فاکتور قبلاً اصلاحیه شماره ' . zigurat_invoice_object_number($previous_correction) . ' ساخته شده است.');
+        }
+        if ($branch_source_id || $source_proforma_id) {
+            return new WP_Error('invalid_correction', 'اصلاحیه نمی‌تواند هم‌زمان تبدیل یا انشعاب باشد.');
+        }
+    } else {
+        $reference_invoice_id = 0;
     }
     if ($branch_source_id) {
         $branch_source = zigurat_invoice_get($branch_source_id);
@@ -405,8 +614,12 @@ function zigurat_invoice_save($data)
     $taxable = $amount_with_overhead + $insurance_amount;
     $tax_amount = (int) round($taxable * $tax_rate / 100);
     $grand_total = $taxable + $tax_amount;
-    $paid_amount = zigurat_invoice_money($data['paid_amount'] ?? 0);
+    // وضعیت پرداخت فقط از ستون پرداخت در فهرست فاکتورها تغییر می‌کند.
+    $paid_amount = $existing && ($existing->payment_status ?? '') === 'settled' ? $grand_total : 0;
     $balance = max(0, $grand_total - $paid_amount);
+    $payment_status = $type !== 'invoice'
+        ? 'not_applicable'
+        : ($grand_total > 0 && $paid_amount >= $grand_total ? 'settled' : ($paid_amount > 0 ? 'partial' : 'unpaid'));
     $seller = zigurat_invoice_clean_seller($data, $brand);
     $now = current_time('mysql', true);
     $user_id = get_current_user_id();
@@ -424,6 +637,10 @@ function zigurat_invoice_save($data)
         if (!$locked) {
             $wpdb->query('ROLLBACK');
             return new WP_Error('not_found', 'فاکتور پیدا نشد.');
+        }
+        if (zigurat_invoice_is_locked($locked)) {
+            $wpdb->query('ROLLBACK');
+            return new WP_Error('invoice_locked', zigurat_invoice_lock_reason_label($locked));
         }
         $document_number = (int) $locked->document_number;
         $number_suffix = absint($locked->number_suffix ?? 0);
@@ -553,6 +770,8 @@ function zigurat_invoice_save($data)
         'tax_quarter'=>$tax_period['quarter'], 'status'=>$status,
         'subject'=>sanitize_text_field(wp_unslash((string) ($data['subject'] ?? ''))),
         'source_proforma_id'=>$source_proforma_id,
+        'tax_subject'=>$tax_subject,
+        'reference_invoice_id'=>$reference_invoice_id,
         'seller_json'=>wp_json_encode($seller, JSON_UNESCAPED_UNICODE),
         'customer_name'=>$customer_name,
         'customer_national_id'=>sanitize_text_field(wp_unslash((string) ($data['customer_national_id'] ?? ''))),
@@ -568,6 +787,7 @@ function zigurat_invoice_save($data)
         'insurance_rate'=>$insurance_rate, 'insurance_amount'=>$insurance_amount,
         'tax_rate'=>$tax_rate, 'tax_amount'=>$tax_amount, 'grand_total'=>$grand_total,
         'paid_amount'=>$paid_amount, 'balance'=>$balance,
+        'payment_status'=>$payment_status,
         'notes'=>sanitize_textarea_field(wp_unslash((string) ($data['notes'] ?? ''))),
         'payment_info'=>sanitize_textarea_field(wp_unslash((string) ($data['payment_info'] ?? ''))),
         'updated_by'=>$user_id, 'updated_at'=>$now,
@@ -598,6 +818,17 @@ function zigurat_invoice_save($data)
             return new WP_Error('database', 'ذخیره ردیف‌های فاکتور انجام نشد.');
         }
     }
+    if ($status === 'issued' && $payment_status === 'settled') {
+        $locked_saved = $wpdb->update($invoice_table, array(
+            'settled_at'=>$now,
+            'locked_at'=>$now,
+            'locked_reason'=>'settled',
+        ), array('id'=>$invoice_id), array('%s','%s','%s'), array('%d'));
+        if ($locked_saved === false) {
+            $wpdb->query('ROLLBACK');
+            return new WP_Error('database', 'وضعیت تسویه فاکتور ذخیره نشد.');
+        }
+    }
     $wpdb->query('COMMIT');
     return zigurat_invoice_get($invoice_id);
 }
@@ -605,12 +836,16 @@ function zigurat_invoice_save($data)
 function zigurat_invoice_list($args = array())
 {
     global $wpdb;
-    $args = wp_parse_args($args, array('brand'=>'','type'=>'','status'=>'','search'=>'','tax_year'=>0,'tax_quarter'=>0,'page'=>1,'per_page'=>30));
+    $args = wp_parse_args($args, array('brand'=>'','type'=>'','status'=>'','payment_status'=>'','tax_status'=>'','search'=>'','tax_year'=>0,'tax_quarter'=>0,'page'=>1,'per_page'=>30));
     $where = array('1=1');
     $values = array();
     if (in_array($args['brand'], array('official','unofficial'), true)) { $where[]='brand=%s'; $values[]=$args['brand']; }
     if (in_array($args['type'], array('invoice','proforma'), true)) { $where[]='document_type=%s'; $values[]=$args['type']; }
     if (in_array($args['status'], array('draft','issued'), true)) { $where[]='status=%s'; $values[]=$args['status']; }
+    if ($args['payment_status'] === 'unpaid') { $where[]="payment_status IN ('unpaid','partial')"; }
+    elseif ($args['payment_status'] === 'settled') { $where[]='payment_status=%s'; $values[]='settled'; }
+    if ($args['tax_status'] === 'not_submitted') { $where[]="tax_status IN ('not_submitted','ready','rejected')"; }
+    elseif ($args['tax_status'] === 'submitted') { $where[]="tax_status IN ('submitted','confirmed','corrected','voided')"; }
     if (absint($args['tax_year'])) { $where[]='tax_year=%d'; $values[]=absint($args['tax_year']); }
     if (absint($args['tax_quarter']) >= 1 && absint($args['tax_quarter']) <= 4) { $where[]='tax_quarter=%d'; $values[]=absint($args['tax_quarter']); }
     if ($args['search'] !== '') {

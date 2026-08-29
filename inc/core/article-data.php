@@ -37,6 +37,7 @@ function zigurat_record_article_view()
         '_article_views'
     ));
     clean_post_cache($post_id);
+    zigurat_record_daily_view('article');
 
     setcookie($cookie_name, '1', array(
         'expires'  => time() + (12 * HOUR_IN_SECONDS),

@@ -7,6 +7,7 @@ $statistics = zigurat_get_manager_views_statistics(10);
 $total_views = max(0, (int) $statistics['total_views']);
 $article_share = $total_views ? round(((int) $statistics['article_views'] / $total_views) * 100, 1) : 0;
 $project_share = $total_views ? round(((int) $statistics['project_views'] / $total_views) * 100, 1) : 0;
+$traffic_chart_data = zigurat_get_all_views_chart_data();
 $top_max = 0;
 foreach ($statistics['top_content'] as $content_item) {
     $top_max = max($top_max, (int) $content_item->views);
@@ -50,6 +51,28 @@ foreach ($statistics['top_content'] as $content_item) {
             </div>
         </article>
     </div>
+
+    <section class="manager-traffic" data-manager-traffic-chart aria-labelledby="manager-traffic-title">
+        <div class="manager-traffic__heading">
+            <div><span>روند زمانی بازدید</span><h3 id="manager-traffic-title">نمودار بازدید روزانه</h3><small data-traffic-subtitle>۱۴ روز اخیر</small></div>
+            <div class="manager-traffic__ranges" role="group" aria-label="انتخاب بازه نمودار">
+                <button type="button" class="is-active" data-traffic-range="daily">روزانه</button>
+                <button type="button" data-traffic-range="weekly">هفتگی</button>
+                <button type="button" data-traffic-range="monthly">ماهانه</button>
+                <button type="button" data-traffic-range="yearly">سالانه</button>
+            </div>
+        </div>
+        <div class="manager-traffic__summary"><span>مجموع بازدید این بازه</span><strong data-traffic-total>۰</strong></div>
+        <div class="manager-traffic__legend"><span><i class="is-article"></i>مطالب</span><span><i class="is-project"></i>پروژه‌ها</span></div>
+        <div class="manager-traffic__scroll">
+            <div class="manager-traffic__plot" data-traffic-plot role="img" aria-label="نمودار بازدید مطالب و پروژه‌ها">
+                <div class="manager-traffic__bars" data-traffic-bars></div>
+                <div class="manager-traffic__empty" data-traffic-empty hidden>در این بازه هنوز بازدیدی ثبت نشده است.</div>
+            </div>
+        </div>
+        <p class="manager-traffic__note">داده‌های زمانی از زمان فعال‌شدن این نمودار ثبت می‌شوند؛ آمار تجمعی قبلی بدون تغییر در کارت‌های بالای صفحه باقی می‌ماند.</p>
+        <script type="application/json" data-manager-traffic-data><?php echo wp_json_encode($traffic_chart_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?></script>
+    </section>
 
     <div class="manager-view-charts">
         <section class="manager-view-chart manager-view-chart--distribution">

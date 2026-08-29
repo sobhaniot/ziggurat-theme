@@ -21,6 +21,10 @@ function zigurat_invoice_builtin_brand_settings($brand)
             'notes' => 'اعتبار قیمت تا ۴۸ ساعت است.',
             'payment_info' => "شماره حساب: 80000611194000\nشماره کارت: 6221-0610-2723-6779\nشماره شبا: IR450540103480000611194000\nبانک پارسیان به نام سامان موثق",
             'stamp_id' => 0,
+            'stamp_size_mm' => 46,
+            'stamp_position' => 'right',
+            'stamp_x_percent' => 75,
+            'stamp_bottom_mm' => 0,
             'tax_rate' => 10,
         );
     }
@@ -40,7 +44,38 @@ function zigurat_invoice_builtin_brand_settings($brand)
         'notes' => 'اعتبار قیمت تا ۴۸ ساعت است.',
         'payment_info' => '',
         'stamp_id' => 0,
+        'stamp_size_mm' => 40,
+        'stamp_position' => 'right',
+        'stamp_x_percent' => 75,
+        'stamp_bottom_mm' => 0,
         'tax_rate' => 0,
+    );
+}
+
+function zigurat_invoice_stamp_number($value, $minimum, $maximum, $fallback)
+{
+    $normalized = zigurat_invoice_normalize_digits($value);
+    if ($normalized === '' || !is_numeric($normalized)) {
+        return (float) $fallback;
+    }
+    return max((float) $minimum, min((float) $maximum, (float) $normalized));
+}
+
+function zigurat_invoice_stamp_layout($brand)
+{
+    $brand = $brand === 'official' ? 'official' : 'unofficial';
+    $defaults = zigurat_invoice_builtin_brand_settings($brand);
+    $settings = zigurat_invoice_get_brand_settings($brand);
+    $position = sanitize_key((string) ($settings['stamp_position'] ?? $defaults['stamp_position']));
+    if (!in_array($position, array('right', 'left'), true)) {
+        $position = $defaults['stamp_position'];
+    }
+    $x_percent = zigurat_invoice_stamp_number($settings['stamp_x_percent'] ?? '', 10, 90, $position === 'right' ? 75 : 25);
+    return array(
+        'size_mm' => zigurat_invoice_stamp_number($settings['stamp_size_mm'] ?? '', 20, 70, $defaults['stamp_size_mm']),
+        'x_percent' => $x_percent,
+        'position' => $x_percent >= 50 ? 'right' : 'left',
+        'bottom_mm' => zigurat_invoice_stamp_number($settings['stamp_bottom_mm'] ?? '', 0, 30, $defaults['stamp_bottom_mm']),
     );
 }
 
@@ -100,11 +135,20 @@ function zigurat_invoice_save_initial_settings($data)
             return new WP_Error('seller_name', 'نام فروشنده برای هر دو نوع فاکتور الزامی است.');
         }
         $tax_rate = (float) zigurat_invoice_normalize_digits($data['setting_' . $brand . '_tax_rate'] ?? 0);
+        $brand_defaults = zigurat_invoice_builtin_brand_settings($brand);
+        $stamp_position = sanitize_key((string) ($data['setting_' . $brand . '_stamp_position'] ?? ''));
+        if (!in_array($stamp_position, array('right', 'left'), true)) {
+            $stamp_position = $brand_defaults['stamp_position'];
+        }
         $settings[$brand] = array(
             'seller' => $seller,
             'notes' => sanitize_textarea_field(wp_unslash((string) ($data['setting_' . $brand . '_notes'] ?? ''))),
             'payment_info' => sanitize_textarea_field(wp_unslash((string) ($data['setting_' . $brand . '_payment_info'] ?? ''))),
             'stamp_id' => absint($data['setting_' . $brand . '_stamp_id'] ?? 0),
+            'stamp_size_mm' => zigurat_invoice_stamp_number($data['setting_' . $brand . '_stamp_size_mm'] ?? '', 20, 70, $brand_defaults['stamp_size_mm']),
+            'stamp_position' => $stamp_position,
+            'stamp_x_percent' => zigurat_invoice_stamp_number($data['setting_' . $brand . '_stamp_x_percent'] ?? '', 10, 90, $stamp_position === 'right' ? 75 : 25),
+            'stamp_bottom_mm' => zigurat_invoice_stamp_number($data['setting_' . $brand . '_stamp_bottom_mm'] ?? '', 0, 30, $brand_defaults['stamp_bottom_mm']),
             'tax_rate' => max(0, min(100, $tax_rate)),
         );
     }
@@ -219,6 +263,42 @@ function zigurat_invoice_ajax_customer_lookup()
 }
 add_action('wp_ajax_zigurat_invoice_customer_lookup', 'zigurat_invoice_ajax_customer_lookup');
 
+function zigurat_invoice_ajax_save_stamp_layout()
+{
+    check_ajax_referer('zigurat_invoice_stamp_layout', 'nonce');
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'فقط مدیر کل می‌تواند جای مهر را تغییر دهد.'), 403);
+    }
+    $brand = isset($_POST['brand']) ? sanitize_key(wp_unslash($_POST['brand'])) : '';
+    if (!in_array($brand, array('official', 'unofficial'), true)) {
+        wp_send_json_error(array('message' => 'نوع فاکتور معتبر نیست.'), 400);
+    }
+    $defaults = zigurat_invoice_builtin_brand_settings($brand);
+    $size = zigurat_invoice_stamp_number($_POST['size_mm'] ?? '', 20, 70, $defaults['stamp_size_mm']);
+    $x_percent = zigurat_invoice_stamp_number($_POST['x_percent'] ?? '', 10, 90, $defaults['stamp_x_percent']);
+    $bottom = zigurat_invoice_stamp_number($_POST['bottom_mm'] ?? '', 0, 30, $defaults['stamp_bottom_mm']);
+    $all_settings = get_option('zigurat_invoice_defaults', array());
+    $brand_settings = isset($all_settings[$brand]) && is_array($all_settings[$brand])
+        ? $all_settings[$brand]
+        : zigurat_invoice_get_brand_settings($brand);
+    $brand_settings['stamp_size_mm'] = $size;
+    $brand_settings['stamp_x_percent'] = $x_percent;
+    $brand_settings['stamp_position'] = $x_percent >= 50 ? 'right' : 'left';
+    $brand_settings['stamp_bottom_mm'] = $bottom;
+    $all_settings[$brand] = $brand_settings;
+    update_option('zigurat_invoice_defaults', $all_settings, false);
+    wp_send_json_success(array(
+        'layout' => array(
+            'size_mm' => $size,
+            'x_percent' => $x_percent,
+            'position' => $brand_settings['stamp_position'],
+            'bottom_mm' => $bottom,
+        ),
+        'message' => 'جای مهر ذخیره شد و در چاپ بعدی اعمال می‌شود.',
+    ));
+}
+add_action('wp_ajax_zigurat_invoice_save_stamp_layout', 'zigurat_invoice_ajax_save_stamp_layout');
+
 function zigurat_invoice_excel_column($index)
 {
     $column = '';
@@ -250,6 +330,17 @@ function zigurat_invoice_export_rows($args)
         $where[] = 'status = %s';
         $values[] = $args['status'];
     }
+    if (($args['payment_status'] ?? '') === 'unpaid') {
+        $where[] = "payment_status IN ('unpaid','partial')";
+    } elseif (($args['payment_status'] ?? '') === 'settled') {
+        $where[] = 'payment_status = %s';
+        $values[] = 'settled';
+    }
+    if (($args['tax_status'] ?? '') === 'not_submitted') {
+        $where[] = "tax_status IN ('not_submitted','ready','rejected')";
+    } elseif (($args['tax_status'] ?? '') === 'submitted') {
+        $where[] = "tax_status IN ('submitted','confirmed','corrected','voided')";
+    }
     $tax_year = absint($args['tax_year'] ?? 0);
     $tax_quarter = absint($args['tax_quarter'] ?? 0);
     if ($tax_year > 0) {
@@ -277,7 +368,7 @@ function zigurat_invoice_build_xlsx($args)
     }
 
     $rows = zigurat_invoice_export_rows($args);
-    $headers = array('نوع مجموعه', 'نوع سند', 'شماره', 'تاریخ', 'سال مالیاتی', 'فصل مالیاتی', 'وضعیت', 'موضوع', 'خریدار', 'شناسه/ثبت', 'شماره اقتصادی', 'استان', 'شهر', 'تلفن', 'جمع اقلام', 'تخفیف', 'حمل', 'ضریب بالاسری/سود (%)', 'مبلغ بالاسری/سود', 'ضریب بیمه (%)', 'مبلغ بیمه', 'مالیات', 'جمع کل', 'پرداختی', 'مانده');
+    $headers = array('نوع مجموعه', 'نوع سند', 'شماره', 'تاریخ', 'سال مالیاتی', 'فصل مالیاتی', 'وضعیت سند', 'وضعیت پرداخت', 'وضعیت مؤدیان', 'موضوع', 'خریدار', 'شناسه/ثبت', 'شماره اقتصادی', 'استان', 'شهر', 'تلفن', 'جمع اقلام', 'تخفیف', 'حمل', 'ضریب بالاسری/سود (%)', 'مبلغ بالاسری/سود', 'ضریب بیمه (%)', 'مبلغ بیمه', 'مالیات', 'جمع کل', 'پرداختی', 'مانده');
     $sheet_rows = array($headers);
     foreach ($rows as $row) {
         $sheet_rows[] = array(
@@ -288,6 +379,8 @@ function zigurat_invoice_build_xlsx($args)
             !empty($row->tax_year) ? (int) $row->tax_year : '',
             !empty($row->tax_quarter) ? zigurat_invoice_tax_quarter_label($row->tax_quarter) : '',
             zigurat_invoice_status_label($row->status),
+            $row->document_type === 'invoice' ? zigurat_invoice_payment_status_label($row->payment_status ?? 'unpaid') : '',
+            $row->brand === 'official' && $row->document_type === 'invoice' ? zigurat_invoice_tax_status_label($row->tax_status ?? 'not_submitted') : '',
             $row->subject,
             $row->customer_name,
             $row->customer_national_id,
@@ -309,7 +402,7 @@ function zigurat_invoice_build_xlsx($args)
         );
     }
 
-    $numeric_columns = range(14, 24);
+    $numeric_columns = range(16, 26);
     $sheet_data = '';
     foreach ($sheet_rows as $row_index => $cells) {
         $excel_row = $row_index + 1;
@@ -333,9 +426,9 @@ function zigurat_invoice_build_xlsx($args)
         . '<col min="1" max="1" width="22" customWidth="1"/><col min="2" max="2" width="24" customWidth="1"/>'
         . '<col min="3" max="7" width="14" customWidth="1"/><col min="8" max="8" width="30" customWidth="1"/>'
         . '<col min="9" max="9" width="24" customWidth="1"/><col min="10" max="11" width="18" customWidth="1"/>'
-        . '<col min="12" max="14" width="16" customWidth="1"/><col min="15" max="25" width="16" customWidth="1"/>'
+        . '<col min="10" max="16" width="18" customWidth="1"/><col min="17" max="27" width="16" customWidth="1"/>'
         . '</cols><sheetData>' . $sheet_data . '</sheetData>'
-        . '<autoFilter ref="A1:Y' . max(1, count($sheet_rows)) . '"/><pageSetup orientation="landscape"/></worksheet>';
+        . '<autoFilter ref="A1:AA' . max(1, count($sheet_rows)) . '"/><pageSetup orientation="landscape"/></worksheet>';
     $workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView rightToLeft="1"/></bookViews><sheets><sheet name="فاکتورها" sheetId="1" r:id="rId1"/></sheets></workbook>';
     $styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2D2D2D"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>';
 

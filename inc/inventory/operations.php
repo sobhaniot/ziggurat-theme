@@ -174,7 +174,7 @@ function zigurat_inventory_adjust_stock($action, $data)
     $project_name = '';
     if ($action === 'subtract') {
         $project = $project_id ? get_post($project_id) : null;
-        if (!$project || $project->post_type !== 'project' || $project->post_status !== 'publish') {
+        if (!$project || !function_exists('zigurat_inventory_project_is_selectable') || !zigurat_inventory_project_is_selectable($project)) {
             return new WP_Error('invalid_project', 'پروژه را انتخاب کنید.');
         }
         $project_name = get_the_title($project);

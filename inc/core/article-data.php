@@ -8,6 +8,42 @@ function zigurat_get_article_views($post_id)
     return max(0, (int) get_post_meta($post_id, '_article_views', true));
 }
 
+/** تاریخ انتشار مطلب را با تقویم شمسی و نام ماه فارسی نمایش می‌دهد. */
+function zigurat_article_jalali_publish_date($post = null)
+{
+    $post = get_post($post);
+    if (!$post) {
+        return '';
+    }
+    $date = get_post_datetime($post, 'date', 'local');
+    if (!$date || !function_exists('zigurat_inventory_gregorian_to_jalali')) {
+        return mysql2date(get_option('date_format'), $post->post_date);
+    }
+    $jalali = zigurat_inventory_gregorian_to_jalali(
+        (int) $date->format('Y'),
+        (int) $date->format('m'),
+        (int) $date->format('d')
+    );
+    $months = array(
+        1 => 'فروردین', 2 => 'اردیبهشت', 3 => 'خرداد', 4 => 'تیر',
+        5 => 'مرداد', 6 => 'شهریور', 7 => 'مهر', 8 => 'آبان',
+        9 => 'آذر', 10 => 'دی', 11 => 'بهمن', 12 => 'اسفند',
+    );
+    $date_text = sprintf('%d %s %d', $jalali[2], $months[$jalali[1]], $jalali[0]);
+    return strtr($date_text, array(
+        '0'=>'۰', '1'=>'۱', '2'=>'۲', '3'=>'۳', '4'=>'۴',
+        '5'=>'۵', '6'=>'۶', '7'=>'۷', '8'=>'۸', '9'=>'۹',
+    ));
+}
+
+function zigurat_filter_article_publish_date($the_date, $format, $post)
+{
+    return $post instanceof WP_Post && $post->post_type === 'article'
+        ? zigurat_article_jalali_publish_date($post)
+        : $the_date;
+}
+add_filter('get_the_date', 'zigurat_filter_article_publish_date', 10, 3);
+
 /** ثبت یک بازدید برای هر مرورگر در بازه ۱۲ ساعته. */
 function zigurat_record_article_view()
 {

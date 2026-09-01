@@ -291,14 +291,23 @@ function zigurat_seo_organization_schema()
             $organization['logo'] = array('@type' => 'ImageObject', 'url' => $logo);
         }
     }
-    if (!empty($contact['phone'])) {
-        $organization['telephone'] = $contact['phone'];
+    $contact_phones = function_exists('zigurat_get_contact_phones')
+        ? zigurat_get_contact_phones($contact)
+        : array_filter(array($contact['phone'] ?? ''));
+    if ($contact_phones) {
+        $organization['telephone'] = count($contact_phones) === 1 ? reset($contact_phones) : array_values($contact_phones);
     }
     if (!empty($contact['email'])) {
         $organization['email'] = $contact['email'];
     }
     if (!empty($contact['address'])) {
         $organization['address'] = array('@type' => 'PostalAddress', 'streetAddress' => $contact['address'], 'addressCountry' => 'IR');
+    }
+    if (function_exists('zigurat_get_contact_location_url')) {
+        $location_url = zigurat_get_contact_location_url($contact);
+        if ($location_url) {
+            $organization['hasMap'] = $location_url;
+        }
     }
     if ($same_as) {
         $organization['sameAs'] = array_values(array_unique($same_as));

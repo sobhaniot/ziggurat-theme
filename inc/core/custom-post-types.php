@@ -16,6 +16,23 @@ function zigurat_register_project_post_type()
     register_post_type('project', array(
         'labels' => $labels,
         'public' => true,
+        'map_meta_cap' => true,
+        'capabilities' => array(
+            'edit_post' => 'edit_zigurat_project',
+            'read_post' => 'read_zigurat_project',
+            'delete_post' => 'delete_zigurat_project',
+            'edit_posts' => 'manage_options',
+            'edit_others_posts' => 'manage_options',
+            'publish_posts' => 'manage_options',
+            'read_private_posts' => 'manage_options',
+            'delete_posts' => 'manage_options',
+            'delete_private_posts' => 'manage_options',
+            'delete_published_posts' => 'manage_options',
+            'delete_others_posts' => 'manage_options',
+            'edit_private_posts' => 'manage_options',
+            'edit_published_posts' => 'manage_options',
+            'create_posts' => 'manage_options',
+        ),
         'menu_icon' => 'dashicons-building',
         'has_archive' => true,
         'rewrite' => array(

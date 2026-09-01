@@ -61,6 +61,18 @@
 .contact-detail strong {
   font-size: 16px;
 }
+.contact-detail small {
+  display: inline-flex;
+  margin-top: 9px;
+  color: #a77c17;
+  font-size: 12px;
+  font-weight: 700;
+  transition: color .2s ease;
+}
+.contact-detail--location:hover small,
+.contact-detail--location:focus-visible small {
+  color: #171717;
+}
 .contact-socials {
   margin-top: 28px;
 }

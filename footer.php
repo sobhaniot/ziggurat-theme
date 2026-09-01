@@ -1,6 +1,7 @@
 <?php
 $contact_details = zigurat_get_contact_details();
-$phone_url = preg_replace('/[^0-9+]/', '', $contact_details['phone']);
+$contact_phones = zigurat_get_contact_phones($contact_details);
+$location_url = zigurat_get_contact_location_url($contact_details);
 ?>
 <footer class="site-footer">
     <div class="container">
@@ -78,19 +79,29 @@ $phone_url = preg_replace('/[^0-9+]/', '', $contact_details['phone']);
                     ارتباط با ما
                 </h3>
                 <ul class="footer-contact">
-                    <li>
-                        <a href="tel:<?php echo esc_attr($phone_url); ?>">
-                            📞 <?php echo esc_html($contact_details['phone']); ?>
-                        </a>
-                    </li>
-                    <li>
-                        📍 <?php echo esc_html($contact_details['address']); ?>
-                    </li>
-                    <li>
-                        <a href="mailto:<?php echo esc_attr($contact_details['email']); ?>">
-                            ✉ <?php echo esc_html($contact_details['email']); ?>
-                        </a>
-                    </li>
+                    <?php foreach ($contact_phones as $phone): ?>
+                        <li>
+                            <a href="tel:<?php echo esc_attr(zigurat_contact_phone_url($phone)); ?>">
+                                📞 <?php echo esc_html($phone); ?>
+                            </a>
+                        </li>
+                    <?php endforeach; ?>
+                    <?php if (!empty($contact_details['address'])): ?>
+                        <li>
+                            <a href="<?php echo esc_url($location_url); ?>" target="_blank" rel="noopener noreferrer" title="مشاهده لوکیشن روی نقشه">
+                                📍 <?php echo esc_html($contact_details['address']); ?>
+                            </a>
+                        </li>
+                    <?php elseif ($location_url): ?>
+                        <li><a href="<?php echo esc_url($location_url); ?>" target="_blank" rel="noopener noreferrer">📍 مشاهده لوکیشن روی نقشه</a></li>
+                    <?php endif; ?>
+                    <?php if (!empty($contact_details['email'])): ?>
+                        <li>
+                            <a href="mailto:<?php echo esc_attr($contact_details['email']); ?>">
+                                ✉ <?php echo esc_html($contact_details['email']); ?>
+                            </a>
+                        </li>
+                    <?php endif; ?>
                 </ul>
                 <?php zigurat_render_social_links('social-links--footer'); ?>
             </div>

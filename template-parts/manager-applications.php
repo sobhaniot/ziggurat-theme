@@ -57,6 +57,9 @@ $applications = new WP_Query(array(
     'order'          => 'DESC',
     'meta_query'     => $meta_query,
 ));
+$unread_application_ids = function_exists('zigurat_application_unread_ids')
+    ? zigurat_application_unread_ids()
+    : array();
 
 ?>
 <div class="manager-applications">
@@ -119,6 +122,7 @@ $applications = new WP_Query(array(
                 <?php if ($applications->have_posts()): ?>
                     <?php while ($applications->have_posts()): $applications->the_post();
                         $application_id = get_the_ID();
+                        $is_unread = in_array($application_id, $unread_application_ids, true);
                         $type = get_post_meta($application_id, '_application_application_type', true);
                         $business = get_post_meta($application_id, '_application_business_name', true);
                         $province = get_post_meta($application_id, '_application_province', true);
@@ -126,8 +130,8 @@ $applications = new WP_Query(array(
                         $nationwide = get_post_meta($application_id, '_application_nationwide', true);
                         $work_cities = get_post_meta($application_id, '_application_work_cities', true);
                     ?>
-                        <tr>
-                            <td><strong><?php the_title(); ?></strong><?php if ($business): ?><small><?php echo esc_html($business); ?></small><?php endif; ?></td>
+                        <tr class="<?php echo $is_unread ? 'is-unread' : ''; ?>">
+                            <td><strong><?php the_title(); ?></strong><?php if ($is_unread): ?><span class="manager-application-new">جدید برای شما</span><?php endif; ?><?php if ($business): ?><small><?php echo esc_html($business); ?></small><?php endif; ?></td>
                             <td><?php echo esc_html(zigurat_application_type_label($type)); ?></td>
                             <td><?php echo esc_html(get_post_meta($application_id, '_application_profession', true)); ?></td>
                             <td><?php echo esc_html(trim($province . '، ' . $city, '، ')); ?></td>

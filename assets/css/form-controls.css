@@ -1,0 +1,106 @@
+/* Shared form-control geometry across public pages and custom management panels. */
+:root {
+  --zigurat-control-height: 48px;
+}
+
+:where(
+  .contact-form,
+  .application-form,
+  .inventory-form,
+  .inventory-filters,
+  .invoice-editor,
+  .invoice-fields,
+  .invoice-list-filters,
+  .manager-login form,
+  .manager-application-filters,
+  .manager-pricing-rates,
+  .manager-lightbox-fields,
+  .manager-composite-fields,
+  .manager-flexi-fields,
+  .project-filters,
+  .article-filters,
+  .article-sidebar-search,
+  .download-filters
+) input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+:where(
+  .contact-form,
+  .application-form,
+  .inventory-form,
+  .inventory-filters,
+  .invoice-editor,
+  .invoice-fields,
+  .invoice-list-filters,
+  .manager-login form,
+  .manager-application-filters,
+  .manager-pricing-rates,
+  .manager-lightbox-fields,
+  .manager-composite-fields,
+  .manager-flexi-fields,
+  .project-filters,
+  .article-filters,
+  .article-sidebar-search,
+  .download-filters
+) select {
+  height: var(--zigurat-control-height);
+  min-height: var(--zigurat-control-height);
+  max-height: var(--zigurat-control-height);
+  box-sizing: border-box;
+}
+
+/* Native file fields need smaller vertical padding to fit the shared height. */
+.application-form input[type="file"] {
+  height: var(--zigurat-control-height);
+  min-height: var(--zigurat-control-height);
+  max-height: var(--zigurat-control-height);
+  box-sizing: border-box;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+/* Helper text in one column must not stretch the control in its sibling column. */
+:where(
+  .application-row,
+  .invoice-fields,
+  .invoice-list-filters,
+  .manager-application-filters,
+  .manager-lightbox-fields,
+  .manager-composite-fields,
+  .manager-flexi-fields
+) {
+  align-items: start;
+}
+
+:where(
+  .application-row,
+  .invoice-fields,
+  .invoice-list-filters,
+  .manager-application-filters,
+  .manager-lightbox-fields,
+  .manager-composite-fields,
+  .manager-flexi-fields
+) > label {
+  align-self: start;
+  align-content: start;
+}
+
+/* Controls placed beside filters must match their field height exactly. */
+:where(
+  .inventory-filters,
+  .invoice-list-filters,
+  .manager-application-filters,
+  .project-filters,
+  .article-filters,
+  .article-sidebar-search,
+  .download-filters
+) button {
+  height: var(--zigurat-control-height);
+  min-height: var(--zigurat-control-height);
+  max-height: var(--zigurat-control-height);
+  box-sizing: border-box;
+}
+
+@media (max-width: 650px) {
+  :root {
+    --zigurat-control-height: 48px;
+  }
+}

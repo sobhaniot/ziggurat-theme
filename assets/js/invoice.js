@@ -147,6 +147,24 @@
     });
   }
 
+  function closeStatusQuickMenus() {
+    document.querySelectorAll('[data-status-menu]').forEach(function (menu) {
+      menu.hidden = true;
+    });
+    document.querySelectorAll('[data-status-quick]').forEach(function (control) {
+      control.classList.remove('is-menu-open');
+    });
+    document.querySelectorAll('.invoice-list-table tr.is-status-menu-open').forEach(function (row) {
+      row.classList.remove('is-status-menu-open');
+    });
+    document.querySelectorAll('.invoice-list-table td.is-status-menu-open').forEach(function (cell) {
+      cell.classList.remove('is-status-menu-open');
+    });
+    document.querySelectorAll('[data-status-menu-toggle]').forEach(function (toggle) {
+      toggle.setAttribute('aria-expanded', 'false');
+    });
+  }
+
   function setupStatusQuickControls(root) {
     (root || document).querySelectorAll('[data-status-quick]').forEach(function (control) {
       if (control.dataset.statusQuickReady === '1') return;
@@ -156,25 +174,23 @@
       var options = control.querySelectorAll('[data-status-option]');
       var form = control.querySelector('[data-status-quick-form]');
       if (!toggle || !menu || !options.length || !form) return;
-      function closeMenus() {
-        document.querySelectorAll('[data-status-menu]').forEach(function (other) {
-          other.hidden = true;
-        });
-        document.querySelectorAll('[data-status-menu-toggle]').forEach(function (other) { other.setAttribute('aria-expanded', 'false'); });
-      }
       toggle.addEventListener('click', function () {
         var open = menu.hidden;
-        closeMenus();
+        closeStatusQuickMenus();
         if (open) {
           menu.hidden = false;
+          control.classList.add('is-menu-open');
+          var row = control.closest('tr');
+          var cell = control.closest('td');
+          if (row) row.classList.add('is-status-menu-open');
+          if (cell) cell.classList.add('is-status-menu-open');
           toggle.setAttribute('aria-expanded', 'true');
         }
       });
       options.forEach(function (option) {
         option.addEventListener('click', function () {
           if (option.disabled) return;
-          menu.hidden = true;
-          toggle.setAttribute('aria-expanded', 'false');
+          closeStatusQuickMenus();
           var kind = control.dataset.statusKind;
           var target = option.dataset.statusOption;
           var invoiceNumber = control.dataset.invoiceNumber || '';
@@ -205,11 +221,9 @@
     if (event.target.closest('[data-status-quick]')) return;
     var openMenus = document.querySelectorAll('[data-status-menu]:not([hidden])');
     if (!openMenus.length) return;
-    openMenus.forEach(function (menu) {
-      menu.hidden = true;
-    });
-    document.querySelectorAll('[data-status-menu-toggle]').forEach(function (toggle) { toggle.setAttribute('aria-expanded', 'false'); });
+    closeStatusQuickMenus();
   });
+  window.addEventListener('resize', closeStatusQuickMenus);
 
   function setupInvoiceRowSelection(root) {
     var scope = root || document;
@@ -625,31 +639,6 @@
       calculate();
     });
   }
-  function bindClearOnFocus(input) {
-    if (!input || input.dataset.clearOnFocusReady === '1') return;
-    input.dataset.clearOnFocusReady = '1';
-    input.addEventListener('focus', function () {
-      input.dataset.valueBeforeFocus = input.value;
-      input.value = '';
-    });
-    input.addEventListener('blur', function () {
-      if (String(input.value || '').trim() === '') input.value = input.dataset.valueBeforeFocus || '';
-      delete input.dataset.valueBeforeFocus;
-    });
-  }
-  function bindZeroClearingRate(input) {
-    if (!input || input.dataset.zeroClearingReady === '1') return;
-    input.dataset.zeroClearingReady = '1';
-    input.addEventListener('focus', function () {
-      if ((parseFloat(normalize(input.value)) || 0) === 0) input.value = '';
-    });
-    input.addEventListener('blur', function () {
-      if (String(input.value || '').trim() === '') {
-        input.value = '0';
-        input.dispatchEvent(new Event('input', {bubbles:true}));
-      }
-    });
-  }
   function setupCustomerLookup() {
     var config = window.ziguratInvoiceConfig || {};
     var nameInput = editor.querySelector('[name="customer_name"]');
@@ -964,7 +953,6 @@
     handle.addEventListener('pointercancel', finishSorting);
   }
   function bindRow(row) {
-    row.querySelectorAll('[data-clear-on-focus]').forEach(bindClearOnFocus);
     row.querySelectorAll('[data-money]').forEach(bindMoneyInput);
     row.querySelectorAll('[data-quantity]').forEach(bindQuantityInput);
     row.querySelectorAll('input,textarea').forEach(function (input) { input.addEventListener('input', calculate); });
@@ -990,7 +978,6 @@
   body.querySelectorAll('tr').forEach(bindRow);
   updateRowNumbers();
   editor.querySelectorAll('[data-money]').forEach(bindMoneyInput);
-  editor.querySelectorAll('input[name="overhead_rate"],input[name="insurance_rate"]').forEach(bindZeroClearingRate);
   editor.querySelectorAll('input[name="discount"],input[name="shipping"],input[name="overhead_rate"],input[name="insurance_rate"],input[name="tax_rate"],input[name="paid_amount"]').forEach(function (input) { input.addEventListener('input', calculate); });
   setupCustomerLookup();
   setupBranchNumberPreview();

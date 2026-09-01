@@ -102,7 +102,7 @@
     var shell = document.createElement('div');
     shell.dataset.invoiceCalculatorRoot = '1';
     shell.innerHTML = '<div class="invoice-calculator-backdrop" data-calculator-backdrop hidden></div>' +
-      '<section class="invoice-calculator" data-invoice-calculator role="dialog" aria-modal="true" aria-labelledby="invoice-calculator-title" hidden>' +
+      '<section class="invoice-calculator" data-invoice-calculator role="dialog" aria-modal="true" aria-labelledby="invoice-calculator-title" tabindex="-1" hidden>' +
         '<header><strong id="invoice-calculator-title">ماشین‌حساب مبلغ واحد</strong><button type="button" data-calculator-close aria-label="بستن">×</button></header>' +
         '<label>محاسبه<input type="text" inputmode="decimal" dir="ltr" data-calculator-expression autocomplete="off" aria-describedby="invoice-calculator-help"></label>' +
         '<small id="invoice-calculator-help">برای درصد می‌توانید بنویسید: 1500000 × 10٪</small>' +
@@ -126,6 +126,19 @@
     var activeButton = null;
     var lastResult = 0;
     var justEvaluated = false;
+
+    function usesOnScreenKeypad() {
+      return window.matchMedia('(max-width: 700px), (pointer: coarse)').matches;
+    }
+
+    function focusExpression(selectAll) {
+      if (usesOnScreenKeypad()) {
+        panel.focus({preventScroll:true});
+        return;
+      }
+      expression.focus({preventScroll:true});
+      if (selectAll) expression.select();
+    }
 
     function refreshResult() {
       try {
@@ -164,10 +177,11 @@
       panel.hidden = false;
       backdrop.hidden = false;
       button.setAttribute('aria-expanded', 'true');
+      expression.readOnly = usesOnScreenKeypad();
+      expression.setAttribute('inputmode', expression.readOnly ? 'none' : 'decimal');
       refreshResult();
       positionPanel();
-      expression.focus();
-      expression.select();
+      focusExpression(true);
     }
 
     function closeCalculator() {
@@ -196,7 +210,7 @@
         current += value;
       }
       expression.value = current;
-      expression.focus();
+      focusExpression(false);
       refreshResult();
     }
 
@@ -266,8 +280,8 @@
       if (button.matches('[data-calculator-close]')) closeCalculator();
       if (button.matches('[data-calculator-apply]')) applyResult();
       if (button.dataset.value) appendValue(button.dataset.value);
-      if (button.dataset.action === 'clear') { expression.value = ''; justEvaluated = false; refreshResult(); expression.focus(); }
-      if (button.dataset.action === 'backspace') { expression.value = expression.value.slice(0, -1); justEvaluated = false; refreshResult(); expression.focus(); }
+      if (button.dataset.action === 'clear') { expression.value = ''; justEvaluated = false; refreshResult(); focusExpression(false); }
+      if (button.dataset.action === 'backspace') { expression.value = expression.value.slice(0, -1); justEvaluated = false; refreshResult(); focusExpression(false); }
       if (button.dataset.action === 'equals' && refreshResult()) {
         expression.value = String(Math.round(lastResult));
         justEvaluated = true;

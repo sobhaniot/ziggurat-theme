@@ -104,18 +104,20 @@ $submitted_at = $meta['submitted_at'] ?: get_the_date('Y/m/d H:i', $application_
                 </dl>
             </section>
 
-            <section class="manager-resume__section manager-resume__section--wide">
-                <h3>مدارک و فایل‌ها</h3>
-                <div class="manager-resume__documents">
-                    <?php foreach ((array) ($files['national_card'] ?? array()) as $index => $file): ?>
-                        <a href="<?php echo esc_url(zigurat_application_private_file_url($application_id, 'national_card:' . $index)); ?>" target="_blank" rel="noopener">
-                            <span>کارت ملی</span>
-                            <small><?php echo esc_html($file['name'] ?? 'مشاهده فایل'); ?></small>
-                        </a>
-                    <?php endforeach; ?>
-                    <?php if (empty($files['national_card'])): ?><span>مدرک هویتی در دسترس نیست.</span><?php endif; ?>
-                </div>
-            </section>
+            <?php if ($meta['application_type'] !== 'supplier' || !empty($files['national_card'])): ?>
+                <section class="manager-resume__section manager-resume__section--wide">
+                    <h3>مدارک و فایل‌ها</h3>
+                    <div class="manager-resume__documents">
+                        <?php foreach ((array) ($files['national_card'] ?? array()) as $index => $file): ?>
+                            <a href="<?php echo esc_url(zigurat_application_private_file_url($application_id, 'national_card:' . $index)); ?>" target="_blank" rel="noopener">
+                                <span>کارت ملی</span>
+                                <small><?php echo esc_html($file['name'] ?? 'مشاهده فایل'); ?></small>
+                            </a>
+                        <?php endforeach; ?>
+                        <?php if (empty($files['national_card'])): ?><span>مدرک هویتی در دسترس نیست.</span><?php endif; ?>
+                    </div>
+                </section>
+            <?php endif; ?>
 
             <?php if (!empty($files['portfolio']) && is_array($files['portfolio'])): ?>
                 <section class="manager-resume__section manager-resume__section--wide manager-resume__portfolio-section">

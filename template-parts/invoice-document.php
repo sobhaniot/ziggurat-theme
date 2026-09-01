@@ -31,7 +31,7 @@ $stamp_style = sprintf(
         <h1><?php echo esc_html(zigurat_invoice_document_label($invoice->document_type)); ?></h1>
         <dl><div><dt>شماره سریال:</dt><dd><bdi class="invoice-number" dir="ltr"><?php echo esc_html(zigurat_invoice_object_number($invoice)); ?></bdi></dd></div><div><dt>تاریخ:</dt><dd><?php echo esc_html($invoice->issue_date); ?></dd></div></dl>
     </header>
-    <?php if ($invoice->document_type === 'invoice'): ?><div class="invoice-document-status"><span><?php echo esc_html(zigurat_invoice_payment_status_label($invoice->payment_status ?? 'unpaid')); ?></span><?php if (($invoice->tax_subject ?? 'original') === 'correction'): ?><span>اصلاحیه فاکتور شماره <?php $reference = zigurat_invoice_get($invoice->reference_invoice_id ?? 0); ?><bdi dir="ltr"><?php echo esc_html($reference ? zigurat_invoice_object_number($reference) : '—'); ?></bdi></span><?php endif; ?></div><?php endif; ?>
+    <?php if ($invoice->document_type === 'invoice' && ($invoice->tax_subject ?? 'original') === 'correction'): ?><div class="invoice-document-status"><span>اصلاحیه فاکتور شماره <?php $reference = zigurat_invoice_get($invoice->reference_invoice_id ?? 0); ?><bdi dir="ltr"><?php echo esc_html($reference ? zigurat_invoice_object_number($reference) : '—'); ?></bdi></span></div><?php endif; ?>
 
     <section class="invoice-party">
         <h2>مشخصات فروشنده</h2>
@@ -83,7 +83,7 @@ $stamp_style = sprintf(
             <div><dt>مالیات ارزش افزوده <?php echo esc_html(rtrim(rtrim(number_format((float) $invoice->tax_rate, 2, '.', ''), '0'), '.')); ?>٪:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->tax_amount)); ?></dd></div>
             <div class="is-grand"><dt>جمع کل:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->grand_total)); ?></dd></div>
             <div><dt>پرداختی:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->paid_amount)); ?></dd></div>
-            <div><dt>مانده:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->balance)); ?></dd></div>
+            <div class="is-balance"><dt>مانده:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->balance)); ?></dd></div>
         </dl>
     </div>
     <footer class="invoice-signatures"><div class="invoice-signature invoice-signature--seller invoice-signature--stamp-<?php echo esc_attr($stamp_layout['position']); ?>" style="<?php echo esc_attr($stamp_style); ?>"><span>مهر و امضای فروشنده</span><?php if ($stamp_url): ?><img src="<?php echo esc_url($stamp_url); ?>" class="invoice-stamp-image" alt="مهر فروشنده" loading="eager" decoding="sync"><?php endif; ?></div><div class="invoice-signature"><span>مهر و امضای خریدار</span></div></footer>

@@ -53,9 +53,11 @@ add_action('admin_init', 'zigurat_register_contact_settings');
 function zigurat_sanitize_contact_details($details)
 {
     return array(
-        'phone'   => sanitize_text_field($details['phone'] ?? ''),
-        'email'   => sanitize_email($details['email'] ?? ''),
-        'address' => sanitize_textarea_field($details['address'] ?? ''),
+        'phone'        => sanitize_text_field($details['phone'] ?? ''),
+        'phone_2'      => sanitize_text_field($details['phone_2'] ?? ''),
+        'email'        => sanitize_email($details['email'] ?? ''),
+        'address'      => sanitize_textarea_field($details['address'] ?? ''),
+        'location_url' => esc_url_raw($details['location_url'] ?? ''),
     );
 }
 
@@ -82,16 +84,27 @@ function zigurat_render_contact_settings_page()
             <?php settings_fields('zigurat_contact_settings'); ?>
             <table class="form-table" role="presentation">
                 <tr>
-                    <th scope="row"><label for="zigurat-contact-phone">شماره تماس</label></th>
+                    <th scope="row"><label for="zigurat-contact-phone">شماره تماس اول</label></th>
                     <td><input class="regular-text" id="zigurat-contact-phone" name="zigurat_contact_details[phone]" type="text" value="<?php echo esc_attr($details['phone']); ?>"></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="zigurat-contact-phone-2">شماره تماس دوم</label></th>
+                    <td><input class="regular-text" id="zigurat-contact-phone-2" name="zigurat_contact_details[phone_2]" type="text" value="<?php echo esc_attr($details['phone_2']); ?>"></td>
                 </tr>
                 <tr>
                     <th scope="row"><label for="zigurat-contact-email">ایمیل</label></th>
                     <td><input class="regular-text" id="zigurat-contact-email" name="zigurat_contact_details[email]" type="email" value="<?php echo esc_attr($details['email']); ?>"></td>
                 </tr>
                 <tr>
-                    <th scope="row"><label for="zigurat-contact-address">نشانی</label></th>
+                    <th scope="row"><label for="zigurat-contact-address">نشانی پستی</label></th>
                     <td><textarea class="large-text" id="zigurat-contact-address" name="zigurat_contact_details[address]" rows="3"><?php echo esc_textarea($details['address']); ?></textarea></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="zigurat-contact-location">لینک لوکیشن روی نقشه</label></th>
+                    <td>
+                        <input class="large-text" id="zigurat-contact-location" name="zigurat_contact_details[location_url]" type="url" value="<?php echo esc_url($details['location_url']); ?>" placeholder="https://maps.google.com/..."><br>
+                        <p class="description">لینک اشتراک‌گذاری موقعیت را از Google Maps، نشان یا بلد وارد کنید. اگر خالی بماند، نشانی پستی در Google Maps جستجو می‌شود.</p>
+                    </td>
                 </tr>
             </table>
             <h2>شبکه‌های اجتماعی</h2>

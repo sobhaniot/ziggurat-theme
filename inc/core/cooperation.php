@@ -95,6 +95,138 @@ function zigurat_application_fields()
     );
 }
 
+/** تمام کاربرانی که اجازه ورود به پنل اختصاصی مدیران را دارند. */
+function zigurat_application_manager_users()
+{
+    return array_values(array_filter(get_users(array('fields' => 'all')), static function ($user) {
+        if (function_exists('zigurat_user_can_access_manager_panel')) {
+            return zigurat_user_can_access_manager_panel($user);
+        }
+        return $user instanceof WP_User && user_can($user, 'manage_options');
+    }));
+}
+
+function zigurat_application_seen_ids($user_id = 0)
+{
+    $user_id = $user_id ? absint($user_id) : get_current_user_id();
+    $seen = $user_id ? get_user_meta($user_id, '_zigurat_seen_partner_applications', true) : array();
+    return is_array($seen) ? array_values(array_unique(array_filter(array_map('absint', $seen)))) : array();
+}
+
+/** شناسه درخواست‌های جدید فقط برای مدیر جاری؛ خواندن یک مدیر روی دیگری اثر ندارد. */
+function zigurat_application_unread_ids($user_id = 0)
+{
+    $user_id = $user_id ? absint($user_id) : get_current_user_id();
+    if (!$user_id) {
+        return array();
+    }
+    $notifiable_ids = get_posts(array(
+        'post_type' => 'partner_application',
+        'post_status' => 'private',
+        'posts_per_page' => -1,
+        'fields' => 'ids',
+        'orderby' => 'date',
+        'order' => 'DESC',
+        'no_found_rows' => true,
+        'meta_key' => '_application_notify_managers',
+        'meta_value' => '1',
+    ));
+    return array_values(array_diff(array_map('absint', $notifiable_ids), zigurat_application_seen_ids($user_id)));
+}
+
+function zigurat_application_unread_count($user_id = 0)
+{
+    return count(zigurat_application_unread_ids($user_id));
+}
+
+function zigurat_application_is_unread($application_id, $user_id = 0)
+{
+    return in_array(absint($application_id), zigurat_application_unread_ids($user_id), true);
+}
+
+function zigurat_application_mark_seen($application_id, $user_id = 0)
+{
+    $application_id = absint($application_id);
+    $user_id = $user_id ? absint($user_id) : get_current_user_id();
+    $application = $application_id ? get_post($application_id) : null;
+    if (!$user_id || !$application || $application->post_type !== 'partner_application') {
+        return false;
+    }
+    $seen = zigurat_application_seen_ids($user_id);
+    if (!in_array($application_id, $seen, true)) {
+        $seen[] = $application_id;
+        update_user_meta($user_id, '_zigurat_seen_partner_applications', $seen);
+    }
+    return true;
+}
+
+/** ایمیل مستقل برای هر مدیر، بدون پیوست‌کردن مدارک محرمانه. */
+function zigurat_email_managers_for_application($application_id, $data)
+{
+    $application_id = absint($application_id);
+    $display_name = trim((string) ($data['first_name'] ?? '') . ' ' . (string) ($data['last_name'] ?? ''));
+    $type_label = zigurat_application_type_label($data['application_type'] ?? 'collaborator');
+    $list_url = add_query_arg('manager-section', 'applications', zigurat_manager_login_url());
+    $site_name = wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES);
+    $subject = sprintf('[%s] درخواست همکاری جدید: %s', $site_name, $display_name ?: $type_label);
+    $recipients = array();
+    foreach (zigurat_application_manager_users() as $manager) {
+        $email = sanitize_email($manager->user_email);
+        if ($email === '' || isset($recipients[strtolower($email)])) {
+            continue;
+        }
+        $recipients[strtolower($email)] = true;
+        $manager_name = trim((string) $manager->display_name) ?: $manager->user_login;
+        $message = $manager_name . " عزیز،\n\n";
+        $message .= "یک درخواست همکاری جدید در سایت ثبت شده است.\n";
+        $message .= 'متقاضی: ' . ($display_name ?: 'ثبت نشده') . "\n";
+        $message .= 'نوع: ' . $type_label . "\n";
+        $message .= 'زمینه فعالیت: ' . ((string) ($data['profession'] ?? '') ?: 'ثبت نشده') . "\n";
+        $message .= 'محل فعالیت: ' . trim((string) ($data['province'] ?? '') . '، ' . (string) ($data['city'] ?? ''), '، ') . "\n\n";
+        $message .= "برای بررسی اطلاعات و مدارک، وارد پنل مدیران شوید:\n" . $list_url;
+        wp_mail($email, $subject, $message, array('Content-Type: text/plain; charset=UTF-8'));
+    }
+    if (!$recipients) {
+        $fallback_email = sanitize_email(get_option('admin_email'));
+        if ($fallback_email !== '') {
+            wp_mail(
+                $fallback_email,
+                $subject,
+                "یک درخواست همکاری جدید ثبت شده است.\n\n" . $list_url,
+                array('Content-Type: text/plain; charset=UTF-8')
+            );
+        }
+    }
+}
+
+/** بازکردن رزومه، اعلان همان درخواست را فقط برای مدیر جاری خوانده‌شده می‌کند. */
+function zigurat_mark_application_seen_from_resume()
+{
+    if (!function_exists('zigurat_is_manager') || !zigurat_is_manager()) {
+        return;
+    }
+    $section = isset($_GET['manager-section']) ? sanitize_key(wp_unslash((string) $_GET['manager-section'])) : '';
+    $application_id = isset($_GET['application_id']) ? absint($_GET['application_id']) : 0;
+    $nonce = isset($_GET['application_nonce']) ? sanitize_text_field(wp_unslash((string) $_GET['application_nonce'])) : '';
+    if (
+        $section === 'application-detail'
+        && $application_id
+        && wp_verify_nonce($nonce, 'zigurat_view_application_' . $application_id)
+    ) {
+        zigurat_application_mark_seen($application_id);
+    }
+}
+add_action('template_redirect', 'zigurat_mark_application_seen_from_resume', 25);
+
+function zigurat_mark_application_seen_in_wp_admin()
+{
+    $post_id = isset($_GET['post']) ? absint($_GET['post']) : 0;
+    if ($post_id && get_post_type($post_id) === 'partner_application' && current_user_can('manage_options')) {
+        zigurat_application_mark_seen($post_id);
+    }
+}
+add_action('load-post.php', 'zigurat_mark_application_seen_in_wp_admin');
+
 function zigurat_application_meta_box()
 {
     add_meta_box('zigurat_application_details', 'اطلاعات درخواست', 'zigurat_render_application_meta_box', 'partner_application', 'normal', 'high');
@@ -283,6 +415,8 @@ function zigurat_handle_partner_application()
     if (!$redirect) {
         $redirect = home_url('/cooperation/');
     }
+    $type = isset($_POST['application_type']) && is_string($_POST['application_type']) && $_POST['application_type'] === 'supplier' ? 'supplier' : 'collaborator';
+    $redirect = add_query_arg('type', $type, $redirect);
     $status_redirect = function ($status) use ($redirect) {
         wp_safe_redirect(add_query_arg('application-status', $status, $redirect) . '#application-form');
         exit;
@@ -303,7 +437,6 @@ function zigurat_handle_partner_application()
         $status_redirect('limited');
     }
 
-    $type = isset($_POST['application_type']) && is_string($_POST['application_type']) && $_POST['application_type'] === 'supplier' ? 'supplier' : 'collaborator';
     $data = array(
         'application_type' => $type,
         'first_name'       => zigurat_application_request_value('first_name'),
@@ -325,14 +458,20 @@ function zigurat_handle_partner_application()
     }
 
     $photo_files = isset($_FILES['applicant_photo']) ? zigurat_normalize_uploads($_FILES['applicant_photo']) : array();
-    $card_files = isset($_FILES['national_card']) ? zigurat_normalize_uploads($_FILES['national_card']) : array();
+    $card_files = $type !== 'supplier' && isset($_FILES['national_card'])
+        ? zigurat_normalize_uploads($_FILES['national_card'])
+        : array();
     $portfolio_files = isset($_FILES['portfolio']) ? array_slice(zigurat_normalize_uploads($_FILES['portfolio']), 0, 5) : array();
-    if (!$photo_files || !$card_files || !$portfolio_files) {
+    if (!$photo_files || !$portfolio_files || ($type !== 'supplier' && !$card_files)) {
         $status_redirect('upload-error');
     }
 
     $stored_files = array('photo' => array(), 'national_card' => array(), 'portfolio' => array());
-    foreach (array('photo' => $photo_files, 'national_card' => $card_files, 'portfolio' => $portfolio_files) as $group => $uploads) {
+    $upload_groups = array('photo' => $photo_files, 'portfolio' => $portfolio_files);
+    if ($type !== 'supplier') {
+        $upload_groups['national_card'] = $card_files;
+    }
+    foreach ($upload_groups as $group => $uploads) {
         foreach ($uploads as $upload) {
             $stored = zigurat_store_private_application_file($upload, $group);
             if (is_wp_error($stored)) {
@@ -357,8 +496,9 @@ function zigurat_handle_partner_application()
         update_post_meta($post_id, '_application_' . $key, $value);
     }
     update_post_meta($post_id, '_application_files', $stored_files);
+    update_post_meta($post_id, '_application_notify_managers', '1');
     set_transient($rate_key, ((int) get_transient($rate_key)) + 1, HOUR_IN_SECONDS);
-    wp_mail(get_option('admin_email'), 'درخواست همکاری جدید در سایت', 'یک درخواست جدید از طرف ' . $display_name . ' ثبت شد.');
+    zigurat_email_managers_for_application($post_id, $data);
     $status_redirect('sent');
 }
 add_action('template_redirect', 'zigurat_handle_partner_application');

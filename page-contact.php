@@ -5,7 +5,8 @@ $contact_status = isset($_GET['contact-status'])
     ? sanitize_key(wp_unslash($_GET['contact-status']))
     : '';
 $contact_details = zigurat_get_contact_details();
-$phone_url = preg_replace('/[^0-9+]/', '', $contact_details['phone']);
+$contact_phones = zigurat_get_contact_phones($contact_details);
+$location_url = zigurat_get_contact_location_url($contact_details);
 ?>
 
 <main class="contact-page">
@@ -31,18 +32,30 @@ $phone_url = preg_replace('/[^0-9+]/', '', $contact_details['phone']);
             <div class="container contact-layout">
                 <aside class="contact-information">
                     <h2>راه‌های ارتباطی</h2>
-                    <a class="contact-detail" href="tel:<?php echo esc_attr($phone_url); ?>">
-                        <span>تلفن</span>
-                        <strong><?php echo esc_html($contact_details['phone']); ?></strong>
-                    </a>
-                    <a class="contact-detail" href="mailto:<?php echo esc_attr($contact_details['email']); ?>">
-                        <span>ایمیل</span>
-                        <strong><?php echo esc_html($contact_details['email']); ?></strong>
-                    </a>
-                    <div class="contact-detail">
-                        <span>نشانی</span>
-                        <strong><?php echo esc_html($contact_details['address']); ?></strong>
-                    </div>
+                    <?php foreach ($contact_phones as $phone_index => $phone): ?>
+                        <a class="contact-detail" href="tel:<?php echo esc_attr(zigurat_contact_phone_url($phone)); ?>">
+                            <span><?php echo count($contact_phones) > 1 ? esc_html('تلفن ' . ($phone_index + 1)) : 'تلفن'; ?></span>
+                            <strong><?php echo esc_html($phone); ?></strong>
+                        </a>
+                    <?php endforeach; ?>
+                    <?php if (!empty($contact_details['email'])): ?>
+                        <a class="contact-detail" href="mailto:<?php echo esc_attr($contact_details['email']); ?>">
+                            <span>ایمیل</span>
+                            <strong><?php echo esc_html($contact_details['email']); ?></strong>
+                        </a>
+                    <?php endif; ?>
+                    <?php if (!empty($contact_details['address'])): ?>
+                        <a class="contact-detail contact-detail--location" href="<?php echo esc_url($location_url); ?>" target="_blank" rel="noopener noreferrer">
+                            <span>نشانی پستی</span>
+                            <strong><?php echo esc_html($contact_details['address']); ?></strong>
+                            <small>مشاهده لوکیشن روی نقشه</small>
+                        </a>
+                    <?php elseif ($location_url): ?>
+                        <a class="contact-detail contact-detail--location" href="<?php echo esc_url($location_url); ?>" target="_blank" rel="noopener noreferrer">
+                            <span>لوکیشن</span>
+                            <strong>مشاهده موقعیت روی نقشه</strong>
+                        </a>
+                    <?php endif; ?>
                     <?php if (zigurat_get_social_links()): ?>
                         <div class="contact-socials">
                             <h3>شبکه‌های اجتماعی</h3>

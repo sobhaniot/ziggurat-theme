@@ -41,7 +41,6 @@ function zigurat_about_stats_callback($post)
     $stats = array(
         'projects'   => array('label' => 'پروژه اجرا شده', 'automatic' => true, 'value' => $project_stats['projects']),
         'experience' => array('label' => 'سال تجربه', 'automatic' => false),
-        'clients'    => array('label' => 'مشتری', 'automatic' => false),
         'cities'     => array('label' => 'شهر اجرا', 'automatic' => true, 'value' => $project_stats['cities']),
         'provinces'  => array('label' => 'استان اجرا', 'automatic' => true, 'value' => $project_stats['provinces']),
     );
@@ -91,14 +90,12 @@ function zigurat_get_about_stats($about_id)
     $defaults = array(
         'projects'   => 'پروژه اجرا شده',
         'experience' => 'سال تجربه',
-        'clients'    => 'مشتری',
         'cities'     => 'شهر اجرا',
         'provinces'  => 'استان اجرا',
     );
     $values = array(
         'projects'   => $project_stats['projects'],
         'experience' => (int) get_post_meta($about_id, '_about_experience', true),
-        'clients'    => (int) get_post_meta($about_id, '_about_clients', true),
         'cities'     => $project_stats['cities'],
         'provinces'  => $project_stats['provinces'],
     );

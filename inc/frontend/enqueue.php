@@ -31,6 +31,7 @@ function zigurat_enqueue_assets()
         zigurat_enqueue_theme_style('responsive');
     }
     zigurat_enqueue_theme_script('header');
+    zigurat_enqueue_theme_script('form-inputs');
 
     if (function_exists('zigurat_should_show_site_intro') && zigurat_should_show_site_intro()) {
         zigurat_enqueue_theme_style('site-intro', array());
@@ -54,7 +55,6 @@ function zigurat_enqueue_assets()
     }
     if (is_page('cooperation') || is_page_template('page-cooperation.php')) {
         zigurat_enqueue_theme_style('cooperation');
-        zigurat_enqueue_theme_script('cooperation');
     }
     if (is_page('login') || is_page_template('page-login.php')) {
         zigurat_enqueue_theme_style('manager');
@@ -104,7 +104,7 @@ function zigurat_enqueue_assets()
     if (is_page('invoices') || is_page_template('page-invoices.php')) {
         zigurat_enqueue_theme_style('invoice');
         zigurat_enqueue_theme_style('panel-ajax');
-        zigurat_enqueue_theme_script('invoice');
+        zigurat_enqueue_theme_script('invoice', array('zigurat-form-inputs'));
         zigurat_enqueue_theme_script('invoice-calculator', array('zigurat-invoice'));
         zigurat_enqueue_theme_script('panel-ajax', array('zigurat-invoice', 'zigurat-invoice-calculator'));
         wp_localize_script('zigurat-invoice', 'ziguratInvoiceConfig', array(
@@ -121,5 +121,8 @@ function zigurat_enqueue_assets()
             'paths' => array((string) wp_parse_url(zigurat_invoice_page_url(), PHP_URL_PATH)),
         ));
     }
+
+    /* Keep input/select geometry consistent after all page-specific styles. */
+    zigurat_enqueue_theme_style('form-controls', array());
 }
 add_action('wp_enqueue_scripts', 'zigurat_enqueue_assets');

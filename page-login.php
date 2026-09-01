@@ -62,6 +62,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['zigurat_save_lightbox
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['zigurat_save_composite_rates']) && zigurat_is_manager()) {
+    $pricing_nonce = isset($_POST['zigurat_pricing_nonce'])
+        ? sanitize_text_field(wp_unslash($_POST['zigurat_pricing_nonce']))
+        : '';
+    $pricing_status = 'invalid';
+    if (wp_verify_nonce($pricing_nonce, 'zigurat_save_composite_rates')) {
+        $pricing_result = zigurat_save_composite_pricing_settings($_POST);
+        $pricing_status = is_wp_error($pricing_result) ? $pricing_result->get_error_code() : 'saved';
+    }
+    wp_safe_redirect(add_query_arg(array(
+        'manager-section' => 'pricing',
+        'calculator' => 'composite',
+        'pricing-status' => sanitize_key($pricing_status),
+    ), zigurat_manager_login_url()));
+    exit;
+}
+
 get_header();
 ?>
 <main class="manager-area">
@@ -73,6 +90,9 @@ get_header();
             if ($current_manager_name === '') {
                 $current_manager_name = $current_manager->user_login;
             }
+            $manager_unread_applications = function_exists('zigurat_application_unread_count')
+                ? zigurat_application_unread_count($current_manager->ID)
+                : 0;
             ?>
             <section class="manager-panel" aria-labelledby="manager-panel-title">
                 <div class="manager-panel__header">
@@ -81,6 +101,12 @@ get_header();
                         <h1 id="manager-panel-title">پنل مدیران</h1>
                     </div>
                     <div class="manager-panel__account">
+                        <?php if ($manager_unread_applications): ?>
+                            <a class="manager-panel__notification" href="<?php echo esc_url(add_query_arg('manager-section', 'applications', zigurat_manager_login_url())); ?>" aria-label="<?php echo esc_attr($manager_unread_applications . ' درخواست همکاری جدید'); ?>">
+                                <span aria-hidden="true">🔔</span>
+                                <strong><?php echo esc_html(number_format_i18n($manager_unread_applications)); ?> درخواست جدید</strong>
+                            </a>
+                        <?php endif; ?>
                         <div class="manager-panel__user">
                             <span>کاربر واردشده</span>
                             <strong><?php echo esc_html($current_manager_name); ?></strong>

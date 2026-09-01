@@ -13,3 +13,8 @@ node_modules/
 vendor/
 # Environment
 .env
+/content/
+/hosting/
+/n8n/
+/assets/images/*
+!/assets/images/zigurat-logo.svg

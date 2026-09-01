@@ -151,6 +151,144 @@
   color: #59420f;
   line-height: 1.9;
 }
+.inventory-internal-projects {
+  margin-bottom: 24px;
+  border: 1px solid #d8c28f;
+  border-radius: 12px;
+  background: #fffbf2;
+}
+.inventory-internal-projects > summary {
+  display: flex;
+  min-height: 62px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 12px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+.inventory-internal-projects > summary::-webkit-details-marker { display: none; }
+.inventory-internal-projects > summary span { display: grid; gap: 3px; }
+.inventory-internal-projects > summary small { color: #716959; font-weight: 400; }
+.inventory-internal-projects > summary b {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: #c89b3c;
+  color: #171717;
+  font-size: 21px;
+  transition: transform .2s ease;
+}
+.inventory-internal-projects[open] > summary b { transform: rotate(45deg); }
+.inventory-internal-projects__body {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  gap: 16px;
+  padding: 0 16px 16px;
+  border-top: 1px solid #eadfca;
+}
+.inventory-internal-project-create,
+.inventory-internal-project-list {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #e6dfd1;
+  border-radius: 10px;
+  background: #fff;
+}
+.inventory-internal-project-create h2,
+.inventory-internal-project-list h2 { margin: 0 0 14px; font-size: 19px; }
+.inventory-internal-project-empty { margin: 0; color: #777; }
+.inventory-internal-project {
+  margin-bottom: 9px;
+  border: 1px solid #e2ddd2;
+  border-radius: 9px;
+  background: #fbfaf7;
+}
+.inventory-internal-project:last-child { margin-bottom: 0; }
+.inventory-internal-project > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  cursor: pointer;
+}
+.inventory-internal-project > summary span { display: grid; gap: 3px; }
+.inventory-internal-project > summary small { color: #766f62; }
+.inventory-internal-project > summary em {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e5f5e9;
+  color: #24643a;
+  font-size: 11px;
+  font-style: normal;
+  white-space: nowrap;
+}
+.inventory-internal-project.is-archived > summary em { background: #eee; color: #666; }
+.inventory-internal-project > div { padding: 0 12px 12px; }
+.inventory-internal-project-edit-link {
+  display: flex;
+  min-height: 42px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border: 1px solid #b7892e;
+  border-radius: 7px;
+  background: #fff7e4;
+  color: #684906;
+  font-weight: 800;
+  text-align: center;
+}
+.inventory-internal-project-edit-link:hover { border-color: #8e6515; background: #ffefc8; }
+.inventory-internal-project-duplicate {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid #e0a22d;
+  border-radius: 8px;
+  background: #fff4d7;
+  color: #5d430d;
+}
+.inventory-internal-project-duplicate > strong { display: block; margin-bottom: 4px; color: #7a3f00; }
+.inventory-internal-project-duplicate > p { margin: 0 0 10px; line-height: 1.8; }
+.inventory-internal-project-duplicate > div { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+.inventory-internal-project-duplicate form { margin: 0; }
+.inventory-internal-project-duplicate a,
+.inventory-internal-project-duplicate button {
+  display: inline-flex;
+  min-height: 38px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 11px;
+  border: 1px solid #b67808;
+  border-radius: 7px;
+  background: #fff;
+  color: #6c4705;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+.inventory-internal-project-duplicate button { background: #177342; border-color: #177342; color: #fff; }
+.inventory-internal-project-duplicate a:hover { background: #fff9e9; }
+.inventory-internal-project-duplicate button:hover { background: #0f5d34; }
+.inventory-internal-project-state { margin-top: 10px; }
+.inventory-internal-project-state button {
+  min-height: 40px;
+  padding: 8px 13px;
+  border: 1px solid #a93434;
+  border-radius: 7px;
+  background: #fff;
+  color: #8b2222;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.inventory-internal-project.is-archived .inventory-internal-project-state button { border-color: #398052; color: #23683b; }
 .inventory-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -385,6 +523,7 @@
   .inventory-report-toolbar .inventory-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .inventory-report-toolbar { grid-template-columns: 1fr; }
   .inventory-catalog-forms { grid-template-columns: 1fr; }
+  .inventory-internal-projects__body { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
   .inventory-page { padding-top: 105px; }

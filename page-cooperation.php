@@ -54,7 +54,7 @@ $provinces = array(
         <div class="container application-layout">
             <div class="application-intro">
                 <span>فرم محرمانه</span>
-                <h2>ثبت اطلاعات برای همکاری</h2>
+                <h2><?php echo $selected_type === 'supplier' ? 'ثبت اطلاعات تأمین‌کننده' : 'ثبت اطلاعات همکار اجرایی'; ?></h2>
                 <p>اطلاعات شما عمومی نمی‌شود. همکاران و تأمین‌کنندگان به اطلاعات یکدیگر دسترسی ندارند و فقط مدیران زیگورات درخواست را بررسی می‌کنند.</p>
                 <ul>
                     <li>امکان انتخاب همکاری در شهرهای مشخص یا سراسر ایران</li>
@@ -75,28 +75,23 @@ $provinces = array(
                 <form class="application-form" method="post" enctype="multipart/form-data">
                     <?php wp_nonce_field('zigurat_partner_application', 'zigurat_application_nonce'); ?>
                     <input type="hidden" name="zigurat_partner_application" value="1">
+                    <input type="hidden" name="application_type" value="<?php echo esc_attr($selected_type); ?>">
                     <div class="application-honeypot" aria-hidden="true">
                         <label for="company-website">وب‌سایت شرکت</label>
                         <input id="company-website" type="text" name="company_website" tabindex="-1" autocomplete="off">
                     </div>
 
-                    <fieldset class="application-type-selector">
-                        <legend>نوع همکاری *</legend>
-                        <label><input type="radio" name="application_type" value="collaborator" <?php checked($selected_type, 'collaborator'); ?>> همکار اجرایی</label>
-                        <label><input type="radio" name="application_type" value="supplier" <?php checked($selected_type, 'supplier'); ?>> تأمین‌کننده</label>
-                    </fieldset>
-
                     <div class="application-row">
                         <label>نام *<input type="text" name="first_name" autocomplete="given-name" required></label>
                         <label>نام خانوادگی *<input type="text" name="last_name" autocomplete="family-name" required></label>
                     </div>
-                    <label class="business-name-field">نام مجموعه یا کارگاه<input type="text" name="business_name" autocomplete="organization"></label>
+                    <?php if ($selected_type === 'supplier'): ?><label class="business-name-field">نام مجموعه یا کارگاه<input type="text" name="business_name" autocomplete="organization"></label><?php endif; ?>
                     <div class="application-row">
                         <label>شماره تماس *<input type="tel" name="phone" inputmode="tel" autocomplete="tel" required></label>
                         <label>ایمیل<input type="email" name="email" autocomplete="email"></label>
                     </div>
                     <div class="application-row">
-                        <label><span class="profession-label">زمینه شغلی *</span><input type="text" name="profession" list="zigurat-professions" placeholder="مثلاً برقکار" required></label>
+                        <label><span class="profession-label"><?php echo $selected_type === 'supplier' ? 'حوزه تأمین یا تولید *' : 'زمینه شغلی *'; ?></span><input type="text" name="profession" list="zigurat-professions" placeholder="<?php echo esc_attr($selected_type === 'supplier' ? 'مثلاً شیشه سکوریت' : 'مثلاً برقکار'); ?>" required></label>
                         <label>سابقه فعالیت (سال)<input type="number" name="experience_years" min="0" max="70"></label>
                     </div>
                     <datalist id="zigurat-professions">
@@ -119,7 +114,9 @@ $provinces = array(
 
                     <div class="application-files">
                         <label>عکس متقاضی یا مجموعه *<input type="file" name="applicant_photo" accept="image/jpeg,image/png,image/webp" required><small>JPG، PNG یا WEBP؛ حداکثر ۵ مگابایت</small></label>
-                        <label>عکس کارت ملی *<input type="file" name="national_card" accept="image/jpeg,image/png,image/webp" required><small>این فایل فقط برای مدیر قابل مشاهده است.</small></label>
+                        <?php if ($selected_type !== 'supplier'): ?>
+                            <label>عکس کارت ملی *<input type="file" name="national_card" accept="image/jpeg,image/png,image/webp" required><small>این فایل فقط برای مدیر قابل مشاهده است.</small></label>
+                        <?php endif; ?>
                         <label>نمونه‌کارها *<input type="file" name="portfolio[]" accept="image/jpeg,image/png,image/webp,application/pdf" multiple required><small>حداکثر ۵ فایل تصویر یا PDF، هر فایل تا ۵ مگابایت</small></label>
                     </div>
                     <label class="application-checkbox privacy-consent"><input type="checkbox" name="privacy_consent" value="1" required> با ذخیره و بررسی محرمانه اطلاعات برای ارزیابی همکاری موافقم. *</label>

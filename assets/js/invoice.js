@@ -296,6 +296,28 @@
     updateSummary();
   }
 
+  function setupInvoiceDeleteControls(root) {
+    (root || document).querySelectorAll('[data-invoice-delete-form]').forEach(function (form) {
+      if (form.dataset.deleteReady === '1') return;
+      form.dataset.deleteReady = '1';
+      form.addEventListener('submit', function (event) {
+        if (form.dataset.deleteConfirmed === '1') return;
+        event.preventDefault();
+        var invoiceNumber = form.dataset.invoiceNumber || '';
+        showActionConfirm({
+          title: 'حذف فاکتور',
+          message: 'فاکتور شماره ' + invoiceNumber + ' برای همیشه حذف شود؟',
+          confirmText: 'بله، حذف شود',
+          warning: 'این عملیات قابل بازگشت نیست و ردیف‌های کالا و پرداخت‌های این سند نیز حذف می‌شوند.'
+        }, function () {
+          form.dataset.deleteConfirmed = '1';
+          if (typeof form.requestSubmit === 'function') form.requestSubmit();
+          else form.submit();
+        });
+      });
+    });
+  }
+
   document.addEventListener('click', function (event) {
     if (!invoiceHasUnsavedChanges || event.defaultPrevented || event.button !== 0) return;
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -534,6 +556,7 @@
   if (leaveDialog && !leaveDialog.hidden) closeLeaveDialog(false);
   setupInvoiceListAutoFilters(root);
   setupInvoiceRowSelection(root);
+  setupInvoiceDeleteControls(root);
   setupStampLayoutEditors(root);
   setupStatusQuickControls(root);
   var editor = (root || document).querySelector('[data-invoice-editor]');

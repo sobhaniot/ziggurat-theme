@@ -22,9 +22,16 @@
             if ($projects->have_posts()) :
                 while ($projects->have_posts()) :
                     $projects->the_post();
+                    $project_client_terms = get_the_terms(get_the_ID(), 'project_client');
+                    $project_client_term = $project_client_terms && !is_wp_error($project_client_terms)
+                        ? reset($project_client_terms)
+                        : null;
+                    $project_card_url = $project_client_term
+                        ? add_query_arg('project_client', $project_client_term->slug, get_post_type_archive_link('project'))
+                        : get_permalink();
             ?>
                     <article class="project-card">
-                        <a href="<?php the_permalink(); ?>">
+                        <a href="<?php echo esc_url($project_card_url); ?>"<?php if ($project_client_term): ?> aria-label="مشاهده پروژه‌های کارفرمای <?php echo esc_attr($project_client_term->name); ?>"<?php endif; ?>>
                             <div class="project-image">
                                 <?php
                                 if (has_post_thumbnail()) {

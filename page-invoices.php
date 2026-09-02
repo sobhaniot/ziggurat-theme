@@ -27,6 +27,27 @@ $invoice_status_return_url = static function ($fallback) {
     return $validated_url !== '' ? $validated_url : $fallback;
 };
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_invoice'])) {
+    $delete_invoice_id = absint($_POST['invoice_id'] ?? 0);
+    $nonce = isset($_POST['invoice_delete_nonce']) ? sanitize_text_field(wp_unslash($_POST['invoice_delete_nonce'])) : '';
+    if (!wp_verify_nonce($nonce, 'zigurat_delete_invoice_' . $delete_invoice_id)) {
+        $list_error = new WP_Error('invalid_nonce', 'درخواست حذف معتبر نیست؛ صفحه را تازه‌سازی کنید.');
+    } else {
+        $deleted_invoice = zigurat_invoice_delete($delete_invoice_id);
+        if (is_wp_error($deleted_invoice)) {
+            $list_error = $deleted_invoice;
+        } else {
+            $return_url = $invoice_status_return_url(zigurat_invoice_page_url(array('brand'=>$deleted_invoice->brand,'view'=>'list')));
+            $return_url = preg_replace('/#.*$/', '', add_query_arg('invoice-status', 'deleted', $return_url));
+            wp_safe_redirect($return_url);
+            exit;
+        }
+    }
+    $invoice_for_list = zigurat_invoice_get($delete_invoice_id);
+    $brand = $invoice_for_list ? $invoice_for_list->brand : $brand;
+    $view = 'list';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_invoice_settings'])) {
     $nonce = isset($_POST['invoice_settings_nonce']) ? sanitize_text_field(wp_unslash($_POST['invoice_settings_nonce'])) : '';
     if (!wp_verify_nonce($nonce, 'zigurat_save_invoice_settings')) {
@@ -137,7 +158,7 @@ if ($view === 'print') {
     $print_number = str_replace('/', '-', zigurat_invoice_object_number($invoice));
     $print_title = $print_number . '. ' . $print_subject;
     remove_action('wp_head', '_wp_render_title_tag', 1);
-    ?><!doctype html><html <?php language_attributes(); ?>><head><meta charset="<?php bloginfo('charset'); ?>"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?php echo esc_html($print_title); ?></title><?php wp_head(); ?><script>window.ziguratInvoicePrintTitle=<?php echo wp_json_encode($print_title, JSON_UNESCAPED_UNICODE); ?>;document.title=window.ziguratInvoicePrintTitle;window.addEventListener('beforeprint',function(){document.title=window.ziguratInvoicePrintTitle;});function ziguratPrintInvoice(){document.title=window.ziguratInvoicePrintTitle;window.requestAnimationFrame(function(){window.setTimeout(function(){window.print();},100);});}</script></head><body class="invoice-print-body" data-print-filename="<?php echo esc_attr($print_title); ?>"><div class="invoice-print-toolbar no-print"><a href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$invoice->brand,'view'=>'list'))); ?>">بازگشت به فهرست</a><?php if (!zigurat_invoice_is_locked($invoice)): ?><a href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$invoice->brand,'view'=>'form','type'=>$invoice->document_type,'edit'=>$invoice->id))); ?>">اصلاح فاکتور</a><?php endif; ?><button type="button" onclick="ziguratPrintInvoice()">چاپ / ذخیره PDF</button></div><main class="invoice-print-sheet"><?php get_template_part('template-parts/invoice-document', null, array('invoice'=>$invoice)); ?></main><?php wp_footer(); ?></body></html><?php
+    ?><!doctype html><html <?php language_attributes(); ?>><head><meta charset="<?php bloginfo('charset'); ?>"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?php echo esc_html($print_title); ?></title><?php wp_head(); ?><script>window.ziguratInvoicePrintTitle=<?php echo wp_json_encode($print_title, JSON_UNESCAPED_UNICODE); ?>;document.title=window.ziguratInvoicePrintTitle;function ziguratInvoiceMillimeter(){var probe=document.createElement('span');probe.style.cssText='position:absolute;visibility:hidden;width:100mm;height:1px;';document.body.appendChild(probe);var value=probe.getBoundingClientRect().width/100;probe.remove();return value||3.7795275591;}function ziguratPrepareInvoicePrint(){document.title=window.ziguratInvoicePrintTitle;var sheet=document.querySelector('.invoice-print-sheet');var invoice=document.querySelector('.invoice-document');if(!sheet||!invoice)return;invoice.classList.remove('is-multipage-print');void invoice.offsetHeight;var sheetBox=sheet.getBoundingClientRect();var invoiceBox=invoice.getBoundingClientRect();var contentHeight=Math.max(invoice.scrollHeight,invoiceBox.height)+(invoiceBox.top-sheetBox.top);var pageHeight=210*ziguratInvoiceMillimeter();invoice.classList.toggle('is-multipage-print',contentHeight>pageHeight+2);}window.addEventListener('beforeprint',ziguratPrepareInvoicePrint);window.addEventListener('afterprint',function(){var invoice=document.querySelector('.invoice-document');if(invoice)invoice.classList.remove('is-multipage-print');});function ziguratPrintInvoice(){document.title=window.ziguratInvoicePrintTitle;window.requestAnimationFrame(function(){window.setTimeout(function(){ziguratPrepareInvoicePrint();window.print();},100);});}</script></head><body class="invoice-print-body" data-print-filename="<?php echo esc_attr($print_title); ?>"><div class="invoice-print-toolbar no-print"><a href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$invoice->brand,'view'=>'list'))); ?>">بازگشت به فهرست</a><?php if (!zigurat_invoice_is_locked($invoice)): ?><a href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$invoice->brand,'view'=>'form','type'=>$invoice->document_type,'edit'=>$invoice->id))); ?>">اصلاح فاکتور</a><?php endif; ?><button type="button" onclick="ziguratPrintInvoice()">چاپ / ذخیره PDF</button></div><main class="invoice-print-sheet"><?php get_template_part('template-parts/invoice-document', null, array('invoice'=>$invoice)); ?></main><?php wp_footer(); ?></body></html><?php
     exit;
 }
 
@@ -384,7 +405,7 @@ get_header();
                 ?>
                 <?php $excel_url=wp_nonce_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'export','filter_type'=>$list_type,'filter_status'=>$list_status,'filter_payment_status'=>$list_payment_status,'filter_tax_status'=>$list_tax_status,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>$list_tax_quarter)),'zigurat_invoice_export'); ?>
                 <div class="invoice-list-heading"><h2>لیست فاکتورها</h2><div class="invoice-list-heading__actions no-print"><strong><?php echo esc_html(number_format_i18n($invoice_list['total'])); ?> سند</strong><a class="invoice-excel-button" href="<?php echo esc_url($excel_url); ?>">خروجی اکسل</a></div></div>
-                <?php if ($list_error): ?><div class="invoice-notice is-error" role="alert"><?php echo esc_html($list_error->get_error_message()); ?></div><?php elseif (!empty($_GET['invoice-status']) && $_GET['invoice-status'] === 'saved-locked'): ?><div class="invoice-notice is-success">فاکتور ذخیره و قفل شد.</div><?php endif; ?>
+                <?php if ($list_error): ?><div class="invoice-notice is-error" role="alert"><?php echo esc_html($list_error->get_error_message()); ?></div><?php elseif (!empty($_GET['invoice-status']) && $_GET['invoice-status'] === 'saved-locked'): ?><div class="invoice-notice is-success">فاکتور ذخیره و قفل شد.</div><?php elseif (!empty($_GET['invoice-status']) && $_GET['invoice-status'] === 'deleted'): ?><div class="invoice-notice is-success">فاکتور با موفقیت حذف شد.</div><?php endif; ?>
                 <form class="invoice-list-filters no-print" method="get">
                     <input type="hidden" name="invoice_brand" value="<?php echo esc_attr($brand); ?>">
                     <input type="hidden" name="invoice_view" value="list">
@@ -458,6 +479,7 @@ get_header();
                                         <a class="invoice-converted-link" href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$conversion->brand,'view'=>'form','type'=>'invoice','edit'=>$conversion->id))); ?>">فاکتور <bdi class="invoice-number" dir="ltr"><?php echo esc_html(zigurat_invoice_object_number($conversion)); ?></bdi></a>
                                     <?php endif; ?>
                                     <?php if ($latest_correction): ?><a class="invoice-converted-link" href="<?php echo esc_url(zigurat_invoice_page_url(array('view'=>'print','id'=>$latest_correction->id))); ?>" target="_blank" rel="noopener">اصلاحیه <?php echo esc_html(zigurat_invoice_object_number($latest_correction)); ?></a><?php endif; ?>
+                                    <?php if (current_user_can('manage_options') && empty($row->has_related_documents)): ?><form class="invoice-delete-form" method="post" data-invoice-delete-form data-invoice-number="<?php echo esc_attr(zigurat_invoice_object_number($row)); ?>"><input type="hidden" name="delete_invoice" value="1"><input type="hidden" name="invoice_id" value="<?php echo (int) $row->id; ?>"><input type="hidden" name="invoice_return_url" value="<?php echo esc_url($list_return_url); ?>"><?php wp_nonce_field('zigurat_delete_invoice_' . $row->id, 'invoice_delete_nonce'); ?><button type="submit">حذف</button></form><?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; else: ?>

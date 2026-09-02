@@ -300,7 +300,7 @@ add_action('set_object_terms', function ($object_id, $terms, $term_taxonomy_ids,
 
 /** انتقال یک‌باره اطلاعات پروژه‌های قبلی به taxonomy و ساخت کش اولیه. */
 add_action('init', function () {
-    if (get_option('zigurat_project_data_version') === '2') {
+    if (get_option('zigurat_project_data_version') === '3') {
         return;
     }
     $project_ids = get_posts(array(
@@ -313,7 +313,7 @@ add_action('init', function () {
         zigurat_sync_project_taxonomies($project_id, false);
     }
     zigurat_rebuild_project_cache();
-    update_option('zigurat_project_data_version', '2', false);
+    update_option('zigurat_project_data_version', '3', false);
 }, 40);
 
 /** انتقال اصطلاحات taxonomy قدیمی نوع اجرا به ساختار جدید. */

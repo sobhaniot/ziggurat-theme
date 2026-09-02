@@ -298,6 +298,48 @@ function zigurat_invoice_get($invoice_id)
     return $invoice;
 }
 
+/**
+ * Delete an invoice and its own rows. Related documents must be removed first
+ * so an invoice branch, correction or converted invoice never becomes orphaned.
+ */
+function zigurat_invoice_delete($invoice_id)
+{
+    if (!current_user_can('manage_options')) {
+        return new WP_Error('forbidden', 'فقط مدیرکل اجازه حذف فاکتور را دارد.');
+    }
+
+    $invoice_id = absint($invoice_id);
+    $invoice = zigurat_invoice_get($invoice_id);
+    if (!$invoice) {
+        return new WP_Error('not_found', 'فاکتور پیدا نشد.');
+    }
+
+    global $wpdb;
+    $invoice_table = zigurat_invoices_table_name();
+    $related_count = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM {$invoice_table}
+         WHERE parent_invoice_id = %d OR reference_invoice_id = %d OR source_proforma_id = %d",
+        $invoice_id,
+        $invoice_id,
+        $invoice_id
+    ));
+    if ($related_count > 0) {
+        return new WP_Error('has_related_documents', 'این سند به فاکتور یا انشعاب دیگری متصل است؛ ابتدا اسناد وابسته را حذف کنید.');
+    }
+
+    $wpdb->query('START TRANSACTION');
+    $items_deleted = $wpdb->delete(zigurat_invoice_items_table_name(), array('invoice_id' => $invoice_id), array('%d'));
+    $payments_deleted = $wpdb->delete(zigurat_invoice_payments_table_name(), array('invoice_id' => $invoice_id), array('%d'));
+    $invoice_deleted = $wpdb->delete($invoice_table, array('id' => $invoice_id), array('%d'));
+    if ($items_deleted === false || $payments_deleted === false || $invoice_deleted !== 1) {
+        $wpdb->query('ROLLBACK');
+        return new WP_Error('database', 'حذف فاکتور کامل نشد؛ دوباره تلاش کنید.');
+    }
+
+    $wpdb->query('COMMIT');
+    return $invoice;
+}
+
 function zigurat_invoice_get_latest_correction($invoice_id)
 {
     global $wpdb;
@@ -860,7 +902,19 @@ function zigurat_invoice_list($args = array())
     $per_page = max(1, min(100, absint($args['per_page'])));
     $page = max(1, absint($args['page']));
     $offset = ($page - 1) * $per_page;
-    $sql = "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY COALESCE(NULLIF(parent_invoice_id,0),id) DESC, number_suffix DESC, id DESC LIMIT %d OFFSET %d";
+    $sql = "SELECT current_invoice.*,
+            EXISTS(
+                SELECT 1 FROM {$table} related_invoice
+                WHERE related_invoice.parent_invoice_id = current_invoice.id
+                   OR related_invoice.reference_invoice_id = current_invoice.id
+                   OR related_invoice.source_proforma_id = current_invoice.id
+            ) AS has_related_documents
+            FROM {$table} current_invoice
+            WHERE {$where_sql}
+            ORDER BY COALESCE(NULLIF(current_invoice.parent_invoice_id,0),current_invoice.id) DESC,
+                     current_invoice.number_suffix DESC,
+                     current_invoice.id DESC
+            LIMIT %d OFFSET %d";
     return array(
         'items'=>$wpdb->get_results($wpdb->prepare($sql, array_merge($values, array($per_page,$offset)))),
         'total'=>$total, 'pages'=>max(1,(int)ceil($total/$per_page)), 'page'=>$page,

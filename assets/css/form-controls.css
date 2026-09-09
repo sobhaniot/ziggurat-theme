@@ -17,6 +17,7 @@
   .manager-lightbox-fields,
   .manager-composite-fields,
   .manager-flexi-fields,
+  .manager-letter-fields,
   .project-filters,
   .article-filters,
   .article-sidebar-search,
@@ -36,6 +37,7 @@
   .manager-lightbox-fields,
   .manager-composite-fields,
   .manager-flexi-fields,
+  .manager-letter-fields,
   .project-filters,
   .article-filters,
   .article-sidebar-search,
@@ -65,7 +67,8 @@
   .manager-application-filters,
   .manager-lightbox-fields,
   .manager-composite-fields,
-  .manager-flexi-fields
+  .manager-flexi-fields,
+  .manager-letter-fields
 ) {
   align-items: start;
 }
@@ -77,7 +80,8 @@
   .manager-application-filters,
   .manager-lightbox-fields,
   .manager-composite-fields,
-  .manager-flexi-fields
+  .manager-flexi-fields,
+  .manager-letter-fields
 ) > label {
   align-self: start;
   align-content: start;

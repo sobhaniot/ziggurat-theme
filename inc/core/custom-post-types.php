@@ -43,7 +43,8 @@ function zigurat_register_project_post_type()
             'editor',
             'thumbnail',
             'excerpt',
-            'custom-fields'
+            'custom-fields',
+            'comments'
         ),
         'show_in_rest' => true
     ));

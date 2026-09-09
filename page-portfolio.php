@@ -1,3 +1,6 @@
+<?php
+$zigurat_uploads_url = trailingslashit( wp_get_upload_dir()['baseurl'] );
+?>
 <!DOCTYPE html>
 <html lang="fa">
 <head>
@@ -253,56 +256,56 @@ img {
             </a>
         </div>
         <div class="logo">
-            <img src="http://zigurat.eleknow.com/wp-content/uploads/2025/03/123.png" alt="Company Logo">
+            <img src="<?php echo esc_url( $zigurat_uploads_url . '2025/03/123.png' ); ?>" alt="Company Logo">
         </div>
     </div>
 <div class="download-container">
-    <a href="http://zigurat.eleknow.com/wp-content/uploads/2025/05/Catalog_A4_low.pdf" download>
+    <a href="<?php echo esc_url( $zigurat_uploads_url . '2025/05/Catalog_A4_low.pdf' ); ?>" download>
         <button class="download-btn">📄 دانلود کاتالوگ آ4</button>
     </a>
 </div>
 	<div class="download-container">
-    <a href="http://zigurat.eleknow.com/wp-content/uploads/2025/05/Catalog_A3_Ersali_low.pdf" download>
+    <a href="<?php echo esc_url( $zigurat_uploads_url . '2025/05/Catalog_A3_Ersali_low.pdf' ); ?>" download>
         <button class="download-btn">📄 دانلود کاتالوگ آ3</button>
     </a>
 </div>
 
     <div class="slider">
     <div class="slide fade">
-        <img src="http://zigurat.eleknow.com/wp-content/uploads/2025/04/Catalog-1-scaled.jpg" alt="Ziggurat01">
+        <img src="<?php echo esc_url( $zigurat_uploads_url . '2025/04/Catalog-1-scaled.jpg' ); ?>" alt="Ziggurat01">
     </div>
 		<div class="slide fade">
-        <img src="http://zigurat.eleknow.com/wp-content/uploads/2025/04/Catalog-2-scaled.jpg" alt="Ziggurat02">
+		<img src="<?php echo esc_url( $zigurat_uploads_url . '2025/04/Catalog-2-scaled.jpg' ); ?>" alt="Ziggurat02">
     </div>
 	<div class="slide fade">
-        <img src="http://zigurat.eleknow.com/wp-content/uploads/2025/04/Catalog-3-scaled.jpg" alt="Ziggurat03">
+		<img src="<?php echo esc_url( $zigurat_uploads_url . '2025/04/Catalog-3-scaled.jpg' ); ?>" alt="Ziggurat03">
     </div>
 	<div class="slide fade">
-        <img src="http://zigurat.eleknow.com/wp-content/uploads/2025/04/Catalog-4-scaled.jpg" alt="Ziggurat04">
+		<img src="<?php echo esc_url( $zigurat_uploads_url . '2025/04/Catalog-4-scaled.jpg' ); ?>" alt="Ziggurat04">
     </div>
 	<div class="slide fade">
-        <img src="http://zigurat.eleknow.com/wp-content/uploads/2025/04/Catalog-5-scaled.jpg" alt="Ziggurat05">
+		<img src="<?php echo esc_url( $zigurat_uploads_url . '2025/04/Catalog-5-scaled.jpg' ); ?>" alt="Ziggurat05">
     </div>
 	<div class="slide fade">
-        <img src="http://zigurat.eleknow.com/wp-content/uploads/2025/04/Catalog-6-scaled.jpg" alt="Ziggurat06">
+		<img src="<?php echo esc_url( $zigurat_uploads_url . '2025/04/Catalog-6-scaled.jpg' ); ?>" alt="Ziggurat06">
     </div>
 	<div class="slide fade">
-        <img src="http://zigurat.eleknow.com/wp-content/uploads/2025/04/Catalog-7-scaled.jpg" alt="Ziggurat07">
+		<img src="<?php echo esc_url( $zigurat_uploads_url . '2025/04/Catalog-7-scaled.jpg' ); ?>" alt="Ziggurat07">
     </div>
 	<div class="slide fade">
-        <img src="http://zigurat.eleknow.com/wp-content/uploads/2025/04/Catalog-8-scaled.jpg" alt="Ziggurat08">
+		<img src="<?php echo esc_url( $zigurat_uploads_url . '2025/04/Catalog-8-scaled.jpg' ); ?>" alt="Ziggurat08">
     </div>
 	<div class="slide fade">
-        <img src="http://zigurat.eleknow.com/wp-content/uploads/2025/04/Catalog-9-scaled.jpg" alt="Ziggurat09">
+		<img src="<?php echo esc_url( $zigurat_uploads_url . '2025/04/Catalog-9-scaled.jpg' ); ?>" alt="Ziggurat09">
     </div>
 	<div class="slide fade">
-        <img src="http://zigurat.eleknow.com/wp-content/uploads/2025/04/Catalog-10-scaled.jpg" alt="Ziggurat10">
+		<img src="<?php echo esc_url( $zigurat_uploads_url . '2025/04/Catalog-10-scaled.jpg' ); ?>" alt="Ziggurat10">
     </div>
 	<div class="slide fade">
-        <img src="http://zigurat.eleknow.com/wp-content/uploads/2025/04/Catalog-11-scaled.jpg" alt="Ziggurat11">
+		<img src="<?php echo esc_url( $zigurat_uploads_url . '2025/04/Catalog-11-scaled.jpg' ); ?>" alt="Ziggurat11">
     </div>
 	<div class="slide fade">
-        <img src="http://zigurat.eleknow.com/wp-content/uploads/2025/04/Catalog-12-scaled.jpg" alt="Ziggurat12">
+		<img src="<?php echo esc_url( $zigurat_uploads_url . '2025/04/Catalog-12-scaled.jpg' ); ?>" alt="Ziggurat12">
     </div>
     <button class="prev" onclick="changeSlide(-1)">❯</button>
     <button class="next" onclick="changeSlide(1)">❮</button>

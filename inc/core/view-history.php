@@ -30,10 +30,10 @@ function zigurat_install_view_history_table()
 add_action('init', 'zigurat_install_view_history_table', 5);
 add_action('after_switch_theme', 'zigurat_install_view_history_table');
 
-/** ثبت اتمیک یک بازدید روزانه؛ در هر روز فقط دو ردیف مطلب و پروژه ساخته می‌شود. */
+/** ثبت اتمیک بازدید مطالب و پروژه‌ها یا دریافت فایل‌های مرکز دانلود. */
 function zigurat_record_daily_view($content_type)
 {
-    if (!in_array($content_type, array('article', 'project'), true)) {
+    if (!in_array($content_type, array('article', 'project', 'download'), true)) {
         return;
     }
     global $wpdb;
@@ -162,6 +162,7 @@ function zigurat_get_views_chart_data($range = 'daily')
         $end = $period['end']->format('Y-m-d');
         $article = 0;
         $project = 0;
+        $download = 0;
         foreach ($rows as $row) {
             if ($row->view_date < $start || $row->view_date > $end) {
                 continue;
@@ -170,13 +171,16 @@ function zigurat_get_views_chart_data($range = 'daily')
                 $article += (int) $row->views;
             } elseif ($row->content_type === 'project') {
                 $project += (int) $row->views;
+            } elseif ($row->content_type === 'download') {
+                $download += (int) $row->views;
             }
         }
         $result[] = array(
             'label' => $period['label'],
             'article' => $article,
             'project' => $project,
-            'total' => $article + $project,
+            'download' => $download,
+            'total' => $article + $project + $download,
         );
     }
     return $result;

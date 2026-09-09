@@ -12,6 +12,7 @@ if (have_posts()): while (have_posts()): the_post();
     $changelog = zigurat_download_meta($post_id, 'changelog');
     $official_url = zigurat_download_meta($post_id, 'official_url');
     $source_url = zigurat_download_source_url($post_id);
+    $version_history = zigurat_download_version_history($post_id);
     $sketchup = zigurat_download_term_names($post_id, 'sketchup_version');
     $os = zigurat_download_term_names($post_id, 'download_os');
     $categories = zigurat_download_term_names($post_id, 'download_category');
@@ -72,6 +73,30 @@ if (have_posts()): while (have_posts()): the_post();
                 <?php if ($changelog): ?>
                     <section class="download-panel"><h2>تغییرات این نسخه</h2><div><?php echo wpautop(wp_kses_post($changelog)); ?></div></section>
                 <?php endif; ?>
+                <?php if ($version_history): ?>
+                    <section class="download-panel download-version-archive">
+                        <div class="download-version-archive-heading">
+                            <div><span>نسخه‌های پیشین</span><h2>آرشیو نسخه‌ها</h2></div>
+                            <p>برای سازگاری با پروژه‌های قدیمی می‌توانید نسخه‌های قبلی را نیز دریافت کنید.</p>
+                        </div>
+                        <div class="download-version-list">
+                            <?php foreach ($version_history as $version_index => $old_version):
+                                $old_source = zigurat_download_version_source_url($old_version);
+                            ?>
+                                <article class="download-version-item">
+                                    <div class="download-version-number"><span>نسخه</span><strong><?php echo esc_html($old_version['version']); ?></strong></div>
+                                    <div class="download-version-meta">
+                                        <?php if (!empty($old_version['release_date'])): ?><span><?php echo esc_html(wp_date(get_option('date_format'), strtotime($old_version['release_date']))); ?></span><?php endif; ?>
+                                        <?php if (!empty($old_version['file_size'])): ?><span><?php echo esc_html($old_version['file_size']); ?></span><?php endif; ?>
+                                        <?php if (!empty($old_version['file_format'])): ?><span><?php echo esc_html($old_version['file_format']); ?></span><?php endif; ?>
+                                    </div>
+                                    <?php if (!empty($old_version['changelog'])): ?><div class="download-version-changelog"><?php echo wpautop(wp_kses_post($old_version['changelog'])); ?></div><?php endif; ?>
+                                    <?php if ($old_source): ?><a class="download-version-button" href="<?php echo esc_url(zigurat_download_action_url($post_id, $version_index)); ?>" rel="nofollow">دانلود نسخه <?php echo esc_html($old_version['version']); ?></a><?php endif; ?>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
+                    </section>
+                <?php endif; ?>
             </article>
             <aside class="download-sidebar">
                 <section class="download-panel download-facts">
@@ -87,7 +112,7 @@ if (have_posts()): while (have_posts()): the_post();
                 </section>
             </aside>
         </div>
+        <?php comments_template(); ?>
     </div>
 </main>
 <?php endwhile; endif; get_footer(); ?>
-

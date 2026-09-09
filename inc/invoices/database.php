@@ -27,14 +27,21 @@ function zigurat_invoice_payments_table_name()
     return $wpdb->prefix . 'zigurat_invoice_payments';
 }
 
+function zigurat_invoice_trash_table_name()
+{
+    global $wpdb;
+    return $wpdb->prefix . 'zigurat_invoice_trash';
+}
+
 function zigurat_install_invoice_tables()
 {
     global $wpdb;
-    $version = '7';
+    $version = '8';
     $invoices = zigurat_invoices_table_name();
     $items = zigurat_invoice_items_table_name();
     $sequences = zigurat_invoice_sequences_table_name();
     $payments = zigurat_invoice_payments_table_name();
+    $trash = zigurat_invoice_trash_table_name();
     // در حالت عادی نسخه ذخیره‌شده کافی است. بررسی سه جدول در هر درخواست
     // باعث کندشدن همه صفحات، حتی برای بازدیدکنندگان عمومی، می‌شد.
     if (get_option('zigurat_invoice_schema_version') === $version) {
@@ -144,6 +151,27 @@ function zigurat_install_invoice_tables()
         KEY invoice_id (invoice_id),
         KEY payment_date (payment_date)
     ) {$charset};");
+    dbDelta("CREATE TABLE {$trash} (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        original_invoice_id bigint(20) unsigned NOT NULL,
+        brand varchar(20) NOT NULL,
+        document_type varchar(20) NOT NULL,
+        document_number bigint(20) unsigned NOT NULL,
+        number_suffix smallint(5) unsigned NOT NULL DEFAULT 0,
+        issue_date varchar(10) NOT NULL DEFAULT '',
+        customer_name varchar(191) NOT NULL DEFAULT '',
+        subject varchar(191) NOT NULL DEFAULT '',
+        grand_total bigint(20) unsigned NOT NULL DEFAULT 0,
+        snapshot_json longtext NOT NULL,
+        deleted_by bigint(20) unsigned NOT NULL DEFAULT 0,
+        deleted_at datetime NOT NULL,
+        PRIMARY KEY  (id),
+        KEY original_invoice_id (original_invoice_id),
+        KEY brand_type (brand,document_type),
+        KEY document_number (document_number),
+        KEY deleted_at (deleted_at),
+        KEY customer_name (customer_name(100))
+    ) {$charset};");
     if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $invoices)) === $invoices) {
         $old_number_index = $wpdb->get_var("SHOW INDEX FROM {$invoices} WHERE Key_name = 'brand_type_number'");
         if ($old_number_index) {
@@ -196,6 +224,7 @@ function zigurat_install_invoice_tables()
         && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $items)) === $items
         && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $sequences)) === $sequences
         && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $payments)) === $payments
+        && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $trash)) === $trash
         && $wpdb->get_var("SHOW INDEX FROM {$invoices} WHERE Key_name = 'brand_type_number_suffix'")
         && $wpdb->get_var("SHOW INDEX FROM {$invoices} WHERE Key_name = 'tax_period'")
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'tax_year'")

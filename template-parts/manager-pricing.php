@@ -5,7 +5,7 @@ if (!defined('ABSPATH') || !zigurat_is_manager()) {
 $calculator = isset($_GET['calculator']) && is_string($_GET['calculator'])
     ? sanitize_key(wp_unslash($_GET['calculator']))
     : '';
-if (!in_array($calculator, array('', 'lightbox', 'composite', 'flexi'), true)) {
+if (!in_array($calculator, array('', 'lightbox', 'composite', 'flexi', 'letters'), true)) {
     $calculator = '';
 }
 $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login_url());
@@ -37,7 +37,14 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                 <strong>محاسبه قیمت فلکسی</strong>
                 <small>محاسبه رول فلکسی و پرت، سپری، مغزی، کلیپس، کاور، نصب و آهن‌کشی همراه با تودلی‌ها</small>
             </a>
+            <a href="<?php echo esc_url(add_query_arg(array('manager-section'=>'pricing','calculator'=>'letters'), zigurat_manager_login_url())); ?>">
+                <span aria-hidden="true">حـ</span>
+                <strong>محاسبه قیمت حروف</strong>
+                <small>خواندن طرح SVG، چیدمان بهینه قطعات روی ورق، محاسبه پرت و برآورد هزینه ساخت</small>
+            </a>
         </div>
+    <?php elseif ($calculator === 'letters'): ?>
+        <?php get_template_part('template-parts/manager-pricing-letters'); ?>
     <?php elseif ($calculator === 'lightbox'):
         $settings = zigurat_get_lightbox_pricing_settings();
         $last_costs = zigurat_get_lightbox_last_costs();

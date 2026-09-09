@@ -33,6 +33,42 @@
         nameField.value = '';
       });
     }
+
+    var history = document.getElementById('zigurat-download-version-history');
+    var addVersion = document.getElementById('zigurat-download-add-version');
+    var rowTemplate = document.getElementById('tmpl-zigurat-download-version-row');
+    var historyFrame;
+
+    if (history && addVersion && rowTemplate && window.wp && wp.template) {
+      addVersion.addEventListener('click', function () {
+        var index = Date.now().toString();
+        history.insertAdjacentHTML('beforeend', wp.template('zigurat-download-version-row')({ index: index }));
+      });
+
+      history.addEventListener('click', function (event) {
+        var remove = event.target.closest('.zigurat-version-remove');
+        if (remove) {
+          event.preventDefault();
+          remove.closest('.zigurat-version-row').remove();
+          return;
+        }
+
+        var select = event.target.closest('.zigurat-version-select-file');
+        if (!select) return;
+        event.preventDefault();
+        var row = select.closest('.zigurat-version-row');
+        historyFrame = wp.media({
+          title: 'انتخاب فایل نسخه قدیمی',
+          button: { text: 'استفاده از این فایل' },
+          multiple: false
+        });
+        historyFrame.on('select', function () {
+          var attachment = historyFrame.state().get('selection').first().toJSON();
+          row.querySelector('.zigurat-version-file-id').value = attachment.id || '';
+          row.querySelector('.zigurat-version-file-name').value = attachment.filename || attachment.title || '';
+        });
+        historyFrame.open();
+      });
+    }
   });
 }());
-

@@ -29,7 +29,14 @@ function zigurat_render_download_meta_box($post)
         .zigurat-download-file-row{display:flex;gap:8px;align-items:center}
         .zigurat-download-file-row input{flex:1}
         .zigurat-download-help{margin:4px 0 0;color:#646970;font-weight:400}
+        .zigurat-version-history-admin{padding-top:8px;border-top:1px solid #dcdcde}
+        .zigurat-version-history-admin h3{margin:0 0 6px}
+        .zigurat-version-row{display:grid;gap:12px;padding:16px;margin:14px 0;border:1px solid #dcdcde;border-radius:8px;background:#f9f9f9}
+        .zigurat-version-row-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+        .zigurat-version-row>label{display:flex;flex-direction:column;gap:6px;font-weight:600}
+        .zigurat-version-remove{width:max-content}
         @media(max-width:782px){.zigurat-download-fields{grid-template-columns:1fr}}
+        @media(max-width:782px){.zigurat-version-row-grid{grid-template-columns:1fr 1fr}}
     </style>
     <div class="zigurat-download-fields">
         <?php foreach ($fields as $key => $field): ?>
@@ -71,8 +78,73 @@ function zigurat_render_download_meta_box($post)
             <span>تغییرات نسخه</span>
             <textarea rows="5" name="zigurat_download[changelog]" placeholder="ویژگی‌ها و تغییرات این نسخه"><?php echo esc_textarea(zigurat_download_meta($post->ID, 'changelog')); ?></textarea>
         </label>
+
+        <div class="wide zigurat-version-history-admin">
+            <h3>آرشیو نسخه‌های قبلی</h3>
+            <p class="zigurat-download-help">با ثبت نسخه جدید، فایل فعلی به‌صورت خودکار به این آرشیو منتقل می‌شود و حذف نخواهد شد. ردیف‌های آرشیو را نیز می‌توانید دستی ویرایش کنید.</p>
+            <div id="zigurat-download-version-history">
+                <?php foreach (zigurat_download_version_history($post->ID) as $index => $item):
+                    $history_file_id = absint($item['file_id'] ?? 0);
+                    $history_file_name = $history_file_id ? basename((string) get_attached_file($history_file_id)) : '';
+                ?>
+                    <div class="zigurat-version-row" data-index="<?php echo esc_attr($index); ?>">
+                        <div class="zigurat-version-row-grid">
+                            <label><span>نسخه</span><input type="text" name="zigurat_download[version_history][<?php echo esc_attr($index); ?>][version]" value="<?php echo esc_attr($item['version'] ?? ''); ?>"></label>
+                            <label><span>تاریخ انتشار</span><input type="date" name="zigurat_download[version_history][<?php echo esc_attr($index); ?>][release_date]" value="<?php echo esc_attr($item['release_date'] ?? ''); ?>"></label>
+                            <label><span>حجم</span><input type="text" name="zigurat_download[version_history][<?php echo esc_attr($index); ?>][file_size]" value="<?php echo esc_attr($item['file_size'] ?? ''); ?>"></label>
+                            <label><span>فرمت</span><input type="text" name="zigurat_download[version_history][<?php echo esc_attr($index); ?>][file_format]" value="<?php echo esc_attr($item['file_format'] ?? ''); ?>"></label>
+                        </div>
+                        <label><span>فایل نسخه</span><span class="zigurat-download-file-row"><input type="hidden" class="zigurat-version-file-id" name="zigurat_download[version_history][<?php echo esc_attr($index); ?>][file_id]" value="<?php echo esc_attr($history_file_id); ?>"><input type="text" class="zigurat-version-file-name" value="<?php echo esc_attr($history_file_name); ?>" readonly placeholder="فایلی انتخاب نشده است"><button type="button" class="button zigurat-version-select-file">انتخاب فایل</button></span></label>
+                        <label><span>لینک خارجی</span><input type="url" name="zigurat_download[version_history][<?php echo esc_attr($index); ?>][external_url]" value="<?php echo esc_attr($item['external_url'] ?? ''); ?>"></label>
+                        <label><span>تغییرات نسخه</span><textarea rows="3" name="zigurat_download[version_history][<?php echo esc_attr($index); ?>][changelog]"><?php echo esc_textarea($item['changelog'] ?? ''); ?></textarea></label>
+                        <button type="button" class="button-link-delete zigurat-version-remove">حذف ردیف از آرشیو</button>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <button type="button" class="button" id="zigurat-download-add-version">افزودن نسخه قدیمی</button>
+        </div>
     </div>
+    <script type="text/html" id="tmpl-zigurat-download-version-row">
+        <div class="zigurat-version-row" data-index="{{data.index}}">
+            <div class="zigurat-version-row-grid">
+                <label><span>نسخه</span><input type="text" name="zigurat_download[version_history][{{data.index}}][version]"></label>
+                <label><span>تاریخ انتشار</span><input type="date" name="zigurat_download[version_history][{{data.index}}][release_date]"></label>
+                <label><span>حجم</span><input type="text" name="zigurat_download[version_history][{{data.index}}][file_size]"></label>
+                <label><span>فرمت</span><input type="text" name="zigurat_download[version_history][{{data.index}}][file_format]"></label>
+            </div>
+            <label><span>فایل نسخه</span><span class="zigurat-download-file-row"><input type="hidden" class="zigurat-version-file-id" name="zigurat_download[version_history][{{data.index}}][file_id]"><input type="text" class="zigurat-version-file-name" readonly placeholder="فایلی انتخاب نشده است"><button type="button" class="button zigurat-version-select-file">انتخاب فایل</button></span></label>
+            <label><span>لینک خارجی</span><input type="url" name="zigurat_download[version_history][{{data.index}}][external_url]"></label>
+            <label><span>تغییرات نسخه</span><textarea rows="3" name="zigurat_download[version_history][{{data.index}}][changelog]"></textarea></label>
+            <button type="button" class="button-link-delete zigurat-version-remove">حذف ردیف از آرشیو</button>
+        </div>
+    </script>
     <?php
+}
+
+function zigurat_sanitize_download_version_history($items)
+{
+    if (!is_array($items)) {
+        return array();
+    }
+    $clean = array();
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $entry = array(
+            'version'      => sanitize_text_field($item['version'] ?? ''),
+            'release_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($item['release_date'] ?? '')) ? $item['release_date'] : '',
+            'file_size'    => sanitize_text_field($item['file_size'] ?? ''),
+            'file_format'  => sanitize_text_field($item['file_format'] ?? ''),
+            'file_id'      => absint($item['file_id'] ?? 0),
+            'external_url' => esc_url_raw($item['external_url'] ?? ''),
+            'changelog'    => wp_kses_post($item['changelog'] ?? ''),
+        );
+        if ($entry['version'] && ($entry['file_id'] || $entry['external_url'])) {
+            $clean[] = $entry;
+        }
+    }
+    return $clean;
 }
 
 function zigurat_save_download_meta($post_id)
@@ -89,6 +161,39 @@ function zigurat_save_download_meta($post_id)
     $data = isset($_POST['zigurat_download']) && is_array($_POST['zigurat_download'])
         ? wp_unslash($_POST['zigurat_download'])
         : array();
+    $previous = array(
+        'version'      => (string) zigurat_download_meta($post_id, 'version'),
+        'release_date' => '',
+        'file_size'    => (string) zigurat_download_meta($post_id, 'file_size'),
+        'file_format'  => (string) zigurat_download_meta($post_id, 'file_format'),
+        'file_id'      => absint(zigurat_download_meta($post_id, 'file_id')),
+        'external_url' => (string) zigurat_download_meta($post_id, 'external_url'),
+        'changelog'    => (string) zigurat_download_meta($post_id, 'changelog'),
+    );
+    if ($previous['file_id']) {
+        $attachment_date = get_post_field('post_date', $previous['file_id']);
+        if ($attachment_date) {
+            $previous['release_date'] = mysql2date('Y-m-d', $attachment_date);
+        }
+    }
+    $history = zigurat_sanitize_download_version_history($data['version_history'] ?? zigurat_download_version_history($post_id));
+    $next_version = sanitize_text_field($data['version'] ?? '');
+    $next_file_id = absint($data['file_id'] ?? 0);
+    $next_external_url = esc_url_raw($data['external_url'] ?? '');
+    $source_changed = $previous['file_id'] !== $next_file_id || $previous['external_url'] !== $next_external_url;
+    if ($previous['version'] && ($previous['file_id'] || $previous['external_url']) && ($previous['version'] !== $next_version || $source_changed)) {
+        $already_archived = false;
+        foreach ($history as $item) {
+            if ($item['version'] === $previous['version'] && absint($item['file_id']) === $previous['file_id'] && $item['external_url'] === $previous['external_url']) {
+                $already_archived = true;
+                break;
+            }
+        }
+        if (!$already_archived) {
+            array_unshift($history, $previous);
+        }
+    }
+    update_post_meta($post_id, '_zig_download_version_history', $history);
     $text_fields = array('version', 'file_size', 'file_format', 'developer', 'license');
     foreach ($text_fields as $key) {
         update_post_meta($post_id, '_zig_download_' . $key, sanitize_text_field($data[$key] ?? ''));

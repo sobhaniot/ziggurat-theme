@@ -7,6 +7,8 @@ $statistics = zigurat_get_manager_views_statistics(10);
 $total_views = max(0, (int) $statistics['total_views']);
 $article_share = $total_views ? round(((int) $statistics['article_views'] / $total_views) * 100, 1) : 0;
 $project_share = $total_views ? round(((int) $statistics['project_views'] / $total_views) * 100, 1) : 0;
+$download_share = $total_views ? max(0, round(((int) $statistics['download_views'] / $total_views) * 100, 1)) : 0;
+$project_share_end = min(100, $article_share + $project_share);
 $traffic_chart_data = zigurat_get_all_views_chart_data();
 $top_max = 0;
 foreach ($statistics['top_content'] as $content_item) {
@@ -24,14 +26,14 @@ foreach ($statistics['top_content'] as $content_item) {
             <span>گزارش عملکرد محتوا</span>
             <h2 id="manager-views-title">آمار بازدید سایت</h2>
         </div>
-        <p>بازدید کاربران مهمان از صفحات مطالب و پروژه‌ها؛ بازدید مدیران و ربات‌های شناخته‌شده محاسبه نمی‌شود.</p>
+        <p>بازدید کاربران مهمان از صفحات مطالب و پروژه‌ها، به‌همراه تعداد دریافت واقعی فایل‌های مرکز دانلود.</p>
     </header>
 
     <div class="manager-view-cards">
         <article class="manager-view-card manager-view-card--total">
-            <span>مجموع بازدید</span>
+            <span>مجموع بازدید و دانلود</span>
             <strong><?php echo esc_html(number_format_i18n($total_views)); ?></strong>
-            <small>مطالب و پروژه‌ها</small>
+            <small>مطالب، پروژه‌ها و دریافت فایل</small>
         </article>
         <article class="manager-view-card">
             <span>بازدید مطالب</span>
@@ -43,11 +45,17 @@ foreach ($statistics['top_content'] as $content_item) {
             <strong><?php echo esc_html(number_format_i18n($statistics['project_views'])); ?></strong>
             <small><?php echo esc_html(number_format_i18n($statistics['project_count'])); ?> پروژه منتشرشده</small>
         </article>
+        <article class="manager-view-card manager-view-card--download">
+            <span>دانلود فایل‌ها</span>
+            <strong><?php echo esc_html(number_format_i18n($statistics['download_views'])); ?></strong>
+            <small><?php echo esc_html(number_format_i18n($statistics['download_count'])); ?> فایل منتشرشده</small>
+        </article>
         <article class="manager-view-card">
             <span>میانگین بازدید</span>
             <div class="manager-view-card__averages">
                 <small>هر مطلب <b><?php echo esc_html(number_format_i18n($statistics['article_average'])); ?></b></small>
                 <small>هر پروژه <b><?php echo esc_html(number_format_i18n($statistics['project_average'])); ?></b></small>
+                <small>هر فایل <b><?php echo esc_html(number_format_i18n($statistics['download_average'])); ?></b></small>
             </div>
         </article>
     </div>
@@ -63,9 +71,9 @@ foreach ($statistics['top_content'] as $content_item) {
             </div>
         </div>
         <div class="manager-traffic__summary"><span>مجموع بازدید این بازه</span><strong data-traffic-total>۰</strong></div>
-        <div class="manager-traffic__legend"><span><i class="is-article"></i>مطالب</span><span><i class="is-project"></i>پروژه‌ها</span></div>
+        <div class="manager-traffic__legend"><span><i class="is-article"></i>مطالب</span><span><i class="is-project"></i>پروژه‌ها</span><span><i class="is-download"></i>دانلودها</span></div>
         <div class="manager-traffic__scroll">
-            <div class="manager-traffic__plot" data-traffic-plot role="img" aria-label="نمودار بازدید مطالب و پروژه‌ها">
+            <div class="manager-traffic__plot" data-traffic-plot role="img" aria-label="نمودار بازدید مطالب، پروژه‌ها و دانلودها">
                 <div class="manager-traffic__bars" data-traffic-bars></div>
                 <div class="manager-traffic__empty" data-traffic-empty hidden>در این بازه هنوز بازدیدی ثبت نشده است.</div>
             </div>
@@ -78,28 +86,29 @@ foreach ($statistics['top_content'] as $content_item) {
         <section class="manager-view-chart manager-view-chart--distribution">
             <div class="manager-view-chart__heading">
                 <h3>سهم بخش‌ها از بازدید</h3>
-                <small>مقایسه مطالب و پروژه‌ها</small>
+                <small>مقایسه مطالب، پروژه‌ها و دانلودها</small>
             </div>
-            <div class="manager-view-donut <?php echo $total_views ? '' : 'is-empty'; ?>" style="--article-share: <?php echo esc_attr($article_share); ?>%;" role="img" aria-label="<?php echo esc_attr('سهم مطالب ' . $article_share . ' درصد و سهم پروژه‌ها ' . $project_share . ' درصد'); ?>">
+            <div class="manager-view-donut <?php echo $total_views ? '' : 'is-empty'; ?>" style="--article-share: <?php echo esc_attr($article_share); ?>%;--project-share-end: <?php echo esc_attr($project_share_end); ?>%;" role="img" aria-label="<?php echo esc_attr('سهم مطالب ' . $article_share . ' درصد، سهم پروژه‌ها ' . $project_share . ' درصد و سهم دانلودها ' . $download_share . ' درصد'); ?>">
                 <div><strong><?php echo esc_html(number_format_i18n($total_views)); ?></strong><span>کل بازدید</span></div>
             </div>
             <ul class="manager-view-legend">
                 <li><i class="is-article"></i><span>مطالب</span><strong><?php echo esc_html(number_format_i18n($article_share, 1)); ?>٪</strong></li>
                 <li><i class="is-project"></i><span>پروژه‌ها</span><strong><?php echo esc_html(number_format_i18n($project_share, 1)); ?>٪</strong></li>
+                <li><i class="is-download"></i><span>دانلودها</span><strong><?php echo esc_html(number_format_i18n($download_share, 1)); ?>٪</strong></li>
             </ul>
         </section>
 
         <section class="manager-view-chart manager-view-chart--top">
             <div class="manager-view-chart__heading">
                 <h3>پربازدیدترین محتواها</h3>
-                <small>۱۰ مطلب یا پروژه برتر</small>
+                <small>۱۰ مطلب، پروژه یا فایل برتر</small>
             </div>
             <?php if ($statistics['top_content']): ?>
                 <ol class="manager-view-bars">
                     <?php foreach ($statistics['top_content'] as $content_item):
                         $views = max(0, (int) $content_item->views);
                         $width = ($top_max && $views > 0) ? max(2, round(($views / $top_max) * 100, 2)) : 0;
-                        $type_label = $content_item->post_type === 'project' ? 'پروژه' : 'مطلب';
+                        $type_label = $content_item->post_type === 'project' ? 'پروژه' : ($content_item->post_type === 'zig_download' ? 'دانلود' : 'مطلب');
                     ?>
                         <li>
                             <div class="manager-view-bar__label">
@@ -112,7 +121,7 @@ foreach ($statistics['top_content'] as $content_item) {
                     <?php endforeach; ?>
                 </ol>
             <?php else: ?>
-                <div class="manager-view-empty">هنوز مطلب یا پروژه‌ای برای نمایش آمار وجود ندارد.</div>
+                <div class="manager-view-empty">هنوز مطلب، پروژه یا فایل دانلودی برای نمایش آمار وجود ندارد.</div>
             <?php endif; ?>
         </section>
     </div>

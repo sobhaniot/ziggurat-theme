@@ -23,7 +23,7 @@ function zigurat_invoice_payment_status_label($status)
     $labels = array(
         'not_applicable' => 'بدون وضعیت پرداخت',
         'unpaid' => 'پرداخت‌نشده',
-        'partial' => 'پرداخت‌نشده',
+        'partial' => 'پرداخت جزئی',
         'settled' => 'تسویه کامل',
     );
     return $labels[$status] ?? $labels['unpaid'];
@@ -298,9 +298,239 @@ function zigurat_invoice_get($invoice_id)
     return $invoice;
 }
 
+function zigurat_invoice_trash_get_record($trash_id)
+{
+    global $wpdb;
+    return $wpdb->get_row($wpdb->prepare(
+        'SELECT * FROM ' . zigurat_invoice_trash_table_name() . ' WHERE id = %d',
+        absint($trash_id)
+    ));
+}
+
+function zigurat_invoice_trash_get_invoice($trash_id)
+{
+    $record = zigurat_invoice_trash_get_record($trash_id);
+    if (!$record) {
+        return null;
+    }
+    $snapshot = json_decode((string) $record->snapshot_json, true);
+    if (!is_array($snapshot) || empty($snapshot['invoice']) || !is_array($snapshot['invoice'])) {
+        return null;
+    }
+    $invoice = (object) $snapshot['invoice'];
+    $invoice->items = array_map(static function ($item) {
+        return (object) $item;
+    }, is_array($snapshot['items'] ?? null) ? $snapshot['items'] : array());
+    $seller = json_decode((string) ($invoice->seller_json ?? ''), true);
+    $invoice->seller = is_array($seller) ? $seller : zigurat_invoice_default_seller($invoice->brand ?? 'unofficial');
+    $invoice->_trash_id = (int) $record->id;
+    $invoice->_from_trash = true;
+    return $invoice;
+}
+
+function zigurat_invoice_trash_list($args = array())
+{
+    global $wpdb;
+    $args = wp_parse_args($args, array('brand'=>'', 'search'=>'', 'page'=>1, 'per_page'=>30));
+    $where = array('1=1');
+    $values = array();
+    if (in_array($args['brand'], array('official','unofficial'), true)) {
+        $where[] = 'brand=%s';
+        $values[] = $args['brand'];
+    }
+    if ($args['search'] !== '') {
+        $like = '%' . $wpdb->esc_like($args['search']) . '%';
+        $where[] = "(customer_name LIKE %s OR subject LIKE %s OR CONCAT(document_number, IF(number_suffix > 0, CONCAT('/', number_suffix), '')) LIKE %s)";
+        array_push($values, $like, $like, $like);
+    }
+    $table = zigurat_invoice_trash_table_name();
+    $where_sql = implode(' AND ', $where);
+    $count_sql = "SELECT COUNT(*) FROM {$table} WHERE {$where_sql}";
+    $total = (int) ($values ? $wpdb->get_var($wpdb->prepare($count_sql, $values)) : $wpdb->get_var($count_sql));
+    $per_page = max(1, min(100, absint($args['per_page'])));
+    $page = max(1, absint($args['page']));
+    $offset = ($page - 1) * $per_page;
+    $sql = "SELECT trash.*, users.display_name AS deleted_by_name
+            FROM {$table} trash
+            LEFT JOIN {$wpdb->users} users ON users.ID = trash.deleted_by
+            WHERE {$where_sql}
+            ORDER BY trash.deleted_at DESC, trash.id DESC
+            LIMIT %d OFFSET %d";
+    return array(
+        'items' => $wpdb->get_results($wpdb->prepare($sql, array_merge($values, array($per_page, $offset)))),
+        'total' => $total,
+        'pages' => max(1, (int) ceil($total / $per_page)),
+        'page' => $page,
+    );
+}
+
+function zigurat_invoice_number_is_in_use($brand, $type, $number, $suffix = 0)
+{
+    global $wpdb;
+    return (bool) $wpdb->get_var($wpdb->prepare(
+        'SELECT id FROM ' . zigurat_invoices_table_name() . ' WHERE brand = %s AND document_type = %s AND document_number = %d AND number_suffix = %d LIMIT 1',
+        $brand,
+        $type,
+        absint($number),
+        absint($suffix)
+    ));
+}
+
+function zigurat_invoice_restore_from_trash($trash_id, $use_new_number = false)
+{
+    if (!current_user_can('manage_options')) {
+        return new WP_Error('forbidden', 'فقط مدیرکل اجازه بازیابی فاکتور را دارد.');
+    }
+    global $wpdb;
+    $trash_table = zigurat_invoice_trash_table_name();
+    $invoice_table = zigurat_invoices_table_name();
+    $items_table = zigurat_invoice_items_table_name();
+    $payments_table = zigurat_invoice_payments_table_name();
+    $trash_id = absint($trash_id);
+    $wpdb->query('START TRANSACTION');
+    $record = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$trash_table} WHERE id = %d FOR UPDATE", $trash_id));
+    $snapshot = $record ? json_decode((string) $record->snapshot_json, true) : null;
+    if (!$record || !is_array($snapshot) || empty($snapshot['invoice']) || !is_array($snapshot['invoice'])) {
+        $wpdb->query('ROLLBACK');
+        return new WP_Error('not_found', 'نسخه حذف‌شده فاکتور پیدا نشد.');
+    }
+    $invoice_data = $snapshot['invoice'];
+    $original_id = absint($invoice_data['id'] ?? 0);
+    $brand = sanitize_key((string) ($invoice_data['brand'] ?? ''));
+    $type = sanitize_key((string) ($invoice_data['document_type'] ?? ''));
+    $number = absint($invoice_data['document_number'] ?? 0);
+    $suffix = absint($invoice_data['number_suffix'] ?? 0);
+    $id_conflict = $original_id ? (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$invoice_table} WHERE id = %d", $original_id)) : 1;
+    $number_conflict = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM {$invoice_table} WHERE brand = %s AND document_type = %s AND document_number = %d AND number_suffix = %d",
+        $brand,
+        $type,
+        $number,
+        $suffix
+    ));
+    $restore_as_new_record = $number_conflict > 0 && $use_new_number;
+    if ($id_conflict > 0 && !$restore_as_new_record) {
+        $wpdb->query('ROLLBACK');
+        return new WP_Error('restore_id_conflict', 'شناسه داخلی این فاکتور دوباره استفاده شده و بازیابی امن آن ممکن نیست.');
+    }
+    if ($number_conflict > 0 && !$use_new_number) {
+        $wpdb->query('ROLLBACK');
+        return new WP_Error('restore_number_conflict', 'شماره اصلی این فاکتور دوباره استفاده شده است؛ بازیابی با شماره جدید را تأیید کنید.');
+    }
+    $restored_with_new_number = false;
+    if ($number_conflict > 0) {
+        $sequence_table = zigurat_invoice_sequences_table_name();
+        $first_number = zigurat_invoice_next_number($brand, $type);
+        $now = current_time('mysql', true);
+        $wpdb->query($wpdb->prepare(
+            "INSERT IGNORE INTO {$sequence_table} (brand,document_type,last_number,updated_at) VALUES (%s,%s,%d,%s)",
+            $brand,
+            $type,
+            max(0, $first_number - 1),
+            $now
+        ));
+        $last_number = $wpdb->get_var($wpdb->prepare(
+            "SELECT last_number FROM {$sequence_table} WHERE brand = %s AND document_type = %s FOR UPDATE",
+            $brand,
+            $type
+        ));
+        if ($last_number === null) {
+            $wpdb->query('ROLLBACK');
+            return new WP_Error('database', 'شماره جدید برای بازیابی ساخته نشد.');
+        }
+        $number = (int) $last_number + 1;
+        while ($wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM {$invoice_table} WHERE brand = %s AND document_type = %s AND document_number = %d LIMIT 1 FOR UPDATE",
+            $brand,
+            $type,
+            $number
+        ))) {
+            ++$number;
+        }
+        if ($wpdb->update(
+            $sequence_table,
+            array('last_number'=>$number, 'updated_at'=>$now),
+            array('brand'=>$brand, 'document_type'=>$type),
+            array('%d','%s'),
+            array('%s','%s')
+        ) === false) {
+            $wpdb->query('ROLLBACK');
+            return new WP_Error('database', 'شماره جدید بازیابی ذخیره نشد.');
+        }
+        $invoice_data['document_number'] = $number;
+        $invoice_data['number_suffix'] = 0;
+        $invoice_data['parent_invoice_id'] = 0;
+        $invoice_data['allow_branches'] = 0;
+        unset($invoice_data['id']);
+        $restored_with_new_number = true;
+    }
+    foreach (array('parent_invoice_id','reference_invoice_id','source_proforma_id') as $relation_key) {
+        $relation_id = absint($invoice_data[$relation_key] ?? 0);
+        if ($relation_id && !(int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$invoice_table} WHERE id = %d", $relation_id))) {
+            $wpdb->query('ROLLBACK');
+            return new WP_Error('missing_relation', 'ابتدا سند اصلی یا مرتبط با این فاکتور را از سطل زباله بازیابی کنید.');
+        }
+    }
+    $invoice_columns = array_flip($wpdb->get_col("SHOW COLUMNS FROM {$invoice_table}", 0));
+    $invoice_data = array_intersect_key($invoice_data, $invoice_columns);
+    if (!$wpdb->insert($invoice_table, $invoice_data)) {
+        $wpdb->query('ROLLBACK');
+        return new WP_Error('database', 'بازیابی اطلاعات فاکتور انجام نشد.');
+    }
+    $restored_id = $restore_as_new_record ? (int) $wpdb->insert_id : $original_id;
+    foreach ((array) ($snapshot['items'] ?? array()) as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        unset($item['id']);
+        $item['invoice_id'] = $restored_id;
+        if (!$wpdb->insert($items_table, $item)) {
+            $wpdb->query('ROLLBACK');
+            return new WP_Error('database', 'ردیف‌های فاکتور بازیابی نشدند.');
+        }
+    }
+    foreach ((array) ($snapshot['payments'] ?? array()) as $payment) {
+        if (!is_array($payment)) {
+            continue;
+        }
+        unset($payment['id']);
+        $payment['invoice_id'] = $restored_id;
+        if (!$wpdb->insert($payments_table, $payment)) {
+            $wpdb->query('ROLLBACK');
+            return new WP_Error('database', 'پرداخت‌های فاکتور بازیابی نشدند.');
+        }
+    }
+    if ($wpdb->delete($trash_table, array('id'=>$trash_id), array('%d')) !== 1) {
+        $wpdb->query('ROLLBACK');
+        return new WP_Error('database', 'فاکتور بازیابی شد اما از سطل زباله خارج نشد.');
+    }
+    $wpdb->query('COMMIT');
+    $restored = zigurat_invoice_get($restored_id);
+    if ($restored) {
+        $restored->_restored_with_new_number = $restored_with_new_number;
+    }
+    return $restored;
+}
+
+function zigurat_invoice_delete_from_trash($trash_id)
+{
+    if (!current_user_can('manage_options')) {
+        return new WP_Error('forbidden', 'فقط مدیرکل اجازه حذف دائمی فاکتور را دارد.');
+    }
+    $record = zigurat_invoice_trash_get_record($trash_id);
+    if (!$record) {
+        return new WP_Error('not_found', 'نسخه حذف‌شده فاکتور پیدا نشد.');
+    }
+    global $wpdb;
+    if ($wpdb->delete(zigurat_invoice_trash_table_name(), array('id'=>absint($trash_id)), array('%d')) !== 1) {
+        return new WP_Error('database', 'حذف دائمی فاکتور انجام نشد.');
+    }
+    return $record;
+}
+
 /**
- * Delete an invoice and its own rows. Related documents must be removed first
- * so an invoice branch, correction or converted invoice never becomes orphaned.
+ * Move an invoice and all of its own rows to the separate trash archive.
+ * Related documents must be removed first so relationships never become orphaned.
  */
 function zigurat_invoice_delete($invoice_id)
 {
@@ -309,13 +539,17 @@ function zigurat_invoice_delete($invoice_id)
     }
 
     $invoice_id = absint($invoice_id);
-    $invoice = zigurat_invoice_get($invoice_id);
-    if (!$invoice) {
-        return new WP_Error('not_found', 'فاکتور پیدا نشد.');
-    }
-
     global $wpdb;
     $invoice_table = zigurat_invoices_table_name();
+    $items_table = zigurat_invoice_items_table_name();
+    $payments_table = zigurat_invoice_payments_table_name();
+    $trash_table = zigurat_invoice_trash_table_name();
+    $wpdb->query('START TRANSACTION');
+    $invoice_row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$invoice_table} WHERE id = %d FOR UPDATE", $invoice_id), ARRAY_A);
+    if (!$invoice_row) {
+        $wpdb->query('ROLLBACK');
+        return new WP_Error('not_found', 'فاکتور پیدا نشد.');
+    }
     $related_count = (int) $wpdb->get_var($wpdb->prepare(
         "SELECT COUNT(*) FROM {$invoice_table}
          WHERE parent_invoice_id = %d OR reference_invoice_id = %d OR source_proforma_id = %d",
@@ -324,19 +558,92 @@ function zigurat_invoice_delete($invoice_id)
         $invoice_id
     ));
     if ($related_count > 0) {
+        $wpdb->query('ROLLBACK');
         return new WP_Error('has_related_documents', 'این سند به فاکتور یا انشعاب دیگری متصل است؛ ابتدا اسناد وابسته را حذف کنید.');
     }
-
-    $wpdb->query('START TRANSACTION');
-    $items_deleted = $wpdb->delete(zigurat_invoice_items_table_name(), array('invoice_id' => $invoice_id), array('%d'));
-    $payments_deleted = $wpdb->delete(zigurat_invoice_payments_table_name(), array('invoice_id' => $invoice_id), array('%d'));
+    $item_rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$items_table} WHERE invoice_id = %d ORDER BY position ASC, id ASC", $invoice_id), ARRAY_A);
+    $payment_rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$payments_table} WHERE invoice_id = %d ORDER BY id ASC", $invoice_id), ARRAY_A);
+    $snapshot = wp_json_encode(array(
+        'version' => 1,
+        'invoice' => $invoice_row,
+        'items' => $item_rows,
+        'payments' => $payment_rows,
+    ), JSON_UNESCAPED_UNICODE);
+    $trash_saved = $snapshot ? $wpdb->insert(
+        $trash_table,
+        array(
+            'original_invoice_id' => $invoice_id,
+            'brand' => $invoice_row['brand'],
+            'document_type' => $invoice_row['document_type'],
+            'document_number' => $invoice_row['document_number'],
+            'number_suffix' => $invoice_row['number_suffix'],
+            'issue_date' => $invoice_row['issue_date'],
+            'customer_name' => $invoice_row['customer_name'],
+            'subject' => $invoice_row['subject'],
+            'grand_total' => $invoice_row['grand_total'],
+            'snapshot_json' => $snapshot,
+            'deleted_by' => get_current_user_id(),
+            'deleted_at' => current_time('mysql', true),
+        ),
+        array('%d','%s','%s','%d','%d','%s','%s','%s','%d','%s','%d','%s')
+    ) : false;
+    if (!$trash_saved) {
+        $wpdb->query('ROLLBACK');
+        return new WP_Error('database', 'فاکتور به سطل زباله منتقل نشد.');
+    }
+    $items_deleted = $wpdb->delete($items_table, array('invoice_id' => $invoice_id), array('%d'));
+    $payments_deleted = $wpdb->delete($payments_table, array('invoice_id' => $invoice_id), array('%d'));
     $invoice_deleted = $wpdb->delete($invoice_table, array('id' => $invoice_id), array('%d'));
     if ($items_deleted === false || $payments_deleted === false || $invoice_deleted !== 1) {
         $wpdb->query('ROLLBACK');
         return new WP_Error('database', 'حذف فاکتور کامل نشد؛ دوباره تلاش کنید.');
     }
 
+    // اگر هیچ سند یا انشعاب دیگری این شماره را ندارد، شماره برای سند بعدی آزاد شود.
+    $number_still_used = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM {$invoice_table} WHERE brand = %s AND document_type = %s AND document_number = %d",
+        $invoice_row['brand'],
+        $invoice_row['document_type'],
+        $invoice_row['document_number']
+    ));
+    if ($number_still_used === 0) {
+        $sequence_table = zigurat_invoice_sequences_table_name();
+        $released_last_number = max(0, (int) $invoice_row['document_number'] - 1);
+        $current_last_number = $wpdb->get_var($wpdb->prepare(
+            "SELECT last_number FROM {$sequence_table} WHERE brand = %s AND document_type = %s FOR UPDATE",
+            $invoice_row['brand'],
+            $invoice_row['document_type']
+        ));
+        if ($current_last_number === null) {
+            $sequence_saved = $wpdb->insert(
+                $sequence_table,
+                array(
+                    'brand' => $invoice_row['brand'],
+                    'document_type' => $invoice_row['document_type'],
+                    'last_number' => $released_last_number,
+                    'updated_at' => current_time('mysql', true),
+                ),
+                array('%s', '%s', '%d', '%s')
+            );
+        } elseif ((int) $current_last_number > $released_last_number) {
+            $sequence_saved = $wpdb->update(
+                $sequence_table,
+                array('last_number' => $released_last_number, 'updated_at' => current_time('mysql', true)),
+                array('brand' => $invoice_row['brand'], 'document_type' => $invoice_row['document_type']),
+                array('%d', '%s'),
+                array('%s', '%s')
+            );
+        } else {
+            $sequence_saved = true;
+        }
+        if ($sequence_saved === false) {
+            $wpdb->query('ROLLBACK');
+            return new WP_Error('database', 'فاکتور حذف شد اما شماره آن آزاد نشد؛ دوباره تلاش کنید.');
+        }
+    }
+
     $wpdb->query('COMMIT');
+    $invoice = (object) $invoice_row;
     return $invoice;
 }
 
@@ -656,8 +963,10 @@ function zigurat_invoice_save($data)
     $taxable = $amount_with_overhead + $insurance_amount;
     $tax_amount = (int) round($taxable * $tax_rate / 100);
     $grand_total = $taxable + $tax_amount;
-    // وضعیت پرداخت فقط از ستون پرداخت در فهرست فاکتورها تغییر می‌کند.
-    $paid_amount = $existing && ($existing->payment_status ?? '') === 'settled' ? $grand_total : 0;
+    $paid_amount = $type === 'invoice' ? zigurat_invoice_money($data['paid_amount'] ?? 0) : 0;
+    if ($paid_amount > $grand_total) {
+        return new WP_Error('invalid_paid_amount', 'مبلغ پرداخت‌شده نمی‌تواند بیشتر از جمع کل فاکتور باشد.');
+    }
     $balance = max(0, $grand_total - $paid_amount);
     $payment_status = $type !== 'invoice'
         ? 'not_applicable'
@@ -795,6 +1104,14 @@ function zigurat_invoice_save($data)
                 return new WP_Error('database', 'شماره فاکتور ساخته نشد.');
             }
             $document_number = (int) $last_number + 1;
+            while ($wpdb->get_var($wpdb->prepare(
+                "SELECT id FROM {$invoice_table} WHERE brand = %s AND document_type = %s AND document_number = %d LIMIT 1 FOR UPDATE",
+                $brand,
+                $type,
+                $document_number
+            ))) {
+                ++$document_number;
+            }
             $number_suffix = $allow_branches ? 1 : 0;
             $sequence_updated = $wpdb->update($sequence_table, array('last_number'=>$document_number,'updated_at'=>$now), array('brand'=>$brand,'document_type'=>$type), array('%d','%s'), array('%s','%s'));
             if ($sequence_updated === false) {

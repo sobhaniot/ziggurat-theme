@@ -107,12 +107,22 @@ function zigurat_invoice_next_number($brand, $type)
         $brand,
         $type
     ));
-    $max = (int) $wpdb->get_var($wpdb->prepare(
-        'SELECT MAX(document_number) FROM ' . zigurat_invoices_table_name() . ' WHERE brand = %s AND document_type = %s',
+    $candidate = max(1, $last === null ? 1 : ((int) $last + 1));
+    $used_numbers = $wpdb->get_col($wpdb->prepare(
+        'SELECT DISTINCT document_number FROM ' . zigurat_invoices_table_name() . ' WHERE brand = %s AND document_type = %s AND document_number >= %d ORDER BY document_number ASC',
         $brand,
-        $type
+        $type,
+        $candidate
     ));
-    return max(1, $max + 1, $last === null ? 1 : ((int) $last + 1));
+    foreach ($used_numbers as $used_number) {
+        $used_number = (int) $used_number;
+        if ($used_number === $candidate) {
+            ++$candidate;
+        } elseif ($used_number > $candidate) {
+            break;
+        }
+    }
+    return $candidate;
 }
 
 function zigurat_invoice_save_initial_settings($data)
@@ -159,15 +169,16 @@ function zigurat_invoice_save_initial_settings($data)
         foreach (array('proforma', 'invoice') as $type) {
             $key = $brand . '_' . $type;
             $next = max(1, absint(zigurat_invoice_normalize_digits($data['next_' . $key] ?? 1)));
-            $max = (int) $wpdb->get_var($wpdb->prepare(
-                'SELECT MAX(document_number) FROM ' . zigurat_invoices_table_name() . ' WHERE brand = %s AND document_type = %s',
+            $number_exists = (int) $wpdb->get_var($wpdb->prepare(
+                'SELECT COUNT(*) FROM ' . zigurat_invoices_table_name() . ' WHERE brand = %s AND document_type = %s AND document_number = %d',
                 $brand,
-                $type
+                $type,
+                $next
             ));
-            if ($next <= $max) {
+            if ($number_exists > 0) {
                 return new WP_Error(
                     'number_conflict',
-                    sprintf('شماره بعدی %s باید بزرگ‌تر از %s باشد.', zigurat_invoice_brand_label($brand) . ' / ' . zigurat_invoice_document_label($type), zigurat_invoice_format_number($max))
+                    sprintf('شماره %s برای %s قبلاً استفاده شده است.', zigurat_invoice_format_number($next), zigurat_invoice_brand_label($brand) . ' / ' . zigurat_invoice_document_label($type))
                 );
             }
             $requested_numbers[$key] = array('brand' => $brand, 'type' => $type, 'next' => $next);

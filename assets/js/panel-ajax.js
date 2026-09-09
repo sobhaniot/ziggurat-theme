@@ -193,7 +193,13 @@
       data.forEach(function (value, key) {
         if (typeof value === 'string' && value !== '') url.searchParams.append(key, value);
       });
-      loadPanel(url.href, { method: 'GET', historyMode: 'push' });
+      var preserveFilterScroll = root.matches('main.inventory-page') && form.matches('[data-inventory-auto-filter]');
+      loadPanel(url.href, {
+        method: 'GET',
+        historyMode: 'push',
+        focus: !preserveFilterScroll,
+        preserveScroll: preserveFilterScroll
+      });
     } else {
       loadPanel(url.href, {
         method: method,

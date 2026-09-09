@@ -61,8 +61,8 @@ $show_shipping = (int) $invoice->shipping !== 0;
 $show_overhead = (float) ($invoice->overhead_rate ?? 0) !== 0.0 || (int) ($invoice->overhead_amount ?? 0) !== 0;
 $show_insurance = $invoice->brand === 'official' && ((float) ($invoice->insurance_rate ?? 0) !== 0.0 || (int) ($invoice->insurance_amount ?? 0) !== 0);
 $show_tax = (float) ($invoice->tax_rate ?? 0) !== 0.0 || (int) $invoice->tax_amount !== 0;
-$show_grand_total = (int) $invoice->grand_total !== (int) $invoice->subtotal;
 $show_paid = (int) $invoice->paid_amount !== 0;
+$show_grand_total = $show_paid;
 ?>
 <article class="invoice-document invoice-document--<?php echo esc_attr($invoice->brand); ?> <?php echo $invoice->status === 'draft' ? 'is-draft' : ''; ?>" dir="rtl">
     <?php if ($invoice->status === 'draft'): ?><div class="invoice-watermark">پیش‌نویس</div><?php endif; ?>

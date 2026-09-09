@@ -28,7 +28,7 @@ function zigurat_register_download_center()
         'menu_icon'    => 'dashicons-download',
         'menu_position'=> 24,
         'show_in_rest' => true,
-        'supports'     => array('title', 'editor', 'excerpt', 'thumbnail', 'revisions'),
+        'supports'     => array('title', 'editor', 'excerpt', 'thumbnail', 'revisions', 'comments'),
     ));
 
     zigurat_register_taxonomy_helper('download_type', 'نوع فایل', 'انواع فایل', 'download-type', array('zig_download'));
@@ -86,17 +86,50 @@ function zigurat_download_source_url($post_id)
     return $url && wp_http_validate_url($url) ? $url : '';
 }
 
-function zigurat_download_token($post_id)
+/** نسخه‌های قبلی یک فایل دانلودی. */
+function zigurat_download_version_history($post_id)
 {
-    return substr(hash_hmac('sha256', 'zigurat-download-' . absint($post_id), wp_salt('nonce')), 0, 24);
+    $history = get_post_meta($post_id, '_zig_download_version_history', true);
+    if (!is_array($history)) {
+        return array();
+    }
+
+    return array_values(array_filter($history, static function ($item) {
+        return is_array($item)
+            && !empty($item['version'])
+            && (!empty($item['file_id']) || !empty($item['external_url']));
+    }));
 }
 
-function zigurat_download_action_url($post_id)
+function zigurat_download_version_source_url($entry)
 {
-    return add_query_arg(array(
+    $attachment_id = absint($entry['file_id'] ?? 0);
+    if ($attachment_id) {
+        $url = wp_get_attachment_url($attachment_id);
+        if ($url) {
+            return $url;
+        }
+    }
+    $url = esc_url_raw((string) ($entry['external_url'] ?? ''));
+    return $url && wp_http_validate_url($url) ? $url : '';
+}
+
+function zigurat_download_token($post_id, $version_index = null)
+{
+    $version_key = $version_index === null ? 'current' : (string) absint($version_index);
+    return substr(hash_hmac('sha256', 'zigurat-download-' . absint($post_id) . '-' . $version_key, wp_salt('nonce')), 0, 24);
+}
+
+function zigurat_download_action_url($post_id, $version_index = null)
+{
+    $args = array(
         'zigurat_resource_download' => absint($post_id),
-        'token' => zigurat_download_token($post_id),
-    ), home_url('/'));
+        'token' => zigurat_download_token($post_id, $version_index),
+    );
+    if ($version_index !== null) {
+        $args['version'] = absint($version_index);
+    }
+    return add_query_arg($args, home_url('/'));
 }
 
 /** دانلود یا انتقال به منبع رسمی و افزایش شمارنده. */
@@ -107,10 +140,16 @@ function zigurat_handle_download_request()
     }
     $post_id = absint($_GET['zigurat_resource_download']);
     $token = sanitize_text_field(wp_unslash($_GET['token']));
-    if (!$post_id || !hash_equals(zigurat_download_token($post_id), $token) || get_post_status($post_id) !== 'publish' || get_post_type($post_id) !== 'zig_download') {
+    $version_index = isset($_GET['version']) ? absint($_GET['version']) : null;
+    if (!$post_id || !hash_equals(zigurat_download_token($post_id, $version_index), $token) || get_post_status($post_id) !== 'publish' || get_post_type($post_id) !== 'zig_download') {
         wp_die('پیوند دانلود معتبر نیست.', 'دانلود نامعتبر', array('response' => 403));
     }
-    $url = zigurat_download_source_url($post_id);
+    if ($version_index === null) {
+        $url = zigurat_download_source_url($post_id);
+    } else {
+        $history = zigurat_download_version_history($post_id);
+        $url = isset($history[$version_index]) ? zigurat_download_version_source_url($history[$version_index]) : '';
+    }
     if (!$url) {
         wp_die('فایل یا پیوند دانلود هنوز تنظیم نشده است.', 'فایل موجود نیست', array('response' => 404));
     }
@@ -125,6 +164,9 @@ function zigurat_handle_download_request()
         $post_id,
         $meta_key
     ));
+    if (function_exists('zigurat_record_daily_view')) {
+        zigurat_record_daily_view('download');
+    }
     clean_post_cache($post_id);
     nocache_headers();
     wp_redirect($url, 302, 'Zigurat Download Center');
@@ -185,4 +227,3 @@ function zigurat_download_primary_type($post_id)
     $names = zigurat_download_term_names($post_id, 'download_type');
     return $names ? reset($names) : 'فایل دانلودی';
 }
-

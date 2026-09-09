@@ -40,7 +40,8 @@
         items.forEach(function (item) {
           var article = Math.max(0, Number(item.article) || 0);
           var project = Math.max(0, Number(item.project) || 0);
-          var total = article + project;
+          var download = Math.max(0, Number(item.download) || 0);
+          var total = article + project + download;
           var point = document.createElement('div');
           point.className = 'manager-traffic__point';
 
@@ -59,14 +60,18 @@
           var projectSegment = document.createElement('i');
           projectSegment.className = 'is-project';
           projectSegment.style.height = total ? (project / total) * 100 + '%' : '0%';
+          var downloadSegment = document.createElement('i');
+          downloadSegment.className = 'is-download';
+          downloadSegment.style.height = total ? (download / total) * 100 + '%' : '0%';
           bar.appendChild(articleSegment);
           bar.appendChild(projectSegment);
+          bar.appendChild(downloadSegment);
           track.appendChild(bar);
 
           var label = document.createElement('span');
           label.className = 'manager-traffic__label';
           label.textContent = faDigits(item.label || '');
-          point.setAttribute('title', 'کل: ' + faNumber(total) + ' | مطالب: ' + faNumber(article) + ' | پروژه‌ها: ' + faNumber(project));
+          point.setAttribute('title', 'کل: ' + faNumber(total) + ' | مطالب: ' + faNumber(article) + ' | پروژه‌ها: ' + faNumber(project) + ' | دانلودها: ' + faNumber(download));
           point.setAttribute('aria-label', faDigits(item.label || '') + '، ' + point.getAttribute('title'));
           point.appendChild(value);
           point.appendChild(track);

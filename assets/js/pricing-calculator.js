@@ -6,18 +6,57 @@
 
   var digits = {'۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9','٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'};
   function normalize(value) { return String(value || '').replace(/[۰-۹٠-٩]/g, function (digit) { return digits[digit] || digit; }); }
-  function decimal(value) { return Math.max(0, parseFloat(normalize(value).replace(/[،٫,]/g, '.').replace(/[^0-9.]/g, '')) || 0); }
+  function decimalParts(value) {
+    var raw = normalize(value).replace(/\s/g, '').replace(/٬/g, '').replace(/٫/g, '.').replace(/،/g, ',');
+    if (raw.indexOf('.') !== -1) {
+      raw = raw.replace(/,/g, '');
+    } else {
+      var commaParts = raw.split(',');
+      var commaIsDecimal = commaParts.length === 2
+        && commaParts[1].length > 0
+        && (commaParts[0] === '0' || commaParts[1].length < 3);
+      raw = commaIsDecimal ? commaParts[0] + '.' + commaParts[1] : raw.replace(/,/g, '');
+    }
+    raw = raw.replace(/[^0-9.]/g, '');
+    var decimalIndex = raw.indexOf('.');
+    return {
+      integer: (decimalIndex === -1 ? raw : raw.slice(0, decimalIndex)).replace(/[^0-9]/g, ''),
+      fraction: decimalIndex === -1 ? '' : raw.slice(decimalIndex + 1).replace(/[^0-9]/g, ''),
+      hasDecimal: decimalIndex !== -1
+    };
+  }
+  function decimal(value) {
+    var parts = decimalParts(value);
+    return Math.max(0, parseFloat((parts.integer || '0') + (parts.hasDecimal ? '.' + parts.fraction : '')) || 0);
+  }
   function money(value) { return Math.max(0, parseInt(normalize(value).replace(/[^0-9]/g, ''), 10) || 0); }
   function formatMoney(value) { return Math.round(value).toLocaleString('fa-IR') + ' ریال'; }
+  function localizeDigits(value) {
+    return String(value).replace(/[0-9]/g, function (digit) { return '۰۱۲۳۴۵۶۷۸۹'[Number(digit)]; });
+  }
+  function groupedInteger(value) {
+    var clean = String(value || '').replace(/^0+(?=\d)/, '');
+    return localizeDigits((clean || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '٬'));
+  }
   function formatMoneyInput(input) {
     var normalized = normalize(input.value).replace(/[^0-9]/g, '');
-    input.value = normalized === '' ? '' : Number(normalized).toLocaleString('fa-IR');
+    input.value = normalized === '' ? '' : groupedInteger(normalized);
+  }
+  function formatDecimalInput(input) {
+    if (String(input.value || '').trim() === '') return;
+    var parts = decimalParts(input.value);
+    input.value = groupedInteger(parts.integer || '0') + (parts.hasDecimal ? '٫' + localizeDigits(parts.fraction) : '');
   }
   function formatMeasure(value) { return Number(value.toFixed(3)).toLocaleString('fa-IR', { maximumFractionDigits: 3 }); }
 
   pricingSection.querySelectorAll('[data-money-input]').forEach(function (input) {
     formatMoneyInput(input);
     input.addEventListener('input', function () { formatMoneyInput(input); });
+  });
+
+  pricingSection.querySelectorAll('input[inputmode="decimal"]:not([name="roll_widths"]), input[inputmode="numeric"]:not([data-money-input])').forEach(function (input) {
+    formatDecimalInput(input);
+    input.addEventListener('input', function () { formatDecimalInput(input); });
   });
 
   pricingSection.querySelectorAll('input[type="text"]').forEach(function (input) {

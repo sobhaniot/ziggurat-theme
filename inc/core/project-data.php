@@ -49,6 +49,19 @@ function zigurat_count_used_project_terms($taxonomy)
     return is_wp_error($terms) ? 0 : count($terms);
 }
 
+/** کلید پایدار کارفرما برای جلوگیری از نمایش چند پروژه با نام‌های نوشتاری یکسان. */
+function zigurat_project_client_key($client)
+{
+    $client = trim(strtr((string) $client, array(
+        'ي' => 'ی',
+        'ك' => 'ک',
+        'ة' => 'ه',
+        'ۀ' => 'ه',
+    )));
+    $client = preg_replace('/[\s\x{200c}\x{200e}\x{200f}]+/u', ' ', $client);
+    return $client === '' ? '' : (function_exists('mb_strtolower') ? mb_strtolower($client, 'UTF-8') : strtolower($client));
+}
+
 /** فهرست ثابت استان‌ها برای فرم پروژه و نقشه صفحه اصلی. */
 function zigurat_project_province_options()
 {
@@ -139,12 +152,15 @@ function zigurat_rebuild_project_cache()
     foreach ($project_ids as $project_id) {
         $client_terms = get_the_terms($project_id, 'project_client');
         if ($client_terms && !is_wp_error($client_terms)) {
-            $company_key = 'term:' . $client_terms[0]->term_id;
+            $client = trim((string) $client_terms[0]->name);
         } else {
             $client = trim((string) get_post_meta($project_id, '_project_client', true));
-            $company_key = $client !== ''
-                ? 'meta:' . sanitize_title($client)
-                : 'project:' . $project_id;
+        }
+
+        // این بخش باید فقط نماینده آخرین پروژه هر کارفرمای مشخص باشد.
+        $company_key = zigurat_project_client_key($client);
+        if ($company_key === '') {
+            continue;
         }
 
         if (!isset($companies[$company_key])) {
@@ -173,7 +189,7 @@ function zigurat_rebuild_project_cache()
 
     $province_activity = zigurat_build_project_province_activity();
     $stats = array(
-        'cache_version'    => 4,
+        'cache_version'    => 5,
         'projects'         => count($project_ids),
         'cities'           => zigurat_count_used_project_terms('project_city'),
         'provinces'        => count($province_activity),
@@ -191,7 +207,7 @@ function zigurat_get_project_stats()
     $stats = get_option('zigurat_project_stats');
     if (
         !is_array($stats)
-        || ($stats['cache_version'] ?? 0) !== 4
+        || ($stats['cache_version'] ?? 0) !== 5
         || !isset($stats['projects'], $stats['cities'], $stats['provinces'])
     ) {
         $stats = zigurat_rebuild_project_cache();

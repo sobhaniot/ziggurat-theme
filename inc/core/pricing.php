@@ -283,6 +283,268 @@ function zigurat_calculate_composite_price($data, $settings = null)
     );
 }
 
+function zigurat_get_letter_pricing_settings()
+{
+    $defaults = array(
+        'sheet_width_mm' => 1220,
+        'sheet_height_mm' => 1830,
+        'plexi_sqm_rate' => 0,
+        'metal_sheet_07_sqm_rate' => 0,
+        'active_edge_type' => 'swedish',
+        'edge_swedish_material_rate' => 0,
+        'edge_swedish_labor_rate' => 0,
+        'edge_plastic_material_rate' => 0,
+        'edge_plastic_labor_rate' => 0,
+        'edge_channelium_material_rate' => 0,
+        'edge_channelium_labor_rate' => 0,
+        'edge_metal_material_rate' => 0,
+        'edge_metal_labor_rate' => 0,
+        'metal_powder_coating_rate' => 0,
+        'double_layer_labor_rate' => 0,
+        'pvc_rate' => 0,
+        'plexi_cut_rate' => 0,
+        'pvc_cut_rate' => 0,
+        'glue_rate' => 0,
+        'active_smd_type' => 'block',
+        'smd_block_rate' => 0,
+        'smd_lens_rate' => 0,
+        'smd_roll_rate' => 0,
+        'smd_block_units_per_square_meter' => 25,
+        'smd_lens_units_per_square_meter' => 25,
+        'smd_roll_units_per_square_meter' => 25,
+        'smd_block_width_mm' => 75,
+        'smd_block_height_mm' => 15,
+        'smd_block_led_count' => 3,
+        'smd_lens_width_mm' => 75,
+        'smd_lens_height_mm' => 15,
+        'smd_lens_led_count' => 3,
+        'smd_roll_strip_width_mm' => 10,
+        'smd_roll_watts_per_meter' => 12,
+        'smd_roll_length_m' => 10,
+        'smd_roll_cut_interval_mm' => 10,
+        'smd_roll_waste_percent' => 10,
+        'smd_roll_transformer_reserve_percent' => 20,
+        'smd_roll_wall_clearance_mm' => 15,
+        'smd_roll_row_spacing_mm' => 50,
+        'active_transformer_type' => '400',
+        'transformer_60_rate' => 0,
+        'transformer_100_rate' => 0,
+        'transformer_120_rate' => 0,
+        'transformer_200_rate' => 0,
+        'transformer_300_rate' => 0,
+        'transformer_400_rate' => 0,
+        'transformer_60_capacity' => 40,
+        'transformer_100_capacity' => 70,
+        'transformer_120_capacity' => 90,
+        'transformer_200_capacity' => 160,
+        'transformer_300_capacity' => 250,
+        'transformer_400_capacity' => 330,
+        'cut_gap_mm' => 5,
+        'sheet_margin_mm' => 10,
+        'updated_at' => '',
+        'updated_by' => 0,
+    );
+    $saved = get_option('zigurat_letter_pricing', array());
+    if (!is_array($saved)) {
+        $saved = array();
+    }
+
+    // Convert the previous full-sheet and single-type rates without losing saved values.
+    if (!array_key_exists('plexi_sqm_rate', $saved) && !empty($saved['sheet_price'])) {
+        $width = max(100, zigurat_pricing_decimal($saved['sheet_width_mm'] ?? 1220));
+        $height = max(100, zigurat_pricing_decimal($saved['sheet_height_mm'] ?? 1830));
+        $sheet_area = ($width * $height) / 1000000;
+        $saved['plexi_sqm_rate'] = $sheet_area > 0 ? (int) round(zigurat_pricing_money($saved['sheet_price']) / $sheet_area) : 0;
+    }
+    if (!array_key_exists('edge_swedish_material_rate', $saved) && isset($saved['edge_rate'])) {
+        $saved['edge_swedish_material_rate'] = zigurat_pricing_money($saved['edge_rate']);
+    }
+    if (!array_key_exists('edge_swedish_labor_rate', $saved) && isset($saved['build_rate'])) {
+        $saved['edge_swedish_labor_rate'] = zigurat_pricing_money($saved['build_rate']);
+    }
+    if (!array_key_exists('smd_block_rate', $saved) && isset($saved['led_module_rate'])) {
+        $saved['smd_block_rate'] = zigurat_pricing_money($saved['led_module_rate']);
+    }
+    if (!array_key_exists('smd_units_per_square_meter', $saved) && isset($saved['led_modules_per_square_meter'])) {
+        $saved['smd_units_per_square_meter'] = zigurat_pricing_decimal($saved['led_modules_per_square_meter']);
+    }
+    $legacy_smd_density = isset($saved['smd_units_per_square_meter'])
+        ? zigurat_pricing_decimal($saved['smd_units_per_square_meter'])
+        : 25;
+    foreach (array('block', 'lens', 'roll') as $smd_type) {
+        $density_key = 'smd_' . $smd_type . '_units_per_square_meter';
+        if (!array_key_exists($density_key, $saved)) {
+            $saved[$density_key] = $legacy_smd_density;
+        }
+    }
+    if (!array_key_exists('transformer_200_rate', $saved)) {
+        $legacy_values = get_option('zigurat_letter_last_values', array());
+        if (is_array($legacy_values) && !empty($legacy_values['transformer'])) {
+            $saved['transformer_200_rate'] = zigurat_pricing_money($legacy_values['transformer']);
+        }
+    }
+    // Migrate the first transformer defaults to the workshop capacities supplied later.
+    $capacity_migrations = array('200' => array(200, 160), '300' => array(300, 250), '400' => array(400, 330));
+    foreach ($capacity_migrations as $watts => $values) {
+        $key = 'transformer_' . $watts . '_capacity';
+        if (!array_key_exists($key, $saved) || (int) $saved[$key] === $values[0]) {
+            $saved[$key] = $values[1];
+        }
+    }
+    return wp_parse_args($saved, $defaults);
+}
+
+function zigurat_save_letter_pricing_settings($data)
+{
+    if (!zigurat_is_manager()) {
+        return new WP_Error('forbidden', 'دسترسی به تنظیمات محاسبه قیمت مجاز نیست.');
+    }
+    $sheet_width = min(5000, max(100, zigurat_pricing_decimal($data['sheet_width_mm'] ?? 1220)));
+    $sheet_height = min(5000, max(100, zigurat_pricing_decimal($data['sheet_height_mm'] ?? 1830)));
+    $edge_types = array('swedish', 'plastic', 'channelium', 'metal');
+    $smd_types = array('block', 'lens', 'roll');
+    $active_edge_type = sanitize_key($data['active_edge_type'] ?? 'swedish');
+    $active_smd_type = sanitize_key($data['active_smd_type'] ?? 'block');
+    $transformer_types = array('60', '100', '120', '200', '300', '400');
+    $active_transformer_type = sanitize_key($data['active_transformer_type'] ?? '400');
+    $settings = array(
+        'sheet_width_mm' => $sheet_width,
+        'sheet_height_mm' => $sheet_height,
+        'plexi_sqm_rate' => zigurat_pricing_money($data['plexi_sqm_rate'] ?? 0),
+        'metal_sheet_07_sqm_rate' => zigurat_pricing_money($data['metal_sheet_07_sqm_rate'] ?? 0),
+        'active_edge_type' => in_array($active_edge_type, $edge_types, true) ? $active_edge_type : 'swedish',
+        'edge_swedish_material_rate' => zigurat_pricing_money($data['edge_swedish_material_rate'] ?? 0),
+        'edge_swedish_labor_rate' => zigurat_pricing_money($data['edge_swedish_labor_rate'] ?? 0),
+        'edge_plastic_material_rate' => zigurat_pricing_money($data['edge_plastic_material_rate'] ?? 0),
+        'edge_plastic_labor_rate' => zigurat_pricing_money($data['edge_plastic_labor_rate'] ?? 0),
+        'edge_channelium_material_rate' => zigurat_pricing_money($data['edge_channelium_material_rate'] ?? 0),
+        'edge_channelium_labor_rate' => zigurat_pricing_money($data['edge_channelium_labor_rate'] ?? 0),
+        'edge_metal_material_rate' => zigurat_pricing_money($data['edge_metal_material_rate'] ?? 0),
+        'edge_metal_labor_rate' => zigurat_pricing_money($data['edge_metal_labor_rate'] ?? 0),
+        'metal_powder_coating_rate' => zigurat_pricing_money($data['metal_powder_coating_rate'] ?? 0),
+        'double_layer_labor_rate' => zigurat_pricing_money($data['double_layer_labor_rate'] ?? 0),
+        'pvc_rate' => zigurat_pricing_money($data['pvc_rate'] ?? 0),
+        'plexi_cut_rate' => zigurat_pricing_money($data['plexi_cut_rate'] ?? 0),
+        'pvc_cut_rate' => zigurat_pricing_money($data['pvc_cut_rate'] ?? 0),
+        'glue_rate' => zigurat_pricing_money($data['glue_rate'] ?? 0),
+        'active_smd_type' => in_array($active_smd_type, $smd_types, true) ? $active_smd_type : 'block',
+        'smd_block_rate' => zigurat_pricing_money($data['smd_block_rate'] ?? 0),
+        'smd_lens_rate' => zigurat_pricing_money($data['smd_lens_rate'] ?? 0),
+        'smd_roll_rate' => zigurat_pricing_money($data['smd_roll_rate'] ?? 0),
+        'smd_block_units_per_square_meter' => min(1000, zigurat_pricing_decimal($data['smd_block_units_per_square_meter'] ?? 25)),
+        'smd_lens_units_per_square_meter' => min(1000, zigurat_pricing_decimal($data['smd_lens_units_per_square_meter'] ?? 25)),
+        'smd_roll_units_per_square_meter' => min(1000, zigurat_pricing_decimal($data['smd_roll_units_per_square_meter'] ?? 25)),
+        'smd_block_width_mm' => min(150, max(10, zigurat_pricing_decimal($data['smd_block_width_mm'] ?? 75))),
+        'smd_block_height_mm' => min(50, max(5, zigurat_pricing_decimal($data['smd_block_height_mm'] ?? 15))),
+        'smd_block_led_count' => min(8, max(1, absint($data['smd_block_led_count'] ?? 3))),
+        'smd_lens_width_mm' => min(150, max(10, zigurat_pricing_decimal($data['smd_lens_width_mm'] ?? 75))),
+        'smd_lens_height_mm' => min(50, max(5, zigurat_pricing_decimal($data['smd_lens_height_mm'] ?? 15))),
+        'smd_lens_led_count' => min(8, max(1, absint($data['smd_lens_led_count'] ?? 3))),
+        'smd_roll_strip_width_mm' => min(50, max(2, zigurat_pricing_decimal($data['smd_roll_strip_width_mm'] ?? 10))),
+        'smd_roll_watts_per_meter' => min(100, max(0.1, zigurat_pricing_decimal($data['smd_roll_watts_per_meter'] ?? 12))),
+        'smd_roll_length_m' => min(100, max(0.1, zigurat_pricing_decimal($data['smd_roll_length_m'] ?? 10))),
+        'smd_roll_cut_interval_mm' => min(1000, max(1, zigurat_pricing_decimal($data['smd_roll_cut_interval_mm'] ?? 10))),
+        'smd_roll_waste_percent' => min(100, max(0, zigurat_pricing_decimal($data['smd_roll_waste_percent'] ?? 10))),
+        'smd_roll_transformer_reserve_percent' => min(50, max(0, zigurat_pricing_decimal($data['smd_roll_transformer_reserve_percent'] ?? 20))),
+        'smd_roll_wall_clearance_mm' => min(100, max(0, zigurat_pricing_decimal($data['smd_roll_wall_clearance_mm'] ?? 15))),
+        'smd_roll_row_spacing_mm' => min(250, max(10, zigurat_pricing_decimal($data['smd_roll_row_spacing_mm'] ?? 50))),
+        'active_transformer_type' => in_array($active_transformer_type, $transformer_types, true) ? $active_transformer_type : '400',
+        'transformer_60_rate' => zigurat_pricing_money($data['transformer_60_rate'] ?? 0),
+        'transformer_100_rate' => zigurat_pricing_money($data['transformer_100_rate'] ?? 0),
+        'transformer_120_rate' => zigurat_pricing_money($data['transformer_120_rate'] ?? 0),
+        'transformer_200_rate' => zigurat_pricing_money($data['transformer_200_rate'] ?? 0),
+        'transformer_300_rate' => zigurat_pricing_money($data['transformer_300_rate'] ?? 0),
+        'transformer_400_rate' => zigurat_pricing_money($data['transformer_400_rate'] ?? 0),
+        'transformer_60_capacity' => min(2000, max(1, absint($data['transformer_60_capacity'] ?? 40))),
+        'transformer_100_capacity' => min(2000, max(1, absint($data['transformer_100_capacity'] ?? 70))),
+        'transformer_120_capacity' => min(2000, max(1, absint($data['transformer_120_capacity'] ?? 90))),
+        'transformer_200_capacity' => min(2000, max(1, absint($data['transformer_200_capacity'] ?? 160))),
+        'transformer_300_capacity' => min(2000, max(1, absint($data['transformer_300_capacity'] ?? 250))),
+        'transformer_400_capacity' => min(2000, max(1, absint($data['transformer_400_capacity'] ?? 330))),
+        'cut_gap_mm' => min(50, zigurat_pricing_decimal($data['cut_gap_mm'] ?? 5)),
+        'sheet_margin_mm' => min(100, zigurat_pricing_decimal($data['sheet_margin_mm'] ?? 10)),
+        'updated_at' => current_time('mysql'),
+        'updated_by' => get_current_user_id(),
+    );
+    update_option('zigurat_letter_pricing', $settings, false);
+    return $settings;
+}
+
+function zigurat_ajax_save_letter_pricing_settings()
+{
+    check_ajax_referer('zigurat_letter_rates', 'nonce');
+    $result = zigurat_save_letter_pricing_settings($_POST);
+    if (is_wp_error($result)) {
+        wp_send_json_error(array('message' => $result->get_error_message()), 403);
+    }
+    wp_send_json_success($result);
+}
+add_action('wp_ajax_zigurat_save_letter_rates', 'zigurat_ajax_save_letter_pricing_settings');
+
+function zigurat_get_letter_last_values()
+{
+    $defaults = array(
+        'installation' => 0,
+        'installation_mode' => 'fixed',
+        'travel' => 0,
+        'layout_trials' => 10,
+        'wire_supplies' => 0,
+        'profit_percent' => 0,
+        'allow_rotation' => 1,
+        'include_pvc' => 1,
+        'include_metal_sheet_07' => 0,
+        'edge_type' => 'swedish',
+        'smd_type' => 'none',
+    );
+    $saved = get_option('zigurat_letter_last_values', array());
+    if (!is_array($saved)) {
+        $saved = array();
+    }
+    if (!isset($saved['smd_type']) && !empty($saved['include_led'])) {
+        $saved['smd_type'] = 'block';
+    }
+    return wp_parse_args($saved, $defaults);
+}
+
+function zigurat_save_letter_last_values($data)
+{
+    if (!zigurat_is_manager()) {
+        return new WP_Error('forbidden', 'دسترسی به ذخیره مقادیر محاسبه مجاز نیست.');
+    }
+    $edge_types = array('swedish', 'plastic', 'channelium', 'metal');
+    $smd_types = array('none', 'block', 'lens', 'roll');
+    $edge_type = sanitize_key($data['edge_type'] ?? 'swedish');
+    $smd_type = sanitize_key($data['smd_type'] ?? 'none');
+    $installation_mode = sanitize_key($data['installation_mode'] ?? 'fixed');
+    $layout_trials = absint($data['layout_trials'] ?? 10);
+    $values = array(
+        'installation' => zigurat_pricing_money($data['installation'] ?? 0),
+        'installation_mode' => in_array($installation_mode, array('fixed', 'perimeter'), true) ? $installation_mode : 'fixed',
+        'travel' => zigurat_pricing_money($data['travel'] ?? 0),
+        'layout_trials' => in_array($layout_trials, array(5, 10, 20, 30), true) ? $layout_trials : 10,
+        'wire_supplies' => zigurat_pricing_money($data['wire_supplies'] ?? 0),
+        'profit_percent' => min(1000, zigurat_pricing_decimal($data['profit_percent'] ?? 0)),
+        'allow_rotation' => 1,
+        'include_pvc' => 1,
+        'include_metal_sheet_07' => $edge_type === 'metal' ? 1 : 0,
+        'edge_type' => in_array($edge_type, $edge_types, true) ? $edge_type : 'swedish',
+        'smd_type' => in_array($smd_type, $smd_types, true) ? $smd_type : 'none',
+    );
+    update_option('zigurat_letter_last_values', $values, false);
+    return $values;
+}
+
+function zigurat_ajax_save_letter_last_values()
+{
+    check_ajax_referer('zigurat_letter_last_values', 'nonce');
+    $result = zigurat_save_letter_last_values($_POST);
+    if (is_wp_error($result)) {
+        wp_send_json_error(array('message' => $result->get_error_message()), 403);
+    }
+    wp_send_json_success($result);
+}
+add_action('wp_ajax_zigurat_save_letter_last_values', 'zigurat_ajax_save_letter_last_values');
+
 function zigurat_flexi_roll_widths($value)
 {
     $normalized = zigurat_pricing_normalize_digits($value);

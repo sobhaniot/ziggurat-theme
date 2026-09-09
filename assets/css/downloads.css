@@ -88,6 +88,21 @@
 .download-panel h2 { padding-bottom: 12px; margin-bottom: 17px; border-bottom: 1px solid #eee8dc; font-size: 24px; }
 .download-entry-content > * + * { margin-top: 14px; }
 .download-entry-content ul,.download-entry-content ol { padding-right: 22px; list-style: revert; }
+.download-version-archive { overflow: hidden; background: linear-gradient(150deg,#fff,#fbf8f1); }
+.download-version-archive-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--download-border); }
+.download-version-archive-heading span { color: #8b681f; font-size: 12px; font-weight: 700; }
+.download-version-archive-heading h2 { padding: 0; margin: 4px 0 0; border: 0; }
+.download-version-archive-heading p { max-width: 430px; margin: 0; color: var(--download-muted); font-size: 13px; }
+.download-version-list { display: grid; gap: 12px; padding-top: 18px; }
+.download-version-item { display: grid; grid-template-columns: 115px 1fr auto; gap: 16px; align-items: center; padding: 15px; border: 1px solid #e9e1d2; border-radius: 12px; background: #fff; }
+.download-version-number { display: grid; gap: 2px; }
+.download-version-number span { color: var(--download-muted); font-size: 11px; }
+.download-version-number strong { font-size: 21px; }
+.download-version-meta { display: flex; flex-wrap: wrap; gap: 7px; }
+.download-version-meta span { padding: 4px 8px; border-radius: 6px; background: var(--download-soft); color: #645b4b; font-size: 12px; }
+.download-version-changelog { grid-column: 2/4; color: var(--download-muted); font-size: 13px; }
+.download-version-changelog p { margin: 0; }
+.download-version-button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; padding: 7px 14px; border: 1px solid var(--download-gold); border-radius: 8px; color: #6f4b08; font-size: 13px; font-weight: 700; }
 .download-sidebar { position: sticky; top: 110px; display: grid; gap: 16px; }
 .download-facts dl > div { display: grid; grid-template-columns: 1fr 1.15fr; gap: 12px; padding: 10px 0; border-bottom: 1px dashed #e5dece; }
 .download-facts dl > div:last-child { border-bottom: 0; }
@@ -117,4 +132,9 @@
   .download-primary-button { width: 100%; }
   .download-official-link { display: block; margin: 13px 0 0; text-align: center; }
   .download-panel { padding: 18px; }
+  .download-version-archive-heading { display: block; }
+  .download-version-archive-heading p { margin-top: 8px; }
+  .download-version-item { grid-template-columns: 1fr; }
+  .download-version-changelog { grid-column: auto; }
+  .download-version-button { width: 100%; }
 }

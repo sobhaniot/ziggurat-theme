@@ -75,10 +75,13 @@ function zigurat_get_manager_views_statistics($limit = 10)
 
     $article_views = zigurat_get_total_post_type_views('article', '_article_views');
     $project_views = zigurat_get_total_post_type_views('project', '_project_views');
+    $download_views = zigurat_get_total_post_type_views('zig_download', '_zig_download_count');
     $article_counts = wp_count_posts('article');
     $project_counts = wp_count_posts('project');
+    $download_counts = wp_count_posts('zig_download');
     $article_count = isset($article_counts->publish) ? (int) $article_counts->publish : 0;
     $project_count = isset($project_counts->publish) ? (int) $project_counts->publish : 0;
+    $download_count = isset($download_counts->publish) ? (int) $download_counts->publish : 0;
     $limit = min(30, max(1, absint($limit)));
 
     $top_content = $wpdb->get_results($wpdb->prepare(
@@ -87,8 +90,9 @@ function zigurat_get_manager_views_statistics($limit = 10)
         FROM {$wpdb->posts} p
         LEFT JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
             AND ((p.post_type = 'article' AND pm.meta_key = '_article_views')
-                OR (p.post_type = 'project' AND pm.meta_key = '_project_views'))
-        WHERE p.post_status = 'publish' AND p.post_type IN ('article', 'project')
+                OR (p.post_type = 'project' AND pm.meta_key = '_project_views')
+                OR (p.post_type = 'zig_download' AND pm.meta_key = '_zig_download_count'))
+        WHERE p.post_status = 'publish' AND p.post_type IN ('article', 'project', 'zig_download')
         GROUP BY p.ID, p.post_title, p.post_type, p.post_date
         ORDER BY views DESC, p.post_date DESC
         LIMIT %d",
@@ -98,11 +102,14 @@ function zigurat_get_manager_views_statistics($limit = 10)
     return array(
         'article_views' => $article_views,
         'project_views' => $project_views,
-        'total_views' => $article_views + $project_views,
+        'download_views' => $download_views,
+        'total_views' => $article_views + $project_views + $download_views,
         'article_count' => $article_count,
         'project_count' => $project_count,
+        'download_count' => $download_count,
         'article_average' => $article_count ? (int) round($article_views / $article_count) : 0,
         'project_average' => $project_count ? (int) round($project_views / $project_count) : 0,
+        'download_average' => $download_count ? (int) round($download_views / $download_count) : 0,
         'top_content' => is_array($top_content) ? $top_content : array(),
     );
 }
@@ -121,6 +128,7 @@ function zigurat_render_views_dashboard_widget()
 {
     $article_views = zigurat_get_total_post_type_views('article', '_article_views');
     $project_views = zigurat_get_total_post_type_views('project', '_project_views');
+    $download_views = zigurat_get_total_post_type_views('zig_download', '_zig_download_count');
     ?>
     <table class="widefat striped">
         <tbody>
@@ -132,8 +140,12 @@ function zigurat_render_views_dashboard_widget()
                 <th><a href="<?php echo esc_url(admin_url('edit.php?post_type=project')); ?>">پروژه‌ها</a></th>
                 <td><strong><?php echo esc_html(number_format_i18n($project_views)); ?></strong> بازدید</td>
             </tr>
+            <tr>
+                <th><a href="<?php echo esc_url(admin_url('edit.php?post_type=zig_download')); ?>">دانلودها</a></th>
+                <td><strong><?php echo esc_html(number_format_i18n($download_views)); ?></strong> دریافت</td>
+            </tr>
         </tbody>
     </table>
-    <p>در فهرست مطالب و پروژه‌ها نیز ستون «بازدید» قابل مرتب‌سازی است.</p>
+    <p>آمار مطالب و پروژه‌ها براساس بازدید صفحه و آمار دانلودها براساس دریافت واقعی فایل است.</p>
     <?php
 }

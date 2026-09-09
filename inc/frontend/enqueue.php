@@ -61,6 +61,7 @@ function zigurat_enqueue_assets()
         zigurat_enqueue_theme_script('manager-login');
         zigurat_enqueue_theme_script('manager-views');
         zigurat_enqueue_theme_script('pricing-calculator');
+        zigurat_enqueue_theme_script('letter-calculator', array('zigurat-pricing-calculator'));
     }
 
     if (is_post_type_archive('article')) {
@@ -82,6 +83,13 @@ function zigurat_enqueue_assets()
         zigurat_enqueue_theme_style('downloads');
         if (is_post_type_archive('zig_download')) {
             zigurat_enqueue_theme_script('archive-filters');
+        }
+    }
+
+    if (is_singular(array('article', 'zig_download'))) {
+        zigurat_enqueue_theme_style('comments');
+        if (comments_open() && get_option('thread_comments')) {
+            wp_enqueue_script('comment-reply');
         }
     }
 

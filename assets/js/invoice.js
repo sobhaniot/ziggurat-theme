@@ -304,13 +304,43 @@
         if (form.dataset.deleteConfirmed === '1') return;
         event.preventDefault();
         var invoiceNumber = form.dataset.invoiceNumber || '';
-        showActionConfirm({
+        var permanent = form.dataset.deleteMode === 'permanent';
+        showActionConfirm(permanent ? {
+          title: 'حذف دائمی فاکتور',
+          message: 'فاکتور شماره ' + invoiceNumber + ' برای همیشه از سطل زباله حذف شود؟',
+          confirmText: 'بله، حذف دائمی شود',
+          warning: 'بعد از این مرحله، اطلاعات فاکتور قابل بازیابی نیست.'
+        } : {
           title: 'حذف فاکتور',
-          message: 'فاکتور شماره ' + invoiceNumber + ' برای همیشه حذف شود؟',
+          message: 'فاکتور شماره ' + invoiceNumber + ' حذف شود؟',
           confirmText: 'بله، حذف شود',
-          warning: 'این عملیات قابل بازگشت نیست و ردیف‌های کالا و پرداخت‌های این سند نیز حذف می‌شوند.'
+          warning: 'فاکتور به سطل زباله می‌رود و شماره آن برای سند جدید آزاد می‌شود.'
         }, function () {
           form.dataset.deleteConfirmed = '1';
+          if (typeof form.requestSubmit === 'function') form.requestSubmit();
+          else form.submit();
+        });
+      });
+    });
+  }
+
+  function setupInvoiceRestoreControls(root) {
+    (root || document).querySelectorAll('[data-invoice-restore-form]').forEach(function (form) {
+      if (form.dataset.restoreReady === '1') return;
+      form.dataset.restoreReady = '1';
+      form.addEventListener('submit', function (event) {
+        var useNewNumber = form.querySelector('[name="restore_with_new_number"]');
+        if (form.dataset.restoreConflict !== '1' || (useNewNumber && useNewNumber.value === '1')) return;
+        event.preventDefault();
+        var oldNumber = form.dataset.invoiceNumber || '';
+        var newNumber = form.dataset.newNumber || 'شماره آزاد بعدی';
+        showActionConfirm({
+          title: 'بازیابی با شماره جدید',
+          message: 'شماره ' + oldNumber + ' اکنون استفاده شده است. این فاکتور با شماره ' + newNumber + ' بازیابی شود؟',
+          confirmText: 'بله، با شماره جدید بازیابی شود',
+          warning: 'اطلاعات و ردیف‌های فاکتور حفظ می‌شوند و فقط شماره سند تغییر می‌کند.'
+        }, function () {
+          if (useNewNumber) useNewNumber.value = '1';
           if (typeof form.requestSubmit === 'function') form.requestSubmit();
           else form.submit();
         });
@@ -557,6 +587,7 @@
   setupInvoiceListAutoFilters(root);
   setupInvoiceRowSelection(root);
   setupInvoiceDeleteControls(root);
+  setupInvoiceRestoreControls(root);
   setupStampLayoutEditors(root);
   setupStatusQuickControls(root);
   var editor = (root || document).querySelector('[data-invoice-editor]');

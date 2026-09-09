@@ -23,6 +23,7 @@ if (have_posts()) :
                             'next_text' => 'مطلب بعدی: %title →'
                         )); ?>
                     </div>
+                    <?php comments_template(); ?>
                 </article>
 
                 <aside class="article-sidebar" aria-label="آرشیو و مطالب پربازدید">

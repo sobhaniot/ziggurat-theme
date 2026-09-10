@@ -94,7 +94,7 @@ get_header();
                 ? zigurat_application_unread_count($current_manager->ID)
                 : 0;
             ?>
-            <section class="manager-panel" aria-labelledby="manager-panel-title">
+            <section class="manager-panel<?php echo $manager_section === 'letters' ? ' manager-panel--letters' : ''; ?>" aria-labelledby="manager-panel-title">
                 <div class="manager-panel__header">
                     <div>
                         <span>دسترسی مدیریت</span>
@@ -123,6 +123,8 @@ get_header();
                     get_template_part('template-parts/manager-views');
                 } elseif ($manager_section === 'pricing') {
                     get_template_part('template-parts/manager-pricing');
+                } elseif ($manager_section === 'letters') {
+                    get_template_part('template-parts/manager-letters');
                 } else {
                     get_template_part('page-main');
                 }

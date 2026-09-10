@@ -666,6 +666,7 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
 .invoice-status-quick__menu button + button { margin-top: 4px; }
 .invoice-status-quick__menu button:hover:not(:disabled) { background: #d6e2ff; }
 .invoice-status-quick__menu button:disabled { background: #f2f3f5; color: #9198a4; cursor: default; }
+.invoice-editor--payment-readonly label:has(> input[name="paid_amount"]) { display: none; }
 .invoice-lock-notice { display: flex; align-items: center; gap: 13px; padding: 15px 17px; border: 1px solid #edc867; border-radius: 12px; background: #fff8e5; }
 .invoice-lock-notice > span { display: grid; place-items: center; width: 39px; height: 39px; border-radius: 50%; background: #f0cf73; }
 .invoice-lock-notice strong,

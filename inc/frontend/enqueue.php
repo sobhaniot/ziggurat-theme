@@ -62,6 +62,16 @@ function zigurat_enqueue_assets()
         zigurat_enqueue_theme_script('manager-views');
         zigurat_enqueue_theme_script('pricing-calculator');
         zigurat_enqueue_theme_script('letter-calculator', array('zigurat-pricing-calculator'));
+        $manager_section = isset($_GET['manager-section']) ? sanitize_key(wp_unslash($_GET['manager-section'])) : '';
+        if ($manager_section === 'letters' && zigurat_is_manager()) {
+            wp_enqueue_editor();
+            zigurat_enqueue_theme_style('letters');
+            zigurat_enqueue_theme_script('letters');
+            wp_localize_script('zigurat-letters', 'ziguratLettersConfig', array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'stampLayoutNonce' => wp_create_nonce('zigurat_letter_stamp_layout'),
+            ));
+        }
     }
 
     if (is_post_type_archive('article')) {

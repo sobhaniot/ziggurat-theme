@@ -658,8 +658,8 @@ function zigurat_invoice_get_latest_correction($invoice_id)
 
 function zigurat_invoice_set_payment_status($invoice_id, $status)
 {
-    if (!zigurat_is_manager()) {
-        return new WP_Error('forbidden', 'دسترسی به وضعیت پرداخت مجاز نیست.');
+    if (!current_user_can('manage_options')) {
+        return new WP_Error('forbidden', 'فقط مدیر کل می‌تواند وضعیت پرداخت را تغییر دهد.');
     }
     $status = sanitize_key($status);
     if (!in_array($status, array('unpaid','settled'), true)) {
@@ -963,7 +963,12 @@ function zigurat_invoice_save($data)
     $taxable = $amount_with_overhead + $insurance_amount;
     $tax_amount = (int) round($taxable * $tax_rate / 100);
     $grand_total = $taxable + $tax_amount;
-    $paid_amount = $type === 'invoice' ? zigurat_invoice_money($data['paid_amount'] ?? 0) : 0;
+    $paid_amount = 0;
+    if ($type === 'invoice') {
+        $paid_amount = current_user_can('manage_options')
+            ? zigurat_invoice_money($data['paid_amount'] ?? 0)
+            : (int) ($existing->paid_amount ?? 0);
+    }
     if ($paid_amount > $grand_total) {
         return new WP_Error('invalid_paid_amount', 'مبلغ پرداخت‌شده نمی‌تواند بیشتر از جمع کل فاکتور باشد.');
     }

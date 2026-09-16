@@ -363,7 +363,7 @@ add_action('pre_get_posts', function ($query) {
     }
 
     $tax_query = array();
-    foreach (array('project_client', 'project_city', 'project_province', 'project_sign_type') as $taxonomy) {
+    foreach (array('project_service', 'project_client', 'project_city', 'project_province', 'project_sign_type') as $taxonomy) {
         if (!empty($_GET[$taxonomy]) && is_string($_GET[$taxonomy])) {
             $terms = array_values(array_filter(array_map('sanitize_title', preg_split('/\s*,\s*/', wp_unslash($_GET[$taxonomy])))));
             $tax_query[] = array(

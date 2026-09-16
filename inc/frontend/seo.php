@@ -120,6 +120,12 @@ function zigurat_seo_default_home_title()
 
 function zigurat_seo_document_title($title)
 {
+    if (is_page('login') || is_page_template('page-login.php')) {
+        return function_exists('zigurat_is_manager') && zigurat_is_manager()
+            ? 'پنل مدیران | زیگورات'
+            : 'ورود به پنل مدیران | زیگورات';
+    }
+
     if (is_admin() || zigurat_seo_plugin_is_active()) {
         return $title;
     }

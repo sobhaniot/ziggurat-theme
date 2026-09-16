@@ -24,6 +24,22 @@ function zigurat_pricing_decimal($value)
     return max(0, (float) $normalized);
 }
 
+/**
+ * درصد مشترک بیمه و مالیات را می‌خواند. داده‌های قدیمیِ دارای دو درصد جدا
+ * به درصد معادل تبدیل می‌شوند تا نتیجه محاسبات ذخیره‌شده تغییر ناگهانی نکند.
+ */
+function zigurat_pricing_insurance_tax_percent($data)
+{
+    $data = is_array($data) ? $data : array();
+    if (array_key_exists('insurance_tax_percent', $data)) {
+        return min(1000, zigurat_pricing_decimal($data['insurance_tax_percent']));
+    }
+
+    $insurance = min(1000, zigurat_pricing_decimal($data['insurance_percent'] ?? 0));
+    $tax = min(1000, zigurat_pricing_decimal($data['tax_percent'] ?? 0));
+    return min(1000, round(((1 + ($insurance / 100)) * (1 + ($tax / 100)) - 1) * 100, 4));
+}
+
 function zigurat_get_lightbox_pricing_settings()
 {
     $defaults = array(
@@ -192,10 +208,14 @@ function zigurat_get_composite_last_values()
         'freight' => 0,
         'bracing_cost' => 0,
         'profit_percent' => 0,
-        'insurance_percent' => 0,
-        'tax_percent' => 0,
+        'insurance_tax_percent' => 0,
     );
-    return wp_parse_args(get_option('zigurat_composite_last_values', array()), $defaults);
+    $stored = get_option('zigurat_composite_last_values', array());
+    $stored = is_array($stored) ? $stored : array();
+    if (!array_key_exists('insurance_tax_percent', $stored)) {
+        $stored['insurance_tax_percent'] = zigurat_pricing_insurance_tax_percent($stored);
+    }
+    return wp_parse_args($stored, $defaults);
 }
 
 function zigurat_save_composite_last_values($data)
@@ -207,8 +227,7 @@ function zigurat_save_composite_last_values($data)
         'freight' => zigurat_pricing_money($data['freight'] ?? 0),
         'bracing_cost' => zigurat_pricing_money($data['bracing_cost'] ?? 0),
         'profit_percent' => min(1000, zigurat_pricing_decimal($data['profit_percent'] ?? 0)),
-        'insurance_percent' => min(1000, zigurat_pricing_decimal($data['insurance_percent'] ?? 0)),
-        'tax_percent' => min(1000, zigurat_pricing_decimal($data['tax_percent'] ?? 0)),
+        'insurance_tax_percent' => zigurat_pricing_insurance_tax_percent($data),
     );
     update_option('zigurat_composite_last_values', $values, false);
     return $values;
@@ -225,7 +244,7 @@ function zigurat_ajax_save_composite_last_values()
 }
 add_action('wp_ajax_zigurat_save_composite_last_values', 'zigurat_ajax_save_composite_last_values');
 
-/** محاسبه مرجع قیمت کامپوزیت؛ ترتیب سود، بیمه و مالیات در رابط کاربری نیز عیناً رعایت می‌شود. */
+/** محاسبه مرجع قیمت کامپوزیت؛ درصد مشترک بیمه و مالیات پس از سود اعمال می‌شود. */
 function zigurat_calculate_composite_price($data, $settings = null)
 {
     $settings = is_array($settings) ? $settings : zigurat_get_composite_pricing_settings();
@@ -248,15 +267,9 @@ function zigurat_calculate_composite_price($data, $settings = null)
     $profit_amount = (int) round($base_total * $profit_percent / 100);
     $after_profit = $base_total + $profit_amount;
 
-    $insurance_percent = min(1000, zigurat_pricing_decimal($data['insurance_percent'] ?? 0));
-    $use_insurance = $insurance_percent > 0;
-    $insurance_amount = (int) round($after_profit * $insurance_percent / 100);
-    $after_insurance = $after_profit + $insurance_amount;
-
-    $tax_percent = min(1000, zigurat_pricing_decimal($data['tax_percent'] ?? 0));
-    $use_tax = $tax_percent > 0;
-    $tax_amount = (int) round($after_insurance * $tax_percent / 100);
-    $final_price = $after_insurance + $tax_amount;
+    $insurance_tax_percent = zigurat_pricing_insurance_tax_percent($data);
+    $insurance_tax_amount = (int) round($after_profit * $insurance_tax_percent / 100);
+    $final_price = $after_profit + $insurance_tax_amount;
 
     return array(
         'length' => $length,
@@ -272,12 +285,8 @@ function zigurat_calculate_composite_price($data, $settings = null)
         'profit_percent' => $profit_percent,
         'profit_amount' => $profit_amount,
         'after_profit' => $after_profit,
-        'use_insurance' => $use_insurance,
-        'insurance_percent' => $insurance_percent,
-        'insurance_amount' => $insurance_amount,
-        'use_tax' => $use_tax,
-        'tax_percent' => $tax_percent,
-        'tax_amount' => $tax_amount,
+        'insurance_tax_percent' => $insurance_tax_percent,
+        'insurance_tax_amount' => $insurance_tax_amount,
         'price_per_square_meter' => $area > 0 ? (int) round($final_price / $area) : 0,
         'final_price' => $final_price,
     );
@@ -490,6 +499,8 @@ function zigurat_get_letter_last_values()
         'layout_trials' => 10,
         'wire_supplies' => 0,
         'profit_percent' => 0,
+        'insurance_tax_percent' => 0,
+        'use_transformer' => 1,
         'allow_rotation' => 1,
         'include_pvc' => 1,
         'include_metal_sheet_07' => 0,
@@ -502,6 +513,9 @@ function zigurat_get_letter_last_values()
     }
     if (!isset($saved['smd_type']) && !empty($saved['include_led'])) {
         $saved['smd_type'] = 'block';
+    }
+    if (!array_key_exists('insurance_tax_percent', $saved)) {
+        $saved['insurance_tax_percent'] = zigurat_pricing_insurance_tax_percent($saved);
     }
     return wp_parse_args($saved, $defaults);
 }
@@ -524,6 +538,8 @@ function zigurat_save_letter_last_values($data)
         'layout_trials' => in_array($layout_trials, array(5, 10, 20, 30), true) ? $layout_trials : 10,
         'wire_supplies' => zigurat_pricing_money($data['wire_supplies'] ?? 0),
         'profit_percent' => min(1000, zigurat_pricing_decimal($data['profit_percent'] ?? 0)),
+        'insurance_tax_percent' => zigurat_pricing_insurance_tax_percent($data),
+        'use_transformer' => !empty($data['use_transformer']) ? 1 : 0,
         'allow_rotation' => 1,
         'include_pvc' => 1,
         'include_metal_sheet_07' => $edge_type === 'metal' ? 1 : 0,

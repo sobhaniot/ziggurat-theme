@@ -30,7 +30,7 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
             <a href="<?php echo esc_url(add_query_arg(array('manager-section'=>'pricing','calculator'=>'composite'), zigurat_manager_login_url())); ?>">
                 <span aria-hidden="true">▦</span>
                 <strong>محاسبه قیمت تابلو کامپوزیت</strong>
-                <small>محاسبه آهن، کامپوزیت، نصاب و لوازم به‌ازای مترمربع همراه با کرایه، سود، بیمه و مالیات</small>
+                <small>محاسبه آهن، کامپوزیت، نصاب و لوازم به‌ازای مترمربع همراه با کرایه، سود و درصد مشترک بیمه و مالیات</small>
             </a>
             <a href="<?php echo esc_url(add_query_arg(array('manager-section'=>'pricing','calculator'=>'flexi'), zigurat_manager_login_url())); ?>">
                 <span aria-hidden="true">▤</span>
@@ -40,7 +40,7 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
             <a href="<?php echo esc_url(add_query_arg(array('manager-section'=>'pricing','calculator'=>'letters'), zigurat_manager_login_url())); ?>">
                 <span aria-hidden="true">حـ</span>
                 <strong>محاسبه قیمت حروف</strong>
-                <small>خواندن طرح SVG، چیدمان بهینه قطعات روی ورق، محاسبه پرت و برآورد هزینه ساخت</small>
+                <small>خواندن طرح SVG، چیدمان بهینه، محاسبه پرت و برآورد هزینه ساخت همراه با سود، بیمه و مالیات</small>
             </a>
         </div>
     <?php elseif ($calculator === 'letters'): ?>
@@ -112,7 +112,7 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
         <header class="manager-pricing__heading">
             <span>برآورد محصول</span>
             <h2 id="manager-pricing-title">محاسبه قیمت تابلو کامپوزیت</h2>
-            <p>هزینه‌های آهن، کامپوزیت، نصاب و لوازم مصرفی براساس مساحت محاسبه می‌شوند؛ سپس کرایه، سود و در صورت نیاز بیمه و مالیات به‌ترتیب اعمال می‌شوند.</p>
+            <p>هزینه‌های آهن، کامپوزیت، نصاب و لوازم مصرفی براساس مساحت محاسبه می‌شوند؛ سپس کرایه، سود و در صورت نیاز درصد مشترک بیمه و مالیات اعمال می‌شود.</p>
         </header>
 
         <?php if ($pricing_status === 'saved'): ?><div class="manager-pricing-notice is-success" role="status">نرخ‌های پایه کامپوزیت با موفقیت ذخیره شدند.</div><?php elseif ($pricing_status): ?><div class="manager-pricing-notice is-error" role="alert">ذخیره نرخ‌ها انجام نشد؛ دوباره تلاش کنید.</div><?php endif; ?>
@@ -147,15 +147,12 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                     <label>هزینه آهن‌کشی جهت مهار تابلو (ریال)<input name="bracing_cost" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_values['bracing_cost']); ?>"></label>
                     <label>درصد سود<input name="profit_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['profit_percent']); ?>" placeholder="مثلاً ۲۵"></label>
 
-                    <label>درصد بیمه
-                        <input name="insurance_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['insurance_percent']); ?>" placeholder="اگر لازم نیست صفر بگذارید">
-                    </label>
-                    <label>درصد مالیات
-                        <input name="tax_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['tax_percent']); ?>" placeholder="اگر لازم نیست صفر بگذارید">
+                    <label>درصد بیمه و مالیات
+                        <input name="insurance_tax_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['insurance_tax_percent']); ?>" placeholder="اگر لازم نیست صفر بگذارید">
                     </label>
                 </div>
-                <small class="manager-pricing-autosave">آخرین کرایه، هزینه آهن‌کشی مهار، درصد سود، بیمه و مالیات به‌صورت خودکار ذخیره می‌شوند.</small>
-                <div class="manager-pricing-formula"><strong>ترتیب محاسبه:</strong> هزینه‌های متری + کرایه + آهن‌کشی جهت مهار؛ سپس سود و در صورت واردکردن درصد، بیمه و مالیات.</div>
+                <small class="manager-pricing-autosave">آخرین کرایه، هزینه آهن‌کشی مهار، درصد سود و درصد مشترک بیمه و مالیات به‌صورت خودکار ذخیره می‌شوند.</small>
+                <div class="manager-pricing-formula"><strong>ترتیب محاسبه:</strong> هزینه‌های متری + کرایه + آهن‌کشی جهت مهار؛ سپس سود و در صورت واردکردن درصد، مبلغ تجمیعی بیمه و مالیات.</div>
                 <div class="manager-pricing-error" data-composite-error role="alert" hidden></div>
                 <button class="manager-pricing-calculate" type="submit">محاسبه قیمت نهایی</button>
                 <section class="manager-pricing-result manager-pricing-result--composite" data-composite-result aria-live="polite">
@@ -168,8 +165,7 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                     <div><span>آهن‌کشی جهت مهار تابلو</span><strong data-composite-bracing>۰ ریال</strong></div>
                     <div><span>جمع هزینه پایه</span><strong data-composite-base>۰ ریال</strong></div>
                     <div><span>مبلغ سود</span><strong data-composite-profit>۰ ریال</strong></div>
-                    <div><span>مبلغ بیمه</span><strong data-composite-insurance>۰ ریال</strong></div>
-                    <div><span>مبلغ مالیات</span><strong data-composite-tax>۰ ریال</strong></div>
+                    <div><span>مبلغ بیمه و مالیات</span><strong data-composite-insurance-tax>۰ ریال</strong></div>
                     <div><span>قیمت نهایی هر مترمربع</span><strong data-composite-unit>۰ ریال</strong></div>
                     <div class="manager-pricing-result__final"><span>قیمت نهایی</span><strong data-composite-final>۰ ریال</strong></div>
                 </section>

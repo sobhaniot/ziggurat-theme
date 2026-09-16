@@ -227,6 +227,29 @@
     return 'path,polygon,polyline,rect,circle,ellipse,line';
   }
 
+  function assessSvgComplexity(geometry) {
+    var pathCount = 0;
+    var commandCount = 0;
+    var coordinateChars = 0;
+    geometry.forEach(function (node) {
+      if (String(node.localName || '').toLowerCase() !== 'path') return;
+      pathCount += 1;
+      var data = String(node.getAttribute('d') || '');
+      coordinateChars += data.length;
+      commandCount += (data.match(/[a-z]/gi) || []).length;
+    });
+    var highRisk = pathCount >= 8 || commandCount >= 900 || coordinateChars >= 9000;
+    var veryHighRisk = pathCount >= 18 || commandCount >= 2200 || coordinateChars >= 24000;
+    return {
+      pathCount: pathCount,
+      geometryCount: geometry.length,
+      commandCount: commandCount,
+      coordinateChars: coordinateChars,
+      level: veryHighRisk ? 'very-high' : (highRisk ? 'high' : 'normal'),
+      warning: highRisk
+    };
+  }
+
   function geometryShapeSignature(node) {
     var geometryAttributes = {
       path: ['d'],
@@ -406,7 +429,7 @@
     }
     var root = documentNode.documentElement;
     var classStyles = svgClassStyles(root);
-    if (root.querySelector('text, textPath')) {
+    if (root.querySelector('text, textPath, tspan')) {
       throw new Error('داخل فایل هنوز متن وجود دارد. ابتدا در Corel تمام نوشته‌ها را به Curve تبدیل و دوباره SVG بگیرید.');
     }
     if (root.querySelector('use')) {
@@ -479,6 +502,8 @@
       widthMm: widthMm,
       heightMm: heightMm,
       viewBox: viewBox,
+      geometryCount: geometry.length,
+      complexity: assessSvgComplexity(geometry),
       materialJobs: Object.keys(materialJobs).map(function (key) { return materialJobs[key]; })
     };
   }
@@ -609,7 +634,12 @@
       var sizeText = prepared.widthMm > 0 && prepared.heightMm > 0
         ? formatMeasure(prepared.widthMm) + ' × ' + formatMeasure(prepared.heightMm) + ' میلی‌متر'
         : 'ابعاد واقعی را در فیلدهای پایین وارد کنید';
-      details.textContent = (file.name || 'فایل SVG') + ' — ' + sizeText;
+      var complexity = prepared.complexity || {};
+      var complexityText = complexity.warning
+        ? ' — ⚠️ احتمال کندی: ' + Number(complexity.pathCount || 0).toLocaleString('fa-IR') + ' مسیر جدا؛ برای سرعت بیشتر مسیرهای هم‌رنگ را در Corel Combine کنید'
+        : ' — پیچیدگی عادی';
+      details.classList.toggle('is-warning', Boolean(complexity.warning));
+      details.textContent = (file.name || 'فایل SVG') + ' — ' + sizeText + ' — ✓ منحنی تأیید شد (' + Number(prepared.geometryCount || 0).toLocaleString('fa-IR') + ' مسیر برداری)' + complexityText;
     }
     preview.hidden = false;
   }
@@ -1476,6 +1506,7 @@
   function packInOrder(items, sheetWidth, sheetHeight, allowRotation, sorter) {
     var ordered = items.slice().sort(sorter);
     var sheets = [];
+    var unplaced = [];
     ordered.forEach(function (baseItem) {
       var orientations = baseItem.orientations || buildOrientations(baseItem, allowRotation);
       var selected = null;
@@ -1492,11 +1523,15 @@
       if (!selected) {
         selectedSheet = createSheet(sheetWidth, sheetHeight);
         selected = findPlacement(selectedSheet, orientations);
-        if (!selected) throw new Error('حداقل یکی از قطعات با حاشیه و فاصله فعلی داخل ورق جا نمی‌شود. ابعاد ورق یا مقیاس طرح را بررسی کنید.');
+        if (!selected) {
+          unplaced.push(baseItem);
+          return;
+        }
         sheets.push(selectedSheet);
       }
       occupy(selectedSheet, selected);
     });
+    sheets.unplaced = unplaced;
     return sheets;
   }
 
@@ -1537,7 +1572,8 @@
       }).then(function () {
         var candidate = packInOrder(items, sheetWidth, sheetHeight, allowRotation, sorter);
         var usedBottom = candidate.reduce(function (sum, sheet) { return sum + sheet.usedBottom; }, 0);
-        var score = (candidate.length * 1000000000) + usedBottom;
+        var unplacedCount = (candidate.unplaced || []).length;
+        var score = (unplacedCount * 1000000000000000) + (candidate.length * 1000000000) + usedBottom;
         if (!best || score < best.score) best = {sheets: candidate, score: score};
       });
     });
@@ -1560,6 +1596,7 @@
     });
     var orderedGroups = Object.keys(groups).map(function (key) { return groups[key]; });
     var allSheets = [];
+    var allUnplaced = [];
     var sequence = Promise.resolve();
     orderedGroups.forEach(function (group, groupIndex) {
       sequence = sequence.then(function () {
@@ -1571,10 +1608,77 @@
           sheet.materialColor = group.color;
           sheet.materialLabel = group.label;
         });
+        (sheets.unplaced || []).forEach(function (item) {
+          item.materialKey = group.key;
+          item.materialColor = group.color;
+          item.materialLabel = group.label;
+          allUnplaced.push(item);
+        });
         allSheets = allSheets.concat(sheets);
       });
     });
-    return sequence.then(function () { return allSheets; });
+    return sequence.then(function () {
+      allSheets.unplaced = allUnplaced;
+      return allSheets;
+    });
+  }
+
+  function sheetTightBounds(plan, sheet) {
+    if (!sheet.placements.length) return {x: 0, y: plan.sheetHeightMm, width: 0, height: 0, area: 0};
+    var minimumX = plan.sheetWidthMm;
+    var minimumY = plan.sheetHeightMm;
+    var maximumX = 0;
+    var maximumY = 0;
+    sheet.placements.forEach(function (placement) {
+      var angle = placement.item.rotation * Math.PI / 180;
+      var sourceWidth = placement.item.previewWidthMm;
+      var sourceHeight = placement.item.previewHeightMm;
+      var rotatedWidth = (Math.abs(Math.cos(angle)) * sourceWidth) + (Math.abs(Math.sin(angle)) * sourceHeight);
+      var rotatedHeight = (Math.abs(Math.sin(angle)) * sourceWidth) + (Math.abs(Math.cos(angle)) * sourceHeight);
+      var centerX = plan.marginMm + ((placement.x + (placement.item.width / 2)) * plan.stepMm);
+      var centerY = plan.sheetHeightMm - plan.marginMm - ((placement.y + (placement.item.height / 2)) * plan.stepMm);
+      minimumX = Math.min(minimumX, centerX - (rotatedWidth / 2));
+      maximumX = Math.max(maximumX, centerX + (rotatedWidth / 2));
+      minimumY = Math.min(minimumY, centerY - (rotatedHeight / 2));
+      maximumY = Math.max(maximumY, centerY + (rotatedHeight / 2));
+    });
+    minimumX = Math.max(0, minimumX);
+    minimumY = Math.max(0, minimumY);
+    maximumX = Math.min(plan.sheetWidthMm, maximumX);
+    maximumY = Math.min(plan.sheetHeightMm, maximumY);
+    var width = Math.max(0, maximumX - minimumX);
+    var height = Math.max(0, maximumY - minimumY);
+    return {x: minimumX, y: minimumY, width: width, height: height, area: width * height};
+  }
+
+  function updateSheetConsumption(plan, sheet) {
+    var fullHeight = Math.min(plan.sheetHeightMm, plan.marginMm + (sheet.usedBottom * plan.stepMm));
+    sheet.fullConsumption = {
+      x: 0,
+      y: plan.sheetHeightMm - fullHeight,
+      width: plan.sheetWidthMm,
+      height: fullHeight,
+      area: plan.sheetWidthMm * fullHeight
+    };
+    sheet.tightConsumption = sheetTightBounds(plan, sheet);
+    if (sheet.consumptionMode !== 'tight') sheet.consumptionMode = 'full';
+    var selected = sheet.consumptionMode === 'tight' ? sheet.tightConsumption : sheet.fullConsumption;
+    sheet.consumptionWidthMm = selected.width;
+    sheet.consumptionHeightMm = selected.height;
+    sheet.consumptionAreaMm2 = selected.area;
+  }
+
+  function drawConsumptionRectangle(context, rect, scale, color, fillColor, selected) {
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
+    context.save();
+    context.fillStyle = selected ? fillColor : 'transparent';
+    context.strokeStyle = color;
+    context.lineWidth = selected ? Math.max(2.5, 1.8 * window.devicePixelRatio) : Math.max(1.5, window.devicePixelRatio);
+    context.setLineDash(selected ? [] : [6, 4]);
+    var inset = context.lineWidth / 2;
+    context.fillRect(rect.x * scale, rect.y * scale, rect.width * scale, rect.height * scale);
+    context.strokeRect((rect.x * scale) + inset, (rect.y * scale) + inset, Math.max(0, (rect.width * scale) - (2 * inset)), Math.max(0, (rect.height * scale) - (2 * inset)));
+    context.restore();
   }
 
   function drawPreview(plan) {
@@ -1584,6 +1688,34 @@
       var card = document.createElement('article');
       var title = document.createElement('strong');
       title.textContent = 'ورق ' + (sheetIndex + 1).toLocaleString('fa-IR') + ' — ' + (sheet.materialLabel || 'پلکسی');
+      updateSheetConsumption(plan, sheet);
+      var modes = document.createElement('div');
+      modes.className = 'manager-letter-sheet-modes';
+      [
+        {key: 'full', label: 'تمام عرض ورق', color: '#df2f2f', rect: sheet.fullConsumption},
+        {key: 'tight', label: 'فقط دور حروف', color: '#147d92', rect: sheet.tightConsumption}
+      ].forEach(function (option) {
+        var label = document.createElement('label');
+        label.style.setProperty('--mode-color', option.color);
+        var radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'letter-sheet-consumption-' + sheetIndex;
+        radio.value = option.key;
+        radio.checked = sheet.consumptionMode === option.key;
+        if (radio.checked) label.classList.add('is-selected');
+        radio.addEventListener('change', function () {
+          if (!radio.checked) return;
+          sheet.consumptionMode = option.key;
+          showAnalysis(plan);
+        });
+        var swatch = document.createElement('i');
+        var text = document.createElement('span');
+        text.textContent = option.label + ': ' + formatMeasure(option.rect.width, 0) + ' × ' + formatMeasure(option.rect.height, 0) + ' میلی‌متر';
+        label.appendChild(radio);
+        label.appendChild(swatch);
+        label.appendChild(text);
+        modes.appendChild(label);
+      });
       var canvas = document.createElement('canvas');
       var maxPreview = 680;
       var scale = Math.min(maxPreview / plan.sheetWidthMm, maxPreview / plan.sheetHeightMm);
@@ -1618,27 +1750,72 @@
         );
         context.restore();
       });
-      var consumptionWidthMm = sheet.consumptionWidthMm || 0;
-      var consumptionHeightMm = sheet.consumptionHeightMm || 0;
-      if (consumptionWidthMm > 0 && consumptionHeightMm > 0) {
-        var consumptionTopMm = plan.sheetHeightMm - consumptionHeightMm;
-        context.save();
-        context.fillStyle = 'rgba(220, 45, 45, 0.035)';
-        context.strokeStyle = '#df2f2f';
-        context.lineWidth = Math.max(2, 1.5 * window.devicePixelRatio);
-        context.setLineDash([]);
-        context.fillRect(0, consumptionTopMm * scale, consumptionWidthMm * scale, consumptionHeightMm * scale);
-        var strokeInset = Math.max(1, context.lineWidth / 2);
-        context.strokeRect(strokeInset, (consumptionTopMm * scale) + strokeInset, canvas.width - (2 * strokeInset), (consumptionHeightMm * scale) - (2 * strokeInset));
-        context.restore();
-      }
+      drawConsumptionRectangle(context, sheet.fullConsumption, scale, '#df2f2f', 'rgba(220, 45, 45, 0.04)', sheet.consumptionMode === 'full');
+      drawConsumptionRectangle(context, sheet.tightConsumption, scale, '#147d92', 'rgba(20, 125, 146, 0.05)', sheet.consumptionMode === 'tight');
+      var selectedConsumption = sheet.consumptionMode === 'tight' ? sheet.tightConsumption : sheet.fullConsumption;
       var usage = document.createElement('small');
       usage.className = 'manager-letter-sheet-usage';
-      usage.textContent = 'مستطیل مصرف پلکسی: ' + formatMeasure(consumptionWidthMm, 0) + ' × ' + formatMeasure(consumptionHeightMm, 0) + ' میلی‌متر — ' + formatMeasure((consumptionWidthMm * consumptionHeightMm) / 1000000, 3) + ' مترمربع';
+      usage.textContent = 'مبنای قیمت: ' + (sheet.consumptionMode === 'tight' ? 'مستطیل فیروزه‌ای دور حروف' : 'مستطیل قرمز تمام‌عرض') + ' — ' + formatMeasure(selectedConsumption.area / 1000000, 3) + ' مترمربع';
       card.appendChild(title);
+      card.appendChild(modes);
       card.appendChild(canvas);
       card.appendChild(usage);
       container.appendChild(card);
+    });
+  }
+
+  function drawUnplacedItems(state) {
+    var container = form.querySelector('[data-letter-unplaced]');
+    if (!container) return;
+    var items = state.unplacedItems || [];
+    container.innerHTML = '';
+    container.hidden = !items.length;
+    if (!items.length) return;
+    var heading = document.createElement('strong');
+    heading.textContent = items.length.toLocaleString('fa-IR') + ' قطعه داخل ابعاد فعلی ورق جا‌نشد';
+    var note = document.createElement('p');
+    note.textContent = 'بقیه قطعات چیده شده‌اند. مصرف ورق و قیمت رویه، قطعات جانشده را شامل نمی‌شود.';
+    container.appendChild(heading);
+    container.appendChild(note);
+    items.forEach(function (item, index) {
+      var article = document.createElement('article');
+      var preview = document.createElement('canvas');
+      preview.className = 'manager-letter-unplaced__preview';
+      preview.width = 300;
+      preview.height = 220;
+      var context = preview.getContext('2d');
+      context.fillStyle = '#fffdf9';
+      context.fillRect(0, 0, preview.width, preview.height);
+      var scale = Math.min(270 / item.previewCanvas.width, 185 / item.previewCanvas.height);
+      var width = item.previewCanvas.width * scale;
+      var height = item.previewCanvas.height * scale;
+      var left = (preview.width - width) / 2;
+      var top = (preview.height - height) / 2;
+      var pieceCanvas = document.createElement('canvas');
+      pieceCanvas.width = Math.max(1, Math.ceil(width));
+      pieceCanvas.height = Math.max(1, Math.ceil(height));
+      var pieceContext = pieceCanvas.getContext('2d');
+      pieceContext.drawImage(item.previewCanvas, 0, 0, pieceCanvas.width, pieceCanvas.height);
+      pieceContext.globalCompositeOperation = 'source-in';
+      pieceContext.fillStyle = '#d9342b';
+      pieceContext.fillRect(0, 0, pieceCanvas.width, pieceCanvas.height);
+      pieceContext.globalCompositeOperation = 'source-over';
+      context.drawImage(pieceCanvas, left, top, width, height);
+      context.strokeStyle = '#d63a2e';
+      context.lineWidth = 2;
+      context.setLineDash([7, 5]);
+      context.strokeRect(Math.max(1, left - 3), Math.max(1, top - 3), width + 6, height + 6);
+      context.setLineDash([]);
+      var info = document.createElement('span');
+      var label = document.createElement('b');
+      label.textContent = 'قطعه جا‌نشده ' + (index + 1).toLocaleString('fa-IR') + ' — ' + (item.materialLabel || 'پلکسی');
+      var size = document.createElement('small');
+      size.textContent = formatMeasure(item.previewWidthMm, 0) + ' × ' + formatMeasure(item.previewHeightMm, 0) + ' میلی‌متر';
+      info.appendChild(label);
+      info.appendChild(size);
+      article.appendChild(preview);
+      article.appendChild(info);
+      container.appendChild(article);
     });
   }
 
@@ -2020,9 +2197,12 @@
     var installationRate = money(field('installation').value);
     var installation = installationMode === 'perimeter' ? Math.round(perimeterMeters * installationRate) : installationRate;
     var travel = money(field('travel').value);
-    var transformerPlan = smdType === 'roll'
-      ? recommendTransformersByWatts(smdLayout.powerWatts, roolookiOptions.transformerReservePercent)
-      : recommendTransformers(smdCount);
+    var useTransformer = field('use_transformer').checked;
+    var transformerPlan = useTransformer
+      ? (smdType === 'roll'
+        ? recommendTransformersByWatts(smdLayout.powerWatts, roolookiOptions.transformerReservePercent)
+        : recommendTransformers(smdCount))
+      : {items: [], count: 0, capacity: 0, cost: 0};
     var transformerCount = transformerPlan.count;
     var transformer = transformerPlan.cost;
     var wireSupplies = money(field('wire_supplies').value);
@@ -2030,7 +2210,10 @@
     var base = plexiCost + metalSheet07Cost + powderCoatingCost + edgeCost + buildCost + doubleLaborCost + plexiCutCost + pvcCost + pvcCutCost + glueCost + smdCost + transformer + extras;
     var profitPercent = Math.min(1000, decimal(field('profit_percent').value));
     var profit = Math.round(base * profitPercent / 100);
-    var finalPrice = base + profit;
+    var afterProfit = base + profit;
+    var insuranceTaxPercent = Math.min(1000, decimal(field('insurance_tax_percent').value));
+    var insuranceTax = Math.round(afterProfit * insuranceTaxPercent / 100);
+    var finalPrice = afterProfit + insuranceTax;
 
     currentCalculation = {
       plexi: plexiCost,
@@ -2057,11 +2240,14 @@
       installation: installation,
       travel: travel,
       transformer: transformer,
+      use_transformer: useTransformer ? 1 : 0,
       transformer_count: transformerCount,
       transformer_capacity: transformerPlan.capacity,
       wire_supplies: wireSupplies,
       base: base,
       profit: profit,
+      insurance_tax_percent: insuranceTaxPercent,
+      insurance_tax: insuranceTax,
       final: finalPrice,
       rounded_perimeter_m: perimeterMeters,
       double_perimeter_m: doublePerimeterMeters,
@@ -2090,21 +2276,23 @@
       : (smdType !== 'none' ? smdCount.toLocaleString('fa-IR') + ' واحد — ' + formatMoney(smdCost) : 'محاسبه نشده'));
     setText('[data-letter-installation-cost]', installationMode === 'perimeter' ? formatMeasure(perimeterMeters, 1) + ' متر — ' + formatMoney(installation) : 'مبلغ کلی — ' + formatMoney(installation));
     setText('[data-letter-travel-cost]', formatMoney(travel));
-    setText('[data-letter-transformer-cost]', transformerCount > 0 ? transformerPlanText(transformerPlan) + ' — ' + formatMoney(transformer) : 'بدون SMD');
+    setText('[data-letter-transformer-cost]', !useTransformer
+      ? 'استفاده نمی‌شود'
+      : (transformerCount > 0 ? transformerPlanText(transformerPlan) + ' — ' + formatMoney(transformer) : 'بدون SMD'));
     setText('[data-letter-wire-supplies]', formatMoney(wireSupplies));
     setText('[data-letter-extras]', formatMoney(extras));
     setText('[data-letter-base]', formatMoney(base));
     setText('[data-letter-profit]', formatMoney(profit) + ' (' + formatMeasure(profitPercent) + '٪)');
+    setText('[data-letter-insurance-tax]', insuranceTaxPercent > 0 ? formatMoney(insuranceTax) + ' (' + formatMeasure(insuranceTaxPercent) + '٪)' : 'محاسبه نشده');
     setText('[data-letter-final]', formatMoney(finalPrice));
+    setText('[data-letter-unit-price]', perimeterMeters > 0 ? formatMoney(Math.round(finalPrice / perimeterMeters)) + ' به‌ازای هر متر' : 'محیط قابل محاسبه نیست');
     drawSmdPreview(state, smdLayout, smdType);
   }
 
   function showAnalysis(state) {
     var materialUsage = {};
     state.consumedAreaMm2 = state.sheets.reduce(function (sum, sheet) {
-      sheet.consumptionWidthMm = state.sheetWidthMm;
-      sheet.consumptionHeightMm = Math.min(state.sheetHeightMm, state.marginMm + (sheet.usedBottom * state.stepMm));
-      sheet.consumptionAreaMm2 = sheet.consumptionWidthMm * sheet.consumptionHeightMm;
+      updateSheetConsumption(state, sheet);
       var materialKey = sheet.materialKey || sheet.materialColor || '#000000';
       if (!materialUsage[materialKey]) {
         materialUsage[materialKey] = {
@@ -2125,10 +2313,13 @@
     }, 0);
     state.materialUsage = Object.keys(materialUsage).map(function (key) { return materialUsage[key]; });
     state.doubleConsumedAreaMm2 = 0;
-    var wasteArea = Math.max(0, state.consumedAreaMm2 - state.materialAreaMm2);
-    var utilization = state.consumedAreaMm2 > 0 ? (state.materialAreaMm2 / state.consumedAreaMm2) * 100 : 0;
+    state.placedMaterialAreaMm2 = state.sheets.reduce(function (total, sheet) {
+      return total + sheet.placements.reduce(function (area, placement) { return area + placement.item.areaMm2; }, 0);
+    }, 0);
+    var wasteArea = Math.max(0, state.consumedAreaMm2 - state.placedMaterialAreaMm2);
+    var utilization = state.consumedAreaMm2 > 0 ? (state.placedMaterialAreaMm2 / state.consumedAreaMm2) * 100 : 0;
     setText('[data-letter-design-size]', formatMeasure(state.designWidthMm) + ' × ' + formatMeasure(state.designHeightMm) + ' میلی‌متر');
-    setText('[data-letter-parts]', state.components.length.toLocaleString('fa-IR') + ' قطعه برش؛ ' + state.doubleParts.toLocaleString('fa-IR') + ' قطعه دوبل؛ ' + (state.lightingComponents || []).length.toLocaleString('fa-IR') + ' قطعه مستقل روشنایی');
+    setText('[data-letter-parts]', state.components.length.toLocaleString('fa-IR') + ' قطعه برش؛ ' + state.doubleParts.toLocaleString('fa-IR') + ' قطعه دوبل؛ ' + (state.lightingComponents || []).length.toLocaleString('fa-IR') + ' قطعه مستقل روشنایی' + (state.unplacedItems.length ? '؛ ' + state.unplacedItems.length.toLocaleString('fa-IR') + ' قطعه جا‌نشده' : ''));
     setText('[data-letter-area]', formatMeasure(state.areaMm2 / 1000000, 3) + ' مترمربع');
     setText('[data-letter-lighting-area]', formatMeasure((state.lightingAreaMm2 || state.areaMm2) / 1000000, 3) + ' مترمربع');
     setText('[data-letter-perimeter]', formatMeasure(roundUpToOneDecimal(state.perimeterMm / 1000), 1) + ' متر');
@@ -2146,6 +2337,7 @@
       }).join('');
       materials.hidden = !state.materialUsage.length;
     }
+    drawUnplacedItems(state);
     drawPreview(state);
     form.querySelector('[data-letter-analysis]').hidden = false;
     calculateCosts();
@@ -2229,9 +2421,11 @@
       edge_type: field('edge_type').value,
       smd_type: field('smd_type').value,
       installation_mode: field('installation_mode').value === 'perimeter' ? 'perimeter' : 'fixed',
+      use_transformer: field('use_transformer').checked ? 1 : 0,
       allow_rotation: 1,
       include_pvc: 1,
       include_metal_sheet_07: field('edge_type').value === 'metal' ? 1 : 0,
+      consumption_modes: analysisState.sheets.map(function (sheet) { return sheet.consumptionMode === 'tight' ? 'tight' : 'full'; }),
       materials: (analysisState.materialUsage || []).map(function (usage) {
         return {
           key: usage.key,
@@ -2252,6 +2446,8 @@
         travel: money(field('travel').value),
         wire_supplies: money(field('wire_supplies').value),
         profit_percent: decimal(field('profit_percent').value),
+        insurance_tax_percent: decimal(field('insurance_tax_percent').value),
+        use_transformer: field('use_transformer').checked ? 1 : 0,
         layout_trials: Number(field('layout_trials').value) || 10
       },
       rates: letterRateSnapshot(),
@@ -2270,6 +2466,7 @@
         lighting_parts: (analysisState.lightingComponents || []).length,
         parts: analysisState.components.length,
         sheets: analysisState.sheets.length,
+        unplaced_parts: analysisState.unplacedItems.length,
         design_width_mm: analysisState.designWidthMm,
         design_height_mm: analysisState.designHeightMm
       },
@@ -2336,6 +2533,9 @@
       info.appendChild(date);
       var price = document.createElement('b');
       price.textContent = Number(record.final_price || 0).toLocaleString('fa-IR') + ' ریال';
+      var priceDetails = document.createElement('small');
+      priceDetails.textContent = Number(record.perimeter_m || 0).toLocaleString('fa-IR', {maximumFractionDigits: 1}) + ' متر · ' + Number(record.unit_price || 0).toLocaleString('fa-IR') + ' ریال/متر';
+      price.appendChild(priceDetails);
       var actions = document.createElement('div');
       actions.className = 'manager-pricing-estimates__actions';
       var load = document.createElement('button');
@@ -2394,6 +2594,7 @@
     var snapshot = payload.snapshot || {};
     var inputs = snapshot.inputs || {};
     var rates = snapshot.rates || {};
+    var savedBreakdown = snapshot.breakdown || {};
     Object.keys(rates).forEach(function (name) {
       var input = rateField(name);
       if (input) input.value = rates[name];
@@ -2402,6 +2603,12 @@
       var input = field(name);
       if (input) input.value = inputs[name];
     });
+    field('insurance_tax_percent').value = inputs.insurance_tax_percent !== undefined
+      ? inputs.insurance_tax_percent
+      : (savedBreakdown.insurance_tax_percent || 0);
+    field('use_transformer').checked = inputs.use_transformer !== undefined
+      ? Number(inputs.use_transformer) !== 0
+      : (snapshot.use_transformer !== undefined ? Number(snapshot.use_transformer) !== 0 : true);
     field('layout_trials').value = [5, 10, 20, 30].indexOf(Number(inputs.layout_trials)) !== -1 ? String(inputs.layout_trials) : '10';
     field('edge_type').value = snapshot.edge_type || 'swedish';
     field('smd_type').value = snapshot.smd_type || 'none';
@@ -2433,6 +2640,12 @@
       field('design_height_mm').value = inputs.design_height_mm || '';
       return analyze();
     }).then(function () {
+      if (Array.isArray(snapshot.consumption_modes)) {
+        analysisState.sheets.forEach(function (sheet, index) {
+          sheet.consumptionMode = snapshot.consumption_modes[index] === 'tight' ? 'tight' : 'full';
+        });
+        showAnalysis(analysisState);
+      }
       setEstimateStatus('محاسبه ذخیره‌شده با نرخ‌های همان زمان باز شد.', 'success');
       form.scrollIntoView({behavior: 'smooth', block: 'start'});
     }).finally(function () { setBusy(false); });
@@ -2453,8 +2666,13 @@
     var smdName = smdLabels[snapshot.smd_type] || 'بدون SMD';
     var edgeKey = snapshot.edge_type || 'swedish';
     var smdKey = snapshot.smd_type || 'none';
+    var useTransformer = inputs.use_transformer !== undefined
+      ? Number(inputs.use_transformer) !== 0
+      : (snapshot.use_transformer !== undefined ? Number(snapshot.use_transformer) !== 0 : true);
     var transformerPlan;
-    if (smdKey === 'roll') {
+    if (!useTransformer) {
+      transformerPlan = {items: [], count: 0, capacity: 0, cost: 0};
+    } else if (smdKey === 'roll') {
       transformerPlan = recommendTransformersByWatts(
         Number(breakdown.smd_power_watts || 0),
         Object.prototype.hasOwnProperty.call(rates, 'smd_roll_transformer_reserve_percent') ? Number(rates.smd_roll_transformer_reserve_percent) : 20,
@@ -2517,11 +2735,13 @@
       ['برش PVC', formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates.pvc_cut_rate, breakdown.pvc_cut],
       ['چسب', formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates.glue_rate, breakdown.glue],
       [smdName, smdBasis, smdKey !== 'none' ? rates['smd_' + smdKey + '_rate'] : 0, breakdown.smd],
-      ['ترانس پیشنهادی', transformerPlanText(transformerPlan), null, breakdown.transformer],
+      ['ترانس پیشنهادی', useTransformer ? transformerPlanText(transformerPlan) : 'استفاده نمی‌شود', null, breakdown.transformer],
       ['نصب', installationBasis, installationRate, breakdown.installation], ['ایاب و ذهاب', '', null, breakdown.travel],
       ['سیم و لوازم مصرفی', '', null, breakdown.wire_supplies],
       ['جمع هزینه‌های جانبی', '', null, Number(breakdown.installation || 0) + Number(breakdown.travel || 0) + Number(breakdown.wire_supplies || 0)],
-      ['جمع هزینه پایه', '', null, breakdown.base], ['سود (' + formatMeasure(inputs.profit_percent || 0, 2) + '٪)', '', null, breakdown.profit]
+      ['جمع هزینه پایه', '', null, breakdown.base],
+      ['سود (' + formatMeasure(inputs.profit_percent || 0, 2) + '٪)', '', null, breakdown.profit],
+      ['بیمه و مالیات (' + formatMeasure(inputs.insurance_tax_percent || breakdown.insurance_tax_percent || 0, 2) + '٪)', '', null, breakdown.insurance_tax]
     ]);
     var rowsHtml = rows.map(function (row) {
       var rate = row[2] === null ? '—' : formatMoney(Number(row[2] || 0));
@@ -2546,13 +2766,16 @@
         + escapeEstimateHtml(smdPreviewSummary)
         + '</p></section>'
       : '';
+    var unplacedNotice = Number(analysis.unplaced_parts || 0) > 0
+      ? '<div class="unplaced-notice">' + escapeEstimateHtml(Number(analysis.unplaced_parts).toLocaleString('fa-IR') + ' قطعه به‌دلیل بزرگی در ورق جا نشدند و در مصرف ورق منظور نشده‌اند.') + '</div>'
+      : '';
     var safeTitle = escapeEstimateHtml(projectName || 'برآورد قیمت حروف');
     return '<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>برآورد قیمت - ' + safeTitle + '</title><style>'
-      + '@page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0}body{padding:12mm;font-family:Tahoma,Arial,sans-serif;color:#171717;direction:rtl}header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #b78a2d;padding-bottom:10px;margin-bottom:15px}h1{font-size:22px;margin:0}h2{margin:0 0 8px;font-size:14px}header span{color:#6b5a32}.meta{display:grid;grid-template-columns:repeat(2,1fr);border:1px solid #bbb;margin-bottom:14px}.meta div{padding:8px 10px;border-bottom:1px solid #ddd}.meta div:nth-child(odd){border-left:1px solid #ddd}.design{display:block;max-width:100%;max-height:145px;margin:10px auto 14px}.material-section,.layout-section,.smd-section{margin:10px 0 14px;padding:9px;border:1px solid #cfc7b7;background:#faf8f2;break-inside:avoid}.smd-section{border-color:#aec5d5;background:#f3f8fb;text-align:center}.smd-section img{display:block;width:auto;max-width:100%;max-height:90mm;margin:0 auto 6px;object-fit:contain}.smd-section p{margin:4px 0 0;color:#31536c;font-size:10px;font-weight:bold}.materials{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.materials>div{display:flex;gap:7px;align-items:center;padding:6px;background:#fff;border:1px solid #ddd}.materials i{width:18px;height:18px;border-radius:4px;border:1px solid #999;flex:none}.materials span{display:flex;flex-direction:column}.materials small{font-size:9px;color:#666}.layouts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.layouts figure{margin:0;padding:5px;border:1px solid #d8d1c3;background:#fff;text-align:center;break-inside:avoid}.layouts img{display:block;width:auto;max-width:100%;height:34mm;margin:auto;object-fit:contain}.layouts figcaption{margin-top:4px;color:#665b46;font-size:9px;font-weight:bold}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #999;padding:6px 8px;text-align:right}th{background:#eee}td:last-child{text-align:left}.final{display:flex;justify-content:space-between;margin-top:12px;padding:12px 14px;background:#222;color:#fff;font-size:19px;font-weight:bold}.note{margin-top:10px;color:#666;font-size:10px}@media print{body{padding:12mm}.no-print{display:none!important}}</style></head><body>'
+      + '@page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0}body{padding:12mm;font-family:Tahoma,Arial,sans-serif;color:#171717;direction:rtl}header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #b78a2d;padding-bottom:10px;margin-bottom:15px}h1{font-size:22px;margin:0}h2{margin:0 0 8px;font-size:14px}header span{color:#6b5a32}.meta{display:grid;grid-template-columns:repeat(2,1fr);border:1px solid #bbb;margin-bottom:14px}.meta div{padding:8px 10px;border-bottom:1px solid #ddd}.meta div:nth-child(odd){border-left:1px solid #ddd}.design{display:block;max-width:100%;max-height:145px;margin:10px auto 14px}.material-section,.layout-section,.smd-section{margin:10px 0 14px;padding:9px;border:1px solid #cfc7b7;background:#faf8f2;break-inside:avoid}.smd-section{border-color:#aec5d5;background:#f3f8fb;text-align:center}.smd-section img{display:block;width:auto;max-width:100%;max-height:90mm;margin:0 auto 6px;object-fit:contain}.smd-section p{margin:4px 0 0;color:#31536c;font-size:10px;font-weight:bold}.materials{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.materials>div{display:flex;gap:7px;align-items:center;padding:6px;background:#fff;border:1px solid #ddd}.materials i{width:18px;height:18px;border-radius:4px;border:1px solid #999;flex:none}.materials span{display:flex;flex-direction:column}.materials small{font-size:9px;color:#666}.layouts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.layouts figure{margin:0;padding:5px;border:1px solid #d8d1c3;background:#fff;text-align:center;break-inside:avoid}.layouts img{display:block;width:auto;max-width:100%;height:34mm;margin:auto;object-fit:contain}.layouts figcaption{margin-top:4px;color:#665b46;font-size:9px;font-weight:bold}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #999;padding:6px 8px;text-align:right}th{background:#eee}td:last-child{text-align:left}.final{display:flex;justify-content:space-between;margin-top:12px;padding:12px 14px;background:#222;color:#fff;font-size:19px;font-weight:bold}.final strong{display:grid;text-align:left}.final small{margin-top:4px;color:#e8d8a7;font-size:11px}.unplaced-notice{margin:10px 0;padding:8px;border:1px solid #d67b70;background:#fff4f2;color:#8a271d;font-size:10px;font-weight:bold}.note{margin-top:10px;color:#666;font-size:10px}@media print{body{padding:12mm}.no-print{display:none!important}}</style></head><body>'
       + '<header><h1>برآورد قیمت ساخت حروف</h1><span>زیگورات</span></header>'
       + '<section class="meta"><div><b>نام پروژه:</b> ' + safeTitle + '</div><div><b>فایل طرح:</b> ' + escapeEstimateHtml(snapshot.source_file || '—') + '</div><div><b>ابعاد:</b> ' + escapeEstimateHtml(formatMeasure(analysis.design_width_mm || 0, 2) + ' × ' + formatMeasure(analysis.design_height_mm || 0, 2) + ' میلی‌متر') + '</div><div><b>مساحت واقعی رویه:</b> ' + escapeEstimateHtml(formatMeasure((analysis.area_mm2 || 0) / 1000000, 3) + ' مترمربع') + '</div><div><b>محیط محاسباتی:</b> ' + escapeEstimateHtml(formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر') + '</div><div><b>نوع SMD:</b> ' + escapeEstimateHtml(smdName) + '</div></section>'
-      + svgPreview + smdPreviewHtml + materialsHtml + layoutsHtml + '<table><thead><tr><th>شرح</th><th>مبنای محاسبه</th><th>نرخ واحد</th><th>هزینه</th></tr></thead><tbody>' + rowsHtml + '</tbody></table>'
-      + '<div class="final"><span>قیمت نهایی</span><strong>' + escapeEstimateHtml(formatMoney(Number(breakdown.final || 0))) + '</strong></div><p class="note">این گزارش براساس نرخ‌ها و اطلاعات ذخیره‌شده همین برآورد تهیه شده است.</p>'
+      + svgPreview + smdPreviewHtml + materialsHtml + layoutsHtml + unplacedNotice + '<table><thead><tr><th>شرح</th><th>مبنای محاسبه</th><th>نرخ واحد</th><th>هزینه</th></tr></thead><tbody>' + rowsHtml + '</tbody></table>'
+      + '<div class="final"><span>قیمت نهایی</span><strong>' + escapeEstimateHtml(formatMoney(Number(breakdown.final || 0))) + '<small>' + escapeEstimateHtml(Number(analysis.rounded_perimeter_m || 0) > 0 ? formatMoney(Math.round(Number(breakdown.final || 0) / Number(analysis.rounded_perimeter_m))) + ' به‌ازای هر متر' : 'محیط قابل محاسبه نیست') + '</small></strong></div><p class="note">این گزارش براساس نرخ‌ها و اطلاعات ذخیره‌شده همین برآورد تهیه شده است.</p>'
       + '<script>window.addEventListener("load",function(){setTimeout(function(){window.print()},300)})<\/script></body></html>';
   }
 
@@ -2668,6 +2891,7 @@
           sourceComponents: sourceComponents,
           lightingComponents: data.lightingComponents,
           sheets: sheets,
+          unplacedItems: sheets.unplaced || [],
           areaMm2: primaryAreaMm2 > 0 ? primaryAreaMm2 : doubleAreaMm2,
           lightingAreaMm2: data.primaryFullAreaMm2 > 0 ? data.primaryFullAreaMm2 : (primaryAreaMm2 > 0 ? primaryAreaMm2 : doubleAreaMm2),
           materialAreaMm2: materialAreaMm2,
@@ -2762,6 +2986,8 @@
       installation: money(field('installation').value), travel: money(field('travel').value),
       wire_supplies: money(field('wire_supplies').value),
       profit_percent: decimal(field('profit_percent').value),
+      insurance_tax_percent: decimal(field('insurance_tax_percent').value),
+      use_transformer: field('use_transformer').checked ? 1 : 0,
       installation_mode: field('installation_mode').value === 'perimeter' ? 'perimeter' : 'fixed',
       layout_trials: Number(field('layout_trials').value) || 10,
       edge_type: field('edge_type').value,
@@ -2836,10 +3062,14 @@
   rateField('active_smd_type').addEventListener('change', function () { showSelectedRatePanel('smd', rateField('active_smd_type').value); });
   rateField('active_transformer_type').addEventListener('change', function () { showSelectedRatePanel('transformer', rateField('active_transformer_type').value); });
 
-  ['installation','travel','wire_supplies','profit_percent'].forEach(function (name) {
+  ['installation','travel','wire_supplies','profit_percent','insurance_tax_percent'].forEach(function (name) {
     var input = field(name);
     input.addEventListener('input', function () { calculateCosts(); if (input.value.trim() !== '') scheduleValuesSave(); });
     input.addEventListener('change', function () { calculateCosts(); if (input.value.trim() !== '') saveLastValues(); });
+  });
+  field('use_transformer').addEventListener('change', function () {
+    calculateCosts();
+    saveLastValues();
   });
   field('installation_mode').addEventListener('change', function () {
     updateInstallationModeUi();

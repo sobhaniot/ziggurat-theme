@@ -534,6 +534,31 @@
   font-weight: 800;
   cursor: pointer;
 }
+.manager-pricing-calculate {
+  display: block;
+  width: 100%;
+  min-height: 62px;
+  margin: 18px 0 8px;
+  padding: 15px 24px;
+  border: 1px solid #a97917;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #e4bd69 0%, #d9aa43 38%, #b98118 100%);
+  box-shadow: inset 0 7px 0 rgba(255, 255, 255, .28), inset 0 -5px 8px rgba(120, 78, 8, .16), 0 5px 0 #89600f, 0 10px 22px rgba(137, 96, 15, .2);
+  color: #fffdf6;
+  font-size: 1.08rem;
+  letter-spacing: .01em;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .2);
+  transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
+}
+.manager-pricing-calculate:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-2px);
+  box-shadow: inset 0 7px 0 rgba(255, 255, 255, .32), inset 0 -5px 8px rgba(120, 78, 8, .16), 0 7px 0 #89600f, 0 13px 25px rgba(137, 96, 15, .24);
+}
+.manager-pricing-calculate:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, .22), inset 0 -3px 6px rgba(120, 78, 8, .2), 0 2px 0 #89600f, 0 5px 12px rgba(137, 96, 15, .18);
+}
 .manager-pricing-rates__updated { display: block; margin-top: 14px; color: #888; }
 .manager-pricing-rates__status {
   display: block;
@@ -655,7 +680,9 @@
 .manager-pricing-result--flexi strong { max-width: 66%; line-height: 1.75; }
 .manager-pricing-result .manager-pricing-result__final { grid-column: 1 / -1; min-height: 76px; border: 0; background: linear-gradient(135deg, #1b1b1b, #322917); color: #fff; }
 .manager-pricing-result__final span { color: #e0c477; font-size: 16px; }
-.manager-pricing-result__final strong { color: #fff; font-size: clamp(24px, 4vw, 34px); }
+.manager-pricing-result__final strong { display: block; color: #fff; font-size: clamp(24px, 4vw, 34px); white-space: nowrap; }
+.manager-pricing-result__final > div { display: grid; min-width: max-content; gap: 4px; text-align: left; }
+.manager-pricing-result__final small { color: #e8d8a7; font-size: .85rem; font-weight: 700; }
 .manager-pricing-letter-guide {
   display: flex;
   gap: 14px;
@@ -699,6 +726,7 @@
 .manager-letter-file-preview figcaption { display: grid; gap: 7px; min-width: 0; }
 .manager-letter-file-preview figcaption strong { color: #4e3b10; font-size: 16px; }
 .manager-letter-file-preview figcaption small { overflow-wrap: anywhere; color: #746d60; line-height: 1.8; }
+.manager-letter-file-preview figcaption small.is-warning { padding: 9px 11px; border: 1px solid #e2a3a3; border-right: 4px solid #b52222; border-radius: 8px; background: #fff0f0; color: #a21818; font-weight: 800; }
 .manager-letter-rate-panel { display: grid; gap: 11px; margin: 3px 0 8px; padding: 13px; border: 1px solid #e2d6b9; border-radius: 10px; background: #fffaf0; }
 .manager-letter-rate-panel[hidden] { display: none !important; }
 .manager-letter-rate-panel > strong { color: #735313; font-size: 14px; }
@@ -710,6 +738,21 @@
 .manager-letter-runtime-note { margin-top: -10px; color: #777; line-height: 1.75; }
 .manager-letter-progress span { width: 21px; height: 21px; border: 3px solid #dec888; border-top-color: #8c6418; border-radius: 50%; animation: manager-letter-spin .8s linear infinite; }
 .manager-letter-sheet-usage { display: block; margin-top: 8px; color: #6f6550; font-size: .85rem; line-height: 1.8; }
+.manager-letter-sheet-modes { display: flex; flex-wrap: wrap; gap: 7px; align-items: stretch; }
+.manager-letter-sheet-modes label { display: flex; align-items: center; gap: 6px; flex: 1 1 210px; min-height: 38px; padding: 7px 9px; border: 1px solid #d8d0c0; border-radius: 8px; background: #fff; cursor: pointer; font-size: .78rem; line-height: 1.6; }
+.manager-letter-sheet-modes label.is-selected { border-color: var(--mode-color); box-shadow: 0 0 0 2px rgba(20, 125, 146, .12); }
+.manager-letter-sheet-modes input { width: 16px; height: 16px; margin: 0; accent-color: var(--mode-color); }
+.manager-letter-sheet-modes i { width: 18px; height: 10px; border: 2px solid var(--mode-color); border-radius: 2px; background: transparent; }
+.manager-letter-unplaced { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 9px; padding: 13px; border: 1px solid #d67b70; border-radius: 11px; background: #fff4f2; }
+.manager-letter-unplaced[hidden] { display: none !important; }
+.manager-letter-unplaced > strong, .manager-letter-unplaced > p { grid-column: 1 / -1; margin: 0; }
+.manager-letter-unplaced > strong { color: #8a271d; }
+.manager-letter-unplaced > p { color: #76534f; font-size: .86rem; }
+.manager-letter-unplaced article { display: grid; grid-template-columns: minmax(180px, 300px) 1fr; align-items: center; gap: 12px; min-width: 0; padding: 10px; border: 1px solid #edd0cb; border-radius: 8px; background: #fff; }
+.manager-letter-unplaced canvas { display: block; width: 100%; height: auto; max-height: 220px; object-fit: contain; border: 1px solid #f0d9d4; border-radius: 6px; }
+.manager-letter-unplaced span { display: grid; gap: 2px; min-width: 0; }
+.manager-letter-unplaced small { color: #776a66; line-height: 1.5; }
+@media (max-width: 700px) { .manager-letter-unplaced article { grid-template-columns: 1fr; } .manager-letter-unplaced canvas { max-width: 100%; margin: 0 auto; } }
 @keyframes manager-letter-spin { to { transform: rotate(360deg); } }
 .manager-letter-analysis { display: grid; gap: 18px; }
 .manager-letter-analysis__summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border: 1px solid #e1dbcd; border-radius: 11px; background: #fbfaf7; }
@@ -787,6 +830,7 @@
 .manager-pricing-estimates__list article > div:first-child { display: grid; gap: 4px; }
 .manager-pricing-estimates__list article small { color: #7c7569; }
 .manager-pricing-estimates__list article > b { color: #3f3213; text-align: left; }
+.manager-pricing-estimates__list article > b small { display: block; margin-top: 4px; color: #786f61; font-size: .75rem; font-weight: 600; white-space: nowrap; }
 .manager-pricing-estimates__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
 .manager-pricing-estimates__actions button { min-height: 38px; padding: 7px 11px; font-size: 12px; }
 .manager-pricing-estimates__empty { margin: 0; padding: 24px; color: #777; text-align: center; }

@@ -267,8 +267,7 @@
         freight: money(field('freight').value),
         bracing_cost: money(field('bracing_cost').value),
         profit_percent: decimal(field('profit_percent').value),
-        insurance_percent: decimal(field('insurance_percent').value),
-        tax_percent: decimal(field('tax_percent').value)
+        insurance_tax_percent: decimal(field('insurance_tax_percent').value)
       });
       fetch(form.dataset.ajaxUrl, {
         method: 'POST',
@@ -306,12 +305,9 @@
       var profitPercent = Math.min(1000, decimal(field('profit_percent').value));
       var profitAmount = Math.round(baseTotal * profitPercent / 100);
       var afterProfit = baseTotal + profitAmount;
-      var insurancePercent = Math.min(1000, decimal(field('insurance_percent').value));
-      var insuranceAmount = Math.round(afterProfit * insurancePercent / 100);
-      var afterInsurance = afterProfit + insuranceAmount;
-      var taxPercent = Math.min(1000, decimal(field('tax_percent').value));
-      var taxAmount = Math.round(afterInsurance * taxPercent / 100);
-      var finalPrice = afterInsurance + taxAmount;
+      var insuranceTaxPercent = Math.min(1000, decimal(field('insurance_tax_percent').value));
+      var insuranceTaxAmount = Math.round(afterProfit * insuranceTaxPercent / 100);
+      var finalPrice = afterProfit + insuranceTaxAmount;
       setText('[data-composite-area]', formatMeasure(area) + ' مترمربع');
       setText('[data-composite-iron]', formatMoney(ironCost));
       setText('[data-composite-sheet]', formatMoney(compositeCost));
@@ -321,8 +317,7 @@
       setText('[data-composite-bracing]', formatMoney(bracingCost));
       setText('[data-composite-base]', formatMoney(baseTotal));
       setText('[data-composite-profit]', formatMoney(profitAmount) + ' (' + profitPercent.toLocaleString('fa-IR') + '٪)');
-      setText('[data-composite-insurance]', insurancePercent > 0 ? formatMoney(insuranceAmount) + ' (' + insurancePercent.toLocaleString('fa-IR') + '٪)' : 'محاسبه نشده');
-      setText('[data-composite-tax]', taxPercent > 0 ? formatMoney(taxAmount) + ' (' + taxPercent.toLocaleString('fa-IR') + '٪)' : 'محاسبه نشده');
+      setText('[data-composite-insurance-tax]', insuranceTaxPercent > 0 ? formatMoney(insuranceTaxAmount) + ' (' + insuranceTaxPercent.toLocaleString('fa-IR') + '٪)' : 'محاسبه نشده');
       setText('[data-composite-unit]', formatMoney(finalPrice / area));
       setText('[data-composite-final]', formatMoney(finalPrice));
       if (shouldFocus) {
@@ -349,7 +344,7 @@
       input.addEventListener('input', function () { calculate(false); });
       input.addEventListener('change', function () { calculate(false); });
     });
-    ['freight', 'bracing_cost', 'profit_percent', 'insurance_percent', 'tax_percent'].forEach(function (name) {
+    ['freight', 'bracing_cost', 'profit_percent', 'insurance_tax_percent'].forEach(function (name) {
       var input = field(name);
       input.addEventListener('input', function () {
         if (input.value.trim() !== '') scheduleValuesSave();

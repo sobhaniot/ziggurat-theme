@@ -181,9 +181,14 @@ $transformer_types = array(
             </label>
             <label>هزینه سیم و لوازم مصرفی (ریال)<input name="wire_supplies" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_values['wire_supplies']); ?>"></label>
             <label>درصد سود<input name="profit_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['profit_percent']); ?>"></label>
+            <label>درصد بیمه و مالیات<input name="insurance_tax_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['insurance_tax_percent']); ?>" placeholder="اگر لازم نیست صفر بگذارید"></label>
+            <div class="manager-pricing-check">
+                <input id="letter-use-transformer" name="use_transformer" type="checkbox" value="1" <?php checked(!empty($last_values['use_transformer'])); ?> aria-label="استفاده از ترانس">
+                <span><strong>استفاده از ترانس</strong><small>در صورت خاموش‌بودن، پیشنهاد و هزینه ترانس در محاسبه منظور نمی‌شود.</small></span>
+            </div>
         </div>
 
-        <small class="manager-pricing-autosave">آخرین هزینه‌های جانبی، درصدها و انتخاب‌ها به‌صورت خودکار ذخیره می‌شوند.</small>
+        <small class="manager-pricing-autosave">آخرین هزینه‌های جانبی، درصدها و وضعیت استفاده از ترانس به‌صورت خودکار ذخیره می‌شوند.</small>
         <div class="manager-pricing-formula"><strong>مبنای برآورد:</strong> مسیر مشکی یک‌بار، مسیر آبی دو بار (برش داخلی پلکسی اصلی و برش قطعه رویی) و مسیر قرمز یک‌بار به‌عنوان پین‌کات در هزینه برش منظور می‌شوند. قطعه داخلیِ هم‌رنگ پلکسی اصلی دوباره به مصرف ورق اضافه نمی‌شود. SMD بلوکی و لنزدار از سطح کامل داخل مسیر مشکی و رولوکی از مسیر میانی قابل نصب داخل حروف محاسبه می‌شود. طول رولوکی با گام برش و پرت خرید گرد می‌شود و ترانس آن براساس وات مصرفی و رزرو توان پیشنهاد می‌شود. چیدمان هر رنگ پلکسی جداگانه و همیشه با چرخش بهینه انجام می‌شود و PVC نیز محاسبه خواهد شد. برای لبه فلزی، رویه ورق فلزی ۰٫۷ و رنگ کوره‌ای براساس مترمربعِ مساحت واقعی رویه محاسبه می‌شوند.</div>
         <div class="manager-pricing-error" data-letter-error role="alert" hidden></div>
         <button class="manager-pricing-calculate" type="submit" data-letter-calculate>تحلیل فایل و چیدمان ورق</button>
@@ -203,6 +208,8 @@ $transformer_types = array(
             </div>
 
             <div class="manager-letter-materials" data-letter-materials hidden></div>
+
+            <div class="manager-letter-unplaced" data-letter-unplaced hidden></div>
 
             <div class="manager-letter-smd-preview" data-letter-smd-preview hidden>
                 <header>
@@ -236,7 +243,8 @@ $transformer_types = array(
                 <div class="manager-pricing-result__summary"><span>جمع هزینه‌های جانبی</span><strong data-letter-extras>۰ ریال</strong></div>
                 <div class="manager-pricing-result__summary"><span>جمع هزینه پایه</span><strong data-letter-base>۰ ریال</strong></div>
                 <div class="manager-pricing-result__summary"><span>مبلغ سود</span><strong data-letter-profit>۰ ریال</strong></div>
-                <div class="manager-pricing-result__final"><span>قیمت تقریبی ساخت حروف</span><strong data-letter-final>۰ ریال</strong></div>
+                <div class="manager-pricing-result__summary"><span>مبلغ بیمه و مالیات</span><strong data-letter-insurance-tax>۰ ریال</strong></div>
+                <div class="manager-pricing-result__final"><span>قیمت تقریبی ساخت حروف</span><div><strong data-letter-final>۰ ریال</strong><small data-letter-unit-price>۰ ریال به‌ازای هر متر</small></div></div>
             </section>
 
             <section class="manager-pricing-estimate-editor no-print" data-letter-estimate-editor>
@@ -275,7 +283,7 @@ $transformer_types = array(
         <?php else: foreach ($saved_estimates as $estimate): ?>
             <article data-estimate-id="<?php echo esc_attr($estimate['id']); ?>">
                 <div><strong><?php echo esc_html($estimate['project_name']); ?></strong><small>آخرین تغییر: <?php echo esc_html($estimate['modified']); ?></small></div>
-                <b><?php echo esc_html(number_format_i18n($estimate['final_price'])); ?> ریال</b>
+                <b><?php echo esc_html(number_format_i18n($estimate['final_price'])); ?> ریال<small><?php echo esc_html(number_format_i18n($estimate['perimeter_m'], 1)); ?> متر · <?php echo esc_html(number_format_i18n($estimate['unit_price'])); ?> ریال/متر</small></b>
                 <div class="manager-pricing-estimates__actions">
                     <button type="button" data-letter-estimate-load="<?php echo esc_attr($estimate['id']); ?>">بازکردن و ویرایش</button>
                     <button type="button" data-letter-estimate-print-saved="<?php echo esc_attr($estimate['id']); ?>">چاپ / PDF</button>

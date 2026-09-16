@@ -15,6 +15,7 @@ get_header();
         <form class="project-filters" method="get" action="<?php echo esc_url(get_post_type_archive_link('project')); ?>" data-auto-filter-form>
             <?php
             $filter_taxonomies = array(
+                'project_service'   => 'همه خدمات',
                 'project_client'    => 'همه کارفرماها',
                 'project_city'      => 'همه شهرها',
                 'project_province'  => 'همه استان‌ها',

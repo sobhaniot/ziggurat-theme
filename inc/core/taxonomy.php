@@ -170,6 +170,8 @@ add_action('pre_get_posts', function ($query) {
         return;
     }
 
+    $query->set('posts_per_page', 12);
+
     $tax_query = array();
     foreach (array('article_category', 'article_tag') as $taxonomy) {
         if (!empty($_GET[$taxonomy]) && is_string($_GET[$taxonomy])) {

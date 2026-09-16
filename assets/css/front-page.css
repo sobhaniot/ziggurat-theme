@@ -1035,6 +1035,17 @@ body.home .hero {
 .service-card:hover {
   transform: translateY(-10px);
 }
+.service-card__link {
+  display: block;
+  height: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+.service-card__link:focus-visible {
+  outline: 3px solid rgba(200, 155, 60, 0.7);
+  outline-offset: 6px;
+  border-radius: 8px;
+}
 .service-image {
   margin-bottom: 20px;
 }
@@ -1054,6 +1065,106 @@ body.home .hero {
 }
 .service-description p:last-child {
   margin-bottom: 0;
+}
+
+/* Home-page services: an acrylic/metal room-sign inspired panel. */
+.home .services-section {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(200, 155, 60, 0.08), transparent 30%),
+    #f7f5f0;
+}
+.home .services-signboard {
+  position: relative;
+  isolation: isolate;
+  padding: 52px 64px 74px;
+  border: 1px solid rgba(112, 113, 111, 0.36);
+  border-radius: 5px;
+  background:
+    linear-gradient(112deg, rgba(255, 255, 255, 0.92), rgba(219, 220, 218, 0.84) 48%, rgba(250, 250, 249, 0.9)),
+    repeating-linear-gradient(90deg, rgba(80, 80, 80, 0.025) 0 1px, transparent 1px 4px);
+  box-shadow:
+    0 28px 42px rgba(31, 31, 28, 0.18),
+    0 5px 8px rgba(31, 31, 28, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+.home .services-signboard::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  z-index: -1;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.home .services-signboard .section-header {
+  margin: 0 auto 38px;
+}
+.home .services-signboard .section-header h2 {
+  margin: 0;
+  font-size: clamp(30px, 4vw, 50px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+.home .services-signboard .section-header p {
+  margin: 8px 0 0;
+  color: #686560;
+  font-size: 15px;
+}
+.home .services-signboard__screw {
+  position: absolute;
+  top: 50%;
+  z-index: 4;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #74736f;
+  border-radius: 50%;
+  background:
+    linear-gradient(135deg, transparent 44%, rgba(55, 55, 53, 0.72) 45% 54%, transparent 55%),
+    radial-gradient(circle at 35% 30%, #fff 0 10%, #d8d8d5 30%, #8c8b86 68%, #ececea 100%);
+  box-shadow:
+    0 3px 5px rgba(20, 20, 18, 0.38),
+    inset 1px 1px 1px rgba(255, 255, 255, 0.9);
+  transform: translateY(-50%);
+}
+.home .services-signboard__screw--right {
+  right: 19px;
+}
+.home .services-signboard__screw--left {
+  left: 19px;
+}
+.home .services-signboard .services-grid {
+  gap: 20px;
+}
+.home .services-signboard .service-card {
+  padding: 22px;
+  border: 1px solid rgba(125, 122, 113, 0.22);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 7px 18px rgba(45, 43, 38, 0.08);
+  backdrop-filter: blur(4px);
+}
+.home .services-signboard .service-card:hover {
+  border-color: rgba(200, 155, 60, 0.62);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 12px 24px rgba(45, 43, 38, 0.13);
+  transform: translateY(-5px);
+}
+.home .services-signboard .service-image img {
+  border-radius: 3px;
+}
+.home .services-signboard__gold-strip {
+  position: absolute;
+  right: 22px;
+  bottom: 18px;
+  left: 22px;
+  height: 20px;
+  border: 1px solid rgba(137, 94, 13, 0.28);
+  background:
+    linear-gradient(90deg, #b77b16, #e4b541 30%, #c99120 68%, #efc65a),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 4px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38);
 }
 @media (max-width: 900px) {
   .services-grid {
@@ -1080,6 +1191,31 @@ body.home .hero {
   .service-description {
     font-size: 15px;
   }
+  .home .services-signboard {
+    padding: 38px 34px 62px;
+  }
+  .home .services-signboard__screw {
+    width: 17px;
+    height: 17px;
+  }
+  .home .services-signboard__screw--right {
+    right: 9px;
+  }
+  .home .services-signboard__screw--left {
+    left: 9px;
+  }
+  .home .services-signboard .section-header {
+    margin-bottom: 25px;
+  }
+  .home .services-signboard .section-header p {
+    font-size: 13px;
+  }
+  .home .services-signboard__gold-strip {
+    right: 15px;
+    bottom: 14px;
+    left: 15px;
+    height: 16px;
+  }
 }
 
 /* projects.css */
@@ -1100,7 +1236,7 @@ body.home .hero {
 }
 .project-filters {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
   gap: 12px;
   align-items: center;
   margin-bottom: 35px;

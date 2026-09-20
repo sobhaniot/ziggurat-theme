@@ -36,7 +36,7 @@ $transformer_types = array(
 
 <div class="manager-pricing-letter-guide">
     <strong>آماده‌سازی فایل در Corel</strong>
-    <span>تمام نوشته‌ها را به Curve تبدیل کنید، اندازه صفحه را واقعی بگذارید و سپس با فرمت SVG خروجی بگیرید. دورخط مشکی برش اصلی، آبی قطعه دوبل و قرمز پین‌کات است؛ رنگ داخل هر شکل نیز رنگ پلکسی آن محسوب می‌شود. مسیر آبیِ داخل قطعه مشکی از سطح آن کم می‌شود تا پلکسی اصلی به‌صورت نوار برش بخورد و قطعه رنگی داخل فقط یک بار به‌عنوان رویه محاسبه می‌شود. فایل در همین مرورگر تحلیل می‌شود و روی سایت بارگذاری نمی‌شود.</span>
+    <span>تمام نوشته‌ها را به Curve تبدیل کنید، اندازه صفحه را واقعی بگذارید و سپس با فرمت SVG خروجی بگیرید. دورخط مشکی برش اصلی و <em class="manager-pricing-double-color">قرمز</em> مسیر قطعه دوبل است؛ رنگ داخل هر شکل نیز رنگ پلکسی آن محسوب می‌شود. مسیر <em class="manager-pricing-double-color">قرمز</em>ِ داخل قطعه مشکی از سطح آن کم می‌شود تا پلکسی اصلی به‌صورت نوار برش بخورد و قطعه رنگی داخل فقط یک بار به‌عنوان رویه محاسبه می‌شود.</span>
 </div>
 
 <div class="manager-pricing-layout manager-pricing-layout--letters">
@@ -48,7 +48,7 @@ $transformer_types = array(
             <label>ارتفاع ورق رویه (میلی‌متر)<input name="sheet_height_mm" type="text" inputmode="decimal" value="<?php echo esc_attr($settings['sheet_height_mm']); ?>"><small>برای پلکسی و ورق فلزی ۰٫۷ مشترک است.</small></label>
             <label>قیمت پلکسی هر مترمربع (ریال)<input name="plexi_sqm_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['plexi_sqm_rate']); ?>"><small>در مساحت مستطیل مصرف پلکسی ضرب می‌شود.</small></label>
             <label>قیمت ورق فلزی ۰٫۷ هر مترمربع (ریال)<input name="metal_sheet_07_sqm_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['metal_sheet_07_sqm_rate']); ?>"><small>ابعاد و مقدار مصرف آن برابر ورق پلکسی در نظر گرفته می‌شود.</small></label>
-            <label>اجرت دوبل هر متر مسیر آبی (ریال)<input name="double_layer_labor_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['double_layer_labor_rate']); ?>"><small>مسیر آبی یک بار داخل پلکسی اصلی و یک بار برای قطعه رویی برش می‌خورد؛ قطعه زرد داخلی جداگانه محاسبه نمی‌شود.</small></label>
+                    <label>اجرت دوبل هر متر مسیر قرمز (ریال)<input name="double_layer_labor_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['double_layer_labor_rate']); ?>"><small>مسیر قرمز یک بار داخل پلکسی اصلی و یک بار برای قطعه رویی برش می‌خورد؛ قطعه داخلی هم‌رنگ جداگانه محاسبه نمی‌شود.</small></label>
 
             <label>نوع لبه برای تنظیم نرخ
                 <select name="active_edge_type" data-letter-edge-rate-select>
@@ -130,7 +130,8 @@ $transformer_types = array(
         data-sheet-margin-mm="<?php echo esc_attr($settings['sheet_margin_mm']); ?>"
         data-ajax-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>"
         data-values-nonce="<?php echo esc_attr(wp_create_nonce('zigurat_letter_last_values')); ?>"
-        data-estimates-nonce="<?php echo esc_attr(wp_create_nonce('zigurat_pricing_estimates')); ?>">
+        data-estimates-nonce="<?php echo esc_attr(wp_create_nonce('zigurat_pricing_estimates')); ?>"
+        data-letter-worker-url="<?php echo esc_url(get_template_directory_uri() . '/assets/js/letter-calculator-worker.js?ver=' . (is_file(get_template_directory() . '/assets/js/letter-calculator-worker.js') ? filemtime(get_template_directory() . '/assets/js/letter-calculator-worker.js') : time())); ?>">
 
         <label class="manager-letter-upload" data-letter-upload>
             <input name="letter_svg" type="file" accept="image/svg+xml,.svg" required>
@@ -189,11 +190,11 @@ $transformer_types = array(
         </div>
 
         <small class="manager-pricing-autosave">آخرین هزینه‌های جانبی، درصدها و وضعیت استفاده از ترانس به‌صورت خودکار ذخیره می‌شوند.</small>
-        <div class="manager-pricing-formula"><strong>مبنای برآورد:</strong> مسیر مشکی یک‌بار، مسیر آبی دو بار (برش داخلی پلکسی اصلی و برش قطعه رویی) و مسیر قرمز یک‌بار به‌عنوان پین‌کات در هزینه برش منظور می‌شوند. قطعه داخلیِ هم‌رنگ پلکسی اصلی دوباره به مصرف ورق اضافه نمی‌شود. SMD بلوکی و لنزدار از سطح کامل داخل مسیر مشکی و رولوکی از مسیر میانی قابل نصب داخل حروف محاسبه می‌شود. طول رولوکی با گام برش و پرت خرید گرد می‌شود و ترانس آن براساس وات مصرفی و رزرو توان پیشنهاد می‌شود. چیدمان هر رنگ پلکسی جداگانه و همیشه با چرخش بهینه انجام می‌شود و PVC نیز محاسبه خواهد شد. برای لبه فلزی، رویه ورق فلزی ۰٫۷ و رنگ کوره‌ای براساس مترمربعِ مساحت واقعی رویه محاسبه می‌شوند.</div>
+        <div class="manager-pricing-formula"><strong>مبنای برآورد:</strong> مسیر مشکی یک‌بار و مسیر <em class="manager-pricing-double-color">قرمز</em> دوبار (برش داخلی پلکسی اصلی و برش قطعه رویی) محاسبه می‌شوند. قطعه داخلیِ هم‌رنگ پلکسی اصلی دوباره به مصرف ورق اضافه نمی‌شود. SMD بلوکی و لنزدار از سطح کامل داخل مسیر مشکی و رولوکی از مسیر میانی قابل نصب داخل حروف محاسبه می‌شود. طول رولوکی با گام برش و پرت خرید گرد می‌شود و ترانس آن براساس وات مصرفی و رزرو توان پیشنهاد می‌شود. چیدمان هر رنگ پلکسی جداگانه و همیشه با چرخش بهینه انجام می‌شود و PVC نیز محاسبه خواهد شد. برای لبه فلزی، رویه ورق فلزی ۰٫۷ و رنگ کوره‌ای براساس مترمربعِ مساحت واقعی رویه محاسبه می‌شوند.</div>
         <div class="manager-pricing-error" data-letter-error role="alert" hidden></div>
         <button class="manager-pricing-calculate" type="submit" data-letter-calculate>تحلیل فایل و چیدمان ورق</button>
         <small class="manager-letter-runtime-note">طرح‌های معمولی طی چند ثانیه تحلیل می‌شوند؛ مرحله جاری و زمان سپری‌شده هنگام پردازش نمایش داده خواهد شد.</small>
-        <div class="manager-letter-progress" data-letter-progress role="status" hidden><span></span><strong>مرحله ۱ از ۴: خواندن فایل SVG</strong></div>
+        <div class="manager-letter-progress" data-letter-progress role="status" hidden><span></span><i data-letter-progress-color aria-hidden="true" hidden></i><strong>مرحله ۱ از ۴: خواندن فایل SVG</strong></div>
 
         <section class="manager-letter-analysis" data-letter-analysis hidden aria-live="polite">
             <div class="manager-letter-analysis__summary">
@@ -202,7 +203,7 @@ $transformer_types = array(
                 <div><span>مساحت واقعی رویه</span><strong data-letter-area>—</strong></div>
                 <div><span>سطح مبنای محاسبه SMD</span><strong data-letter-lighting-area>—</strong></div>
                 <div><span>مجموع محیط برداری</span><strong data-letter-perimeter>—</strong></div>
-                <div><span>مسیرهای دوبل و پین‌کات</span><strong data-letter-special-paths>—</strong></div>
+                <div><span>مسیر دوبل</span><strong data-letter-special-paths>—</strong></div>
                 <div><span>تعداد ورق موردنیاز</span><strong data-letter-sheets>—</strong></div>
                 <div><span>مصرف و پرت ورق رویه</span><strong data-letter-waste>—</strong></div>
             </div>

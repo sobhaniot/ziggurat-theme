@@ -107,12 +107,16 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
     <?php elseif ($calculator === 'composite'):
         $settings = zigurat_get_composite_pricing_settings();
         $last_values = zigurat_get_composite_last_values();
+        $saved_estimate_page = function_exists('zigurat_get_pricing_estimate_page')
+            ? zigurat_get_pricing_estimate_page(1, 10, '', 'composite')
+            : array('records'=>array(),'total'=>0,'page'=>1,'pages'=>1);
+        $saved_estimates = $saved_estimate_page['records'];
         $pricing_status = isset($_GET['pricing-status']) ? sanitize_key(wp_unslash($_GET['pricing-status'])) : '';
     ?>
         <header class="manager-pricing__heading">
             <span>برآورد محصول</span>
             <h2 id="manager-pricing-title">محاسبه قیمت تابلو کامپوزیت</h2>
-            <p>هزینه‌های آهن، کامپوزیت، نصاب و لوازم مصرفی براساس مساحت محاسبه می‌شوند؛ سپس کرایه، سود و در صورت نیاز درصد مشترک بیمه و مالیات اعمال می‌شود.</p>
+            <p>تابلو به نما، آبچکان، زیر و دو بغل تفکیک می‌شود و قطعات روی ورق استاندارد کامپوزیت ۳۲۰×۱۲۵ سانتی‌متر چیده می‌شوند.</p>
         </header>
 
         <?php if ($pricing_status === 'saved'): ?><div class="manager-pricing-notice is-success" role="status">نرخ‌های پایه کامپوزیت با موفقیت ذخیره شدند.</div><?php elseif ($pricing_status): ?><div class="manager-pricing-notice is-error" role="alert">ذخیره نرخ‌ها انجام نشد؛ دوباره تلاش کنید.</div><?php endif; ?>
@@ -139,10 +143,17 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                 <?php if (!empty($settings['updated_at'])): ?><small class="manager-pricing-rates__updated">آخرین به‌روزرسانی: <?php echo esc_html($settings['updated_at']); ?></small><?php endif; ?>
             </aside>
 
-            <form class="manager-composite-calculator" data-composite-calculator data-iron-rate="<?php echo esc_attr((int) $settings['iron_rate']); ?>" data-composite-rate="<?php echo esc_attr((int) $settings['composite_rate']); ?>" data-installer-rate="<?php echo esc_attr((int) $settings['installer_rate']); ?>" data-supplies-rate="<?php echo esc_attr((int) $settings['supplies_rate']); ?>" data-ajax-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>" data-values-nonce="<?php echo esc_attr(wp_create_nonce('zigurat_composite_last_values')); ?>">
+            <form class="manager-composite-calculator" data-composite-calculator data-iron-rate="<?php echo esc_attr((int) $settings['iron_rate']); ?>" data-composite-rate="<?php echo esc_attr((int) $settings['composite_rate']); ?>" data-installer-rate="<?php echo esc_attr((int) $settings['installer_rate']); ?>" data-supplies-rate="<?php echo esc_attr((int) $settings['supplies_rate']); ?>" data-ajax-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>" data-values-nonce="<?php echo esc_attr(wp_create_nonce('zigurat_composite_last_values')); ?>" data-estimates-nonce="<?php echo esc_attr(wp_create_nonce('zigurat_pricing_estimates')); ?>">
                 <div class="manager-composite-fields">
-                    <label>طول تابلو (متر) *<input name="length" type="text" inputmode="decimal" placeholder="مثلاً ۶.۵" required></label>
-                    <label>ارتفاع تابلو (متر) *<input name="width" type="text" inputmode="decimal" placeholder="مثلاً ۱.۲" required></label>
+                    <div class="manager-composite-dimensions">
+                        <div class="manager-composite-dimensions__heading"><strong>ابعاد تابلو</strong><small>طول آبچکان و زیر تابلو برابر طول تابلو است.</small></div>
+                        <label>طول تابلو (سانتی‌متر) *<input name="length" type="text" inputmode="decimal" placeholder="مثلاً ۶۵۰" required></label>
+                        <label>ارتفاع نما (سانتی‌متر) *<input name="width" type="text" inputmode="decimal" placeholder="مثلاً ۱۲۰" required></label>
+                        <label>عرض آبچکان (سانتی‌متر)<input name="drip_depth" type="text" inputmode="decimal" value="0" placeholder="مثلاً ۴۰"></label>
+                        <label>عرض زیر تابلو (سانتی‌متر)<input name="bottom_depth" type="text" inputmode="decimal" value="0" placeholder="مثلاً ۴۰"></label>
+                        <label>عرض بغل‌ها (سانتی‌متر)<input name="side_depth" type="text" inputmode="decimal" value="0" placeholder="مثلاً ۴۰"></label>
+                        <label>جمع خم نصب (سانتی‌متر)<input name="install_allowance" type="text" inputmode="decimal" value="8" aria-describedby="composite-install-allowance-help"><small id="composite-install-allowance-help">به طول و عرض برش هر قطعه اضافه می‌شود؛ مقدار پیش‌فرض ۸ سانتی‌متر جمع دو لبه است.</small></label>
+                    </div>
                     <label>کرایه (ریال)<input name="freight" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_values['freight']); ?>"></label>
                     <label>هزینه آهن‌کشی جهت مهار تابلو (ریال)<input name="bracing_cost" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_values['bracing_cost']); ?>"></label>
                     <label>درصد سود<input name="profit_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['profit_percent']); ?>" placeholder="مثلاً ۲۵"></label>
@@ -152,11 +163,14 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                     </label>
                 </div>
                 <small class="manager-pricing-autosave">آخرین کرایه، هزینه آهن‌کشی مهار، درصد سود و درصد مشترک بیمه و مالیات به‌صورت خودکار ذخیره می‌شوند.</small>
-                <div class="manager-pricing-formula"><strong>ترتیب محاسبه:</strong> هزینه‌های متری + کرایه + آهن‌کشی جهت مهار؛ سپس سود و در صورت واردکردن درصد، مبلغ تجمیعی بیمه و مالیات.</div>
+                <div class="manager-pricing-formula"><strong>مبنای محاسبه:</strong> آهن براساس مساحت نما، نصب و لوازم براساس کل سطوح، و کامپوزیت براساس تعداد ورق کامل محاسبه می‌شود.</div>
                 <div class="manager-pricing-error" data-composite-error role="alert" hidden></div>
-                <button class="manager-pricing-calculate" type="submit">محاسبه قیمت نهایی</button>
                 <section class="manager-pricing-result manager-pricing-result--composite" data-composite-result aria-live="polite">
-                    <div><span>مساحت کل</span><strong data-composite-area>—</strong></div>
+                    <div><span>مساحت نما</span><strong data-composite-face-area>—</strong></div>
+                    <div><span>مساحت کل سطوح</span><strong data-composite-area>—</strong></div>
+                    <div><span>مساحت برش با لبه نصب</span><strong data-composite-cut-area>—</strong></div>
+                    <div><span>تعداد ورق ۳۲۰×۱۲۵ سانتی‌متر</span><strong data-composite-sheet-count>۰</strong></div>
+                    <div><span>مصرف و پرت ورق</span><strong data-composite-utilization>—</strong></div>
                     <div><span>هزینه آهن</span><strong data-composite-iron>۰ ریال</strong></div>
                     <div><span>هزینه کامپوزیت</span><strong data-composite-sheet>۰ ریال</strong></div>
                     <div><span>دستمزد نصاب</span><strong data-composite-installer>۰ ریال</strong></div>
@@ -169,8 +183,29 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                     <div><span>قیمت نهایی هر مترمربع</span><strong data-composite-unit>۰ ریال</strong></div>
                     <div class="manager-pricing-result__final"><span>قیمت نهایی</span><strong data-composite-final>۰ ریال</strong></div>
                 </section>
+                <section class="manager-composite-layout" data-composite-layout hidden>
+                    <header><div><strong>چیدمان ورق کامپوزیت</strong><small>ورق ۳۲۰×۱۲۵ سانتی‌متر — چرخش ۹۰ درجه برای چیدمان قطعات فعال است</small><em data-composite-face-direction></em><em data-composite-bottom-direction></em></div><div class="manager-composite-legend"><span class="is-face">نما</span><span class="is-drip">آبچکان</span><span class="is-bottom">زیر</span><span class="is-side">بغل</span></div></header>
+                    <div class="manager-composite-sheets" data-composite-sheets></div>
+                    <div class="manager-composite-parts" data-composite-parts></div>
+                </section>
+                <section class="manager-pricing-estimate-editor no-print" data-composite-estimate-editor>
+                    <div><label>نام پروژه برای ذخیره این محاسبه<input name="estimate_project_name" type="text" maxlength="191" placeholder="مثلاً تابلو کامپوزیت فروشگاه"></label><input name="estimate_id" type="hidden" value="0"><small data-composite-estimate-mode>به‌عنوان یک برآورد جدید ذخیره می‌شود.</small></div>
+                    <div class="manager-pricing-estimate-editor__actions"><button type="button" data-composite-estimate-save>ذخیره محاسبه</button><button type="button" data-composite-estimate-new hidden>ایجاد نسخه جدید</button><button type="button" data-composite-estimate-print-customer>چاپ مشتری بدون قیمت</button><button type="button" data-composite-estimate-print>چاپ داخلی با قیمت</button></div>
+                    <p data-composite-estimate-status role="status"></p>
+                </section>
             </form>
         </div>
+        <section class="manager-pricing-estimates no-print" data-composite-estimates data-current-page="<?php echo esc_attr($saved_estimate_page['page']); ?>" data-total-pages="<?php echo esc_attr($saved_estimate_page['pages']); ?>">
+            <header><div><span>سوابق قیمت‌گذاری</span><h3>برآوردهای کامپوزیت ذخیره‌شده</h3></div><strong data-composite-estimate-count><?php echo esc_html(number_format_i18n($saved_estimate_page['total'])); ?> مورد</strong></header>
+            <div class="manager-pricing-estimates__toolbar"><label>جستجو در نام پروژه<input type="search" data-composite-estimate-search placeholder="نام پروژه را بنویسید…" autocomplete="off"></label><button type="button" data-composite-estimate-search-clear hidden>پاک‌کردن جستجو</button></div>
+            <div class="manager-pricing-estimates__list" data-composite-estimate-list>
+                <?php if (!$saved_estimates): ?><p class="manager-pricing-estimates__empty">هنوز محاسبه کامپوزیتی ذخیره نشده است.</p><?php else: foreach ($saved_estimates as $estimate): ?>
+                    <article data-estimate-id="<?php echo esc_attr($estimate['id']); ?>"><div><strong><?php echo esc_html($estimate['project_name']); ?></strong><small>آخرین تغییر: <?php echo esc_html($estimate['modified']); ?></small></div><b><?php echo esc_html(number_format_i18n($estimate['final_price'])); ?> ریال<small><?php echo esc_html(number_format_i18n($estimate['perimeter_m'], 2)); ?> مترمربع · <?php echo esc_html(number_format_i18n($estimate['unit_price'])); ?> ریال/مترمربع</small></b><div class="manager-pricing-estimates__actions"><button type="button" data-composite-estimate-load="<?php echo esc_attr($estimate['id']); ?>">بازکردن و ویرایش</button><button type="button" data-composite-estimate-print-customer-saved="<?php echo esc_attr($estimate['id']); ?>">چاپ مشتری</button><button type="button" data-composite-estimate-print-saved="<?php echo esc_attr($estimate['id']); ?>">چاپ داخلی</button></div></article>
+                <?php endforeach; endif; ?>
+            </div>
+            <p class="manager-pricing-estimates__status" data-composite-estimate-list-status role="status"></p>
+            <nav class="manager-pricing-estimates__pagination" aria-label="صفحه‌بندی برآوردهای کامپوزیت"><button type="button" data-composite-estimate-page="prev" <?php disabled($saved_estimate_page['page'] <= 1); ?>>صفحه قبل</button><span data-composite-estimate-page-label>صفحه <?php echo esc_html(number_format_i18n($saved_estimate_page['page'])); ?> از <?php echo esc_html(number_format_i18n($saved_estimate_page['pages'])); ?></span><button type="button" data-composite-estimate-page="next" <?php disabled($saved_estimate_page['page'] >= $saved_estimate_page['pages']); ?>>صفحه بعد</button></nav>
+        </section>
     <?php elseif ($calculator === 'flexi'):
         $settings = zigurat_get_flexi_pricing_settings();
         $last_values = zigurat_get_flexi_last_values();

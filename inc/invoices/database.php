@@ -36,7 +36,7 @@ function zigurat_invoice_trash_table_name()
 function zigurat_install_invoice_tables()
 {
     global $wpdb;
-    $version = '8';
+    $version = '9';
     $invoices = zigurat_invoices_table_name();
     $items = zigurat_invoice_items_table_name();
     $sequences = zigurat_invoice_sequences_table_name();
@@ -63,6 +63,7 @@ function zigurat_install_invoice_tables()
         status varchar(20) NOT NULL DEFAULT 'issued',
         subject varchar(191) NOT NULL DEFAULT '',
         source_proforma_id bigint(20) unsigned NOT NULL DEFAULT 0,
+        copied_from_invoice_id bigint(20) unsigned NOT NULL DEFAULT 0,
         seller_json longtext NULL,
         customer_name varchar(191) NOT NULL,
         customer_national_id varchar(50) NOT NULL DEFAULT '',
@@ -111,6 +112,7 @@ function zigurat_install_invoice_tables()
         KEY tax_status (tax_status),
         KEY reference_invoice_id (reference_invoice_id),
         KEY source_proforma_id (source_proforma_id),
+        KEY copied_from_invoice_id (copied_from_invoice_id),
         KEY parent_invoice_id (parent_invoice_id),
         KEY tax_period (brand,document_type,tax_year,tax_quarter),
         KEY issue_date (issue_date),
@@ -230,7 +232,8 @@ function zigurat_install_invoice_tables()
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'tax_year'")
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'tax_quarter'")
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'payment_status'")
-        && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'tax_status'")) {
+        && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'tax_status'")
+        && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'copied_from_invoice_id'")) {
         update_option('zigurat_invoice_schema_version', $version, false);
     }
 }

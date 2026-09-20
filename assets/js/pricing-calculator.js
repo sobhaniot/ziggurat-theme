@@ -254,9 +254,179 @@
   function initComposite() {
     var form = document.querySelector('[data-composite-calculator]');
     if (!form) return;
+    var SHEET_WIDTH = 3200;
+    var SHEET_HEIGHT = 1250;
+    var SHEET_AREA = (SHEET_WIDTH * SHEET_HEIGHT) / 1000000;
+    var CUT_GAP = 4;
     function field(name) { return form.elements.namedItem(name); }
     function setText(selector, value) { var node = form.querySelector(selector); if (node) node.textContent = value; }
+    function formatCentimeters(value) { return Number((value / 10).toFixed(1)).toLocaleString('fa-IR', { maximumFractionDigits: 1 }); }
     var saveTimer = null;
+    var estimateSearchTimer = null;
+    var compositeState = null;
+
+    function splitSurface(surface, allowance, forcedDirection) {
+      if (surface.width <= 0 || surface.height <= 0) return [];
+      var usableSheetWidth = Math.max(1, SHEET_WIDTH - allowance);
+      var usableSheetHeight = Math.max(1, SHEET_HEIGHT - allowance);
+      var variants = surface.type === 'face'
+        ? [surface.height + allowance <= SHEET_HEIGHT
+          ? { columns: Math.ceil(surface.width / usableSheetWidth), rows: 1 }
+          : { columns: Math.ceil(surface.width / usableSheetHeight), rows: 1 }]
+        : forcedDirection === 'vertical'
+          ? [{ columns: Math.ceil(surface.width / usableSheetHeight), rows: Math.ceil(surface.height / usableSheetWidth) }]
+          : forcedDirection === 'horizontal'
+            ? [{ columns: Math.ceil(surface.width / usableSheetWidth), rows: Math.ceil(surface.height / usableSheetHeight) }]
+        : [
+          { columns: Math.ceil(surface.width / usableSheetWidth), rows: Math.ceil(surface.height / usableSheetHeight) },
+          { columns: Math.ceil(surface.width / usableSheetHeight), rows: Math.ceil(surface.height / usableSheetWidth) }
+        ];
+      variants.forEach(function (variant) {
+        variant.count = variant.columns * variant.rows;
+        variant.seams = (variant.columns - 1) * surface.height + (variant.rows - 1) * surface.width;
+      });
+      variants.sort(function (a, b) { return a.count - b.count || a.seams - b.seams; });
+      var chosen = variants[0];
+      var parts = [];
+      for (var row = 0; row < chosen.rows; row += 1) {
+        for (var column = 0; column < chosen.columns; column += 1) {
+          var partWidth = column === chosen.columns - 1
+            ? surface.width - (surface.width / chosen.columns) * column
+            : surface.width / chosen.columns;
+          var partHeight = row === chosen.rows - 1
+            ? surface.height - (surface.height / chosen.rows) * row
+            : surface.height / chosen.rows;
+          parts.push({
+            type: surface.type,
+            title: surface.title,
+            label: surface.title + (chosen.count > 1 ? ' ' + localizeDigits(parts.length + 1) : ''),
+            width: Math.round(partWidth + allowance),
+            height: Math.round(partHeight + allowance)
+          });
+        }
+      }
+      return parts;
+    }
+
+    function pruneFreeRectangles(rectangles) {
+      return rectangles.filter(function (rect, index) {
+        if (rect.width < 1 || rect.height < 1) return false;
+        return !rectangles.some(function (other, otherIndex) {
+          return index !== otherIndex
+            && rect.x >= other.x && rect.y >= other.y
+            && rect.x + rect.width <= other.x + other.width
+            && rect.y + rect.height <= other.y + other.height;
+        });
+      });
+    }
+
+    function placeOnSheet(sheet, piece) {
+      var best = null;
+      sheet.free.forEach(function (space, spaceIndex) {
+        [[piece.width, piece.height, false], [piece.height, piece.width, true]].forEach(function (option) {
+          if (option[0] > space.width || option[1] > space.height) return;
+          var placedWidth = Math.min(space.width, option[0] + CUT_GAP);
+          var placedHeight = Math.min(space.height, option[1] + CUT_GAP);
+          var score = (space.width * space.height) - (placedWidth * placedHeight)
+            + Math.min(space.width - placedWidth, space.height - placedHeight) * 10;
+          if (!best || score < best.score) {
+            best = {
+              score: score,
+              spaceIndex: spaceIndex,
+              width: option[0],
+              height: option[1],
+              footprintWidth: placedWidth,
+              footprintHeight: placedHeight,
+              rotated: option[2]
+            };
+          }
+        });
+      });
+      if (!best) return false;
+      var space = sheet.free.splice(best.spaceIndex, 1)[0];
+      var remainingWidth = space.width - best.footprintWidth;
+      var remainingHeight = space.height - best.footprintHeight;
+      if (remainingWidth > remainingHeight) {
+        sheet.free.push({ x: space.x + best.footprintWidth, y: space.y, width: remainingWidth, height: space.height });
+        sheet.free.push({ x: space.x, y: space.y + best.footprintHeight, width: best.footprintWidth, height: remainingHeight });
+      } else {
+        sheet.free.push({ x: space.x + best.footprintWidth, y: space.y, width: remainingWidth, height: best.footprintHeight });
+        sheet.free.push({ x: space.x, y: space.y + best.footprintHeight, width: space.width, height: remainingHeight });
+      }
+      sheet.free = pruneFreeRectangles(sheet.free);
+      sheet.placements.push({
+        piece: piece,
+        x: space.x,
+        y: space.y,
+        width: best.width,
+        height: best.height,
+        rotated: best.rotated
+      });
+      return true;
+    }
+
+    function nestPieces(parts) {
+      var sheets = [];
+      parts.slice().sort(function (a, b) {
+        return Math.max(b.width, b.height) - Math.max(a.width, a.height)
+          || (b.width * b.height) - (a.width * a.height);
+      }).forEach(function (piece) {
+        var placed = sheets.some(function (sheet) { return placeOnSheet(sheet, piece); });
+        if (!placed) {
+          var sheet = { free: [{ x: 0, y: 0, width: SHEET_WIDTH, height: SHEET_HEIGHT }], placements: [] };
+          if (placeOnSheet(sheet, piece)) sheets.push(sheet);
+        }
+      });
+      return sheets;
+    }
+
+    function renderLayout(sheets, parts) {
+      var section = form.querySelector('[data-composite-layout]');
+      var sheetsNode = form.querySelector('[data-composite-sheets]');
+      var partsNode = form.querySelector('[data-composite-parts]');
+      sheetsNode.textContent = '';
+      partsNode.textContent = '';
+      section.hidden = sheets.length === 0;
+      sheets.forEach(function (sheet, index) {
+        var card = document.createElement('article');
+        card.className = 'manager-composite-sheet';
+        var title = document.createElement('strong');
+        title.textContent = 'ورق ' + localizeDigits(index + 1);
+        var board = document.createElement('div');
+        board.className = 'manager-composite-sheet__board';
+        sheet.placements.forEach(function (placement) {
+          var part = document.createElement('span');
+          part.className = 'manager-composite-piece is-' + placement.piece.type;
+          part.style.left = (placement.x / SHEET_WIDTH * 100) + '%';
+          part.style.top = (placement.y / SHEET_HEIGHT * 100) + '%';
+          part.style.width = (placement.width / SHEET_WIDTH * 100) + '%';
+          part.style.height = (placement.height / SHEET_HEIGHT * 100) + '%';
+          part.title = placement.piece.label + ' — ' + formatCentimeters(placement.width) + '×' + formatCentimeters(placement.height) + ' سانتی‌متر';
+          var label = document.createElement('b');
+          label.textContent = placement.piece.label;
+          var size = document.createElement('small');
+          size.textContent = formatCentimeters(placement.width) + '×' + formatCentimeters(placement.height) + ' سانتی‌متر';
+          part.appendChild(label);
+          part.appendChild(size);
+          board.appendChild(part);
+        });
+        card.appendChild(title);
+        card.appendChild(board);
+        sheetsNode.appendChild(card);
+      });
+      var summary = {};
+      parts.forEach(function (part) {
+        if (!summary[part.type]) summary[part.type] = { title: part.title, count: 0, area: 0 };
+        summary[part.type].count += 1;
+        summary[part.type].area += part.width * part.height / 1000000;
+      });
+      Object.keys(summary).forEach(function (type) {
+        var item = document.createElement('span');
+        item.className = 'is-' + type;
+        item.textContent = summary[type].title + ': ' + summary[type].count.toLocaleString('fa-IR') + ' قطعه — ' + formatMeasure(summary[type].area) + ' مترمربع';
+        partsNode.appendChild(item);
+      });
+    }
 
     function saveLastValues() {
       window.clearTimeout(saveTimer);
@@ -283,22 +453,59 @@
     }
 
     function calculate(shouldFocus) {
-      var length = decimal(field('length').value);
-      var width = decimal(field('width').value);
+      var length = decimal(field('length').value) / 100;
+      var width = decimal(field('width').value) / 100;
+      var dripDepth = decimal(field('drip_depth').value) / 100;
+      var bottomDepth = decimal(field('bottom_depth').value) / 100;
+      var sideDepth = decimal(field('side_depth').value) / 100;
+      var installAllowance = decimal(field('install_allowance').value) / 100;
+      var installAllowanceMm = installAllowance * 1000;
       var error = form.querySelector('[data-composite-error]');
       if (length <= 0 || width <= 0) {
         if (shouldFocus) {
           error.textContent = 'طول و ارتفاع را با عددی بیشتر از صفر وارد کنید.';
           error.hidden = false;
         }
+        form.querySelector('[data-composite-layout]').hidden = true;
+        return false;
+      }
+      if ((width * 1000) + installAllowanceMm > SHEET_WIDTH) {
+        error.textContent = 'ارتفاع نما با احتساب خم نصب بیشتر از ۳۲۰ سانتی‌متر است. بدون شیار افقی امکان چیدمان این نما روی ورق ۳۲۰×۱۲۵ وجود ندارد.';
+        error.hidden = false;
+        form.querySelector('[data-composite-layout]').hidden = true;
         return false;
       }
       error.hidden = true;
-      var area = length * width;
-      var ironCost = Math.round(area * money(form.dataset.ironRate));
-      var compositeCost = Math.round(area * money(form.dataset.compositeRate));
-      var installerCost = Math.round(area * money(form.dataset.installerRate));
-      var suppliesCost = Math.round(area * money(form.dataset.suppliesRate));
+      var faceArea = length * width;
+      var visibleArea = faceArea + length * dripDepth + length * bottomDepth + 2 * width * sideDepth;
+      var surfaces = [
+        { type: 'face', title: 'نما', width: length * 1000, height: width * 1000 },
+        { type: 'drip', title: 'آبچکان', width: length * 1000, height: dripDepth * 1000 },
+        { type: 'side', title: 'بغل راست', width: width * 1000, height: sideDepth * 1000 },
+        { type: 'side', title: 'بغل چپ', width: width * 1000, height: sideDepth * 1000 }
+      ];
+      var baseParts = [];
+      surfaces.forEach(function (surface) { baseParts = baseParts.concat(splitSurface(surface, installAllowanceMm)); });
+      var bottomSurface = { type: 'bottom', title: 'زیر تابلو', width: length * 1000, height: bottomDepth * 1000 };
+      var bottomTrials = bottomDepth > 0 ? [
+        { direction: 'vertical', parts: splitSurface(bottomSurface, installAllowanceMm, 'vertical') },
+        { direction: 'horizontal', parts: splitSurface(bottomSurface, installAllowanceMm, 'horizontal') }
+      ] : [{ direction: 'none', parts: [] }];
+      var chosenTrial = null;
+      bottomTrials.forEach(function (trial) {
+        trial.allParts = baseParts.concat(trial.parts);
+        trial.sheets = nestPieces(trial.allParts);
+        if (!chosenTrial || trial.sheets.length < chosenTrial.sheets.length) chosenTrial = trial;
+      });
+      var parts = chosenTrial.allParts;
+      var sheets = chosenTrial.sheets;
+      var cutArea = parts.reduce(function (total, part) { return total + part.width * part.height / 1000000; }, 0);
+      var purchasedArea = sheets.length * SHEET_AREA;
+      var utilization = purchasedArea > 0 ? cutArea / purchasedArea * 100 : 0;
+      var ironCost = Math.round(faceArea * money(form.dataset.ironRate));
+      var compositeCost = Math.round(purchasedArea * money(form.dataset.compositeRate));
+      var installerCost = Math.round(visibleArea * money(form.dataset.installerRate));
+      var suppliesCost = Math.round(visibleArea * money(form.dataset.suppliesRate));
       var freight = money(field('freight').value);
       var bracingCost = money(field('bracing_cost').value);
       var baseTotal = ironCost + compositeCost + installerCost + suppliesCost + freight + bracingCost;
@@ -308,7 +515,38 @@
       var insuranceTaxPercent = Math.min(1000, decimal(field('insurance_tax_percent').value));
       var insuranceTaxAmount = Math.round(afterProfit * insuranceTaxPercent / 100);
       var finalPrice = afterProfit + insuranceTaxAmount;
-      setText('[data-composite-area]', formatMeasure(area) + ' مترمربع');
+      compositeState = {
+        calculator_type: 'composite',
+        bottom_direction: chosenTrial.direction,
+        parts: parts.map(function (part) {
+          return {type:part.type,title:part.title,label:part.label,width:part.width,height:part.height};
+        }),
+        sheets: sheets.map(function (sheet) {
+          return {placements:sheet.placements.map(function (placement) {
+            return {type:placement.piece.type,label:placement.piece.label,x:placement.x,y:placement.y,width:placement.width,height:placement.height};
+          })};
+        }),
+        results: {
+          face_area: faceArea, visible_area: visibleArea, cut_area: cutArea,
+          sheet_count: sheets.length, purchased_area: purchasedArea, utilization_percent: utilization,
+          iron_cost: ironCost, composite_cost: compositeCost, installer_cost: installerCost,
+          supplies_cost: suppliesCost, freight: freight, bracing_cost: bracingCost,
+          base_total: baseTotal, profit_percent: profitPercent, profit_amount: profitAmount,
+          insurance_tax_percent: insuranceTaxPercent, insurance_tax_amount: insuranceTaxAmount,
+          price_per_square_meter: finalPrice / faceArea, final_price: finalPrice
+        }
+      };
+      setText('[data-composite-face-area]', formatMeasure(faceArea) + ' مترمربع');
+      setText('[data-composite-area]', formatMeasure(visibleArea) + ' مترمربع');
+      setText('[data-composite-cut-area]', formatMeasure(cutArea) + ' مترمربع');
+      setText('[data-composite-sheet-count]', sheets.length.toLocaleString('fa-IR') + ' ورق (' + formatMeasure(purchasedArea) + ' مترمربع)');
+      setText('[data-composite-utilization]', utilization.toLocaleString('fa-IR', { maximumFractionDigits: 1 }) + '٪ مصرف — ' + (100 - utilization).toLocaleString('fa-IR', { maximumFractionDigits: 1 }) + '٪ پرت');
+      setText('[data-composite-face-direction]', (width * 1000) + installAllowanceMm <= SHEET_HEIGHT
+        ? 'نما با ورق افقی چیده می‌شود؛ ارتفاع نما و خم نصب در عرض ۱۲۵ سانتی‌متری ورق جا می‌گیرد و شیارها فقط عمودی هستند.'
+        : 'ورق‌های نما عمودی و کنار هم قرار می‌گیرند؛ شیارهای اتصال فقط عمودی هستند.');
+      setText('[data-composite-bottom-direction]', chosenTrial.direction === 'none'
+        ? 'برای زیر تابلو ابعادی وارد نشده است.'
+        : 'زیر تابلو در دو حالت عمودی و طولی آزمایش شد؛ چیدمان ' + (chosenTrial.direction === 'vertical' ? 'عمودی' : 'طولی') + ' با ' + sheets.length.toLocaleString('fa-IR') + ' ورق انتخاب شد.');
       setText('[data-composite-iron]', formatMoney(ironCost));
       setText('[data-composite-sheet]', formatMoney(compositeCost));
       setText('[data-composite-installer]', formatMoney(installerCost));
@@ -318,14 +556,240 @@
       setText('[data-composite-base]', formatMoney(baseTotal));
       setText('[data-composite-profit]', formatMoney(profitAmount) + ' (' + profitPercent.toLocaleString('fa-IR') + '٪)');
       setText('[data-composite-insurance-tax]', insuranceTaxPercent > 0 ? formatMoney(insuranceTaxAmount) + ' (' + insuranceTaxPercent.toLocaleString('fa-IR') + '٪)' : 'محاسبه نشده');
-      setText('[data-composite-unit]', formatMoney(finalPrice / area));
+      setText('[data-composite-unit]', formatMoney(finalPrice / faceArea));
       setText('[data-composite-final]', formatMoney(finalPrice));
+      renderLayout(sheets, parts);
       if (shouldFocus) {
         var result = form.querySelector('[data-composite-result]');
         result.setAttribute('tabindex', '-1');
         result.focus({ preventScroll: true });
       }
       return true;
+    }
+
+    function compositeEstimateRequest(action, fields) {
+      var body = new FormData();
+      body.append('action', action);
+      body.append('nonce', form.dataset.estimatesNonce || '');
+      Object.keys(fields || {}).forEach(function (key) { body.append(key, fields[key]); });
+      return fetch(form.dataset.ajaxUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        body: body
+      }).then(function (response) {
+        return response.json().then(function (payload) {
+          if (!response.ok || !payload.success) {
+            throw new Error(payload && payload.data && payload.data.message ? payload.data.message : 'عملیات انجام نشد.');
+          }
+          return payload.data;
+        });
+      });
+    }
+
+    function compositeRateSnapshot() {
+      return {
+        iron_rate: money(form.dataset.ironRate),
+        composite_rate: money(form.dataset.compositeRate),
+        installer_rate: money(form.dataset.installerRate),
+        supplies_rate: money(form.dataset.suppliesRate)
+      };
+    }
+
+    function buildCompositeEstimateSnapshot() {
+      if (!calculate(false) || !compositeState) throw new Error('ابتدا ابعاد معتبر وارد کنید تا محاسبه انجام شود.');
+      return {
+        version: 1,
+        calculator_type: 'composite',
+        inputs: {
+          length: decimal(field('length').value),
+          width: decimal(field('width').value),
+          drip_depth: decimal(field('drip_depth').value),
+          bottom_depth: decimal(field('bottom_depth').value),
+          side_depth: decimal(field('side_depth').value),
+          install_allowance: decimal(field('install_allowance').value),
+          freight: money(field('freight').value),
+          bracing_cost: money(field('bracing_cost').value),
+          profit_percent: decimal(field('profit_percent').value),
+          insurance_tax_percent: decimal(field('insurance_tax_percent').value)
+        },
+        rates: compositeRateSnapshot(),
+        results: compositeState.results,
+        bottom_direction: compositeState.bottom_direction,
+        parts: compositeState.parts,
+        sheets: compositeState.sheets
+      };
+    }
+
+    function setCompositeEstimateStatus(message, state) {
+      var status = form.querySelector('[data-composite-estimate-status]');
+      if (!status) return;
+      status.textContent = message || '';
+      status.className = state ? 'is-' + state : '';
+    }
+
+    function setCompositeFieldValue(name, value, isMoney) {
+      var input = field(name);
+      if (!input) return;
+      input.value = value === undefined || value === null ? '' : String(value);
+      if (isMoney) formatMoneyInput(input); else formatDecimalInput(input);
+    }
+
+    function restoreCompositeEstimate(payload) {
+      var snapshot = payload.snapshot || {};
+      if (snapshot.calculator_type !== 'composite') throw new Error('این رکورد مربوط به محاسبه کامپوزیت نیست.');
+      var inputs = snapshot.inputs || {};
+      var rates = snapshot.rates || {};
+      ['length','width','drip_depth','bottom_depth','side_depth','install_allowance','profit_percent','insurance_tax_percent'].forEach(function (name) {
+        setCompositeFieldValue(name, inputs[name] || 0, false);
+      });
+      ['freight','bracing_cost'].forEach(function (name) { setCompositeFieldValue(name, inputs[name] || 0, true); });
+      var ratesForm = document.querySelector('[data-pricing-rates-form="composite"]');
+      var datasetMap = {iron_rate:'ironRate',composite_rate:'compositeRate',installer_rate:'installerRate',supplies_rate:'suppliesRate'};
+      Object.keys(datasetMap).forEach(function (name) {
+        var value = Number(rates[name] || 0);
+        form.dataset[datasetMap[name]] = value;
+        if (ratesForm && ratesForm.elements.namedItem(name)) {
+          ratesForm.elements.namedItem(name).value = value;
+          formatMoneyInput(ratesForm.elements.namedItem(name));
+        }
+      });
+      field('estimate_project_name').value = payload.project_name || '';
+      field('estimate_id').value = payload.id || 0;
+      var mode = form.querySelector('[data-composite-estimate-mode]');
+      var newButton = form.querySelector('[data-composite-estimate-new]');
+      if (mode) mode.textContent = 'در حال ویرایش برآورد ذخیره‌شده شماره ' + Number(payload.id).toLocaleString('fa-IR') + ' هستید.';
+      if (newButton) newButton.hidden = false;
+      if (!calculate(false)) throw new Error('اطلاعات ذخیره‌شده قابل محاسبه نیست.');
+      setCompositeEstimateStatus('محاسبه ذخیره‌شده با نرخ‌های همان زمان باز شد.', 'success');
+      form.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }
+
+    function escapeCompositeHtml(value) {
+      return String(value === undefined || value === null ? '' : value).replace(/[&<>'"]/g, function (character) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character];
+      });
+    }
+
+    function compositeLayoutPrintHtml(sheets) {
+      if (!Array.isArray(sheets) || !sheets.length) return '';
+      return '<section class="layout-section"><h2>چیدمان ورق‌های کامپوزیت</h2><div class="layouts">' + sheets.map(function (sheet, index) {
+        var pieces = (sheet.placements || []).map(function (placement) {
+          var style = 'left:' + (Number(placement.x || 0) / SHEET_WIDTH * 100) + '%;top:' + (Number(placement.y || 0) / SHEET_HEIGHT * 100) + '%;width:' + (Number(placement.width || 0) / SHEET_WIDTH * 100) + '%;height:' + (Number(placement.height || 0) / SHEET_HEIGHT * 100) + '%';
+          return '<span class="piece is-' + escapeCompositeHtml(placement.type) + '" style="' + style + '"><b>' + escapeCompositeHtml(placement.label) + '</b><small>' + escapeCompositeHtml(formatCentimeters(Number(placement.width || 0)) + '×' + formatCentimeters(Number(placement.height || 0)) + ' سانتی‌متر') + '</small></span>';
+        }).join('');
+        return '<figure><figcaption>ورق ' + Number(index + 1).toLocaleString('fa-IR') + '</figcaption><div class="sheet">' + pieces + '</div></figure>';
+      }).join('') + '</div></section>';
+    }
+
+    function compositeEstimatePrintHtml(projectName, snapshot, includePrices) {
+      var inputs = snapshot.inputs || {};
+      var rates = snapshot.rates || {};
+      var results = snapshot.results || {};
+      includePrices = includePrices !== false;
+      var safeTitle = escapeCompositeHtml(projectName || 'برآورد کامپوزیت');
+      var bottomDirection = snapshot.bottom_direction === 'vertical' ? 'عمودی' : (snapshot.bottom_direction === 'horizontal' ? 'طولی' : 'بدون زیر تابلو');
+      var rows = [
+        ['آهن', formatMeasure(Number(results.face_area || 0)) + ' مترمربع', rates.iron_rate, results.iron_cost],
+        ['ورق کامپوزیت', Number(results.sheet_count || 0).toLocaleString('fa-IR') + ' ورق؛ ' + formatMeasure(Number(results.purchased_area || 0)) + ' مترمربع', rates.composite_rate, results.composite_cost],
+        ['دستمزد نصاب', formatMeasure(Number(results.visible_area || 0)) + ' مترمربع', rates.installer_rate, results.installer_cost],
+        ['لوازم مصرفی', formatMeasure(Number(results.visible_area || 0)) + ' مترمربع', rates.supplies_rate, results.supplies_cost],
+        ['کرایه', '', null, results.freight],
+        ['آهن‌کشی جهت مهار تابلو', '', null, results.bracing_cost],
+        ['جمع هزینه پایه', '', null, results.base_total],
+        ['سود (' + formatMeasure(Number(results.profit_percent || 0)) + '٪)', '', null, results.profit_amount],
+        ['بیمه و مالیات (' + formatMeasure(Number(results.insurance_tax_percent || 0)) + '٪)', '', null, results.insurance_tax_amount]
+      ];
+      var rowsHtml = rows.map(function (row) {
+        var zeroRate = row[2] !== null && Number(row[2] || 0) === 0 && Number(row[3] || 0) === 0;
+        return '<tr' + (zeroRate ? ' class="zero-rate"' : '') + '><td>' + escapeCompositeHtml(row[0]) + '</td><td>' + escapeCompositeHtml(row[1]) + '</td><td>' + escapeCompositeHtml(row[2] === null ? '—' : formatMoney(Number(row[2] || 0))) + '</td><td>' + escapeCompositeHtml(formatMoney(Number(row[3] || 0))) + '</td></tr>';
+      }).join('');
+      var consumptionHtml = '<section class="consumption"><h2>خلاصه مصرف کامپوزیت</h2><div>'
+        + '<span><b>' + escapeCompositeHtml(Number(results.sheet_count || 0).toLocaleString('fa-IR')) + '</b><small>ورق ۳۲۰×۱۲۵ سانتی‌متر</small></span>'
+        + '<span><b>' + escapeCompositeHtml(formatMeasure(Number(results.purchased_area || 0))) + '</b><small>مترمربع ورق مصرفی</small></span>'
+        + '<span><b>' + escapeCompositeHtml(formatMeasure(Number(results.cut_area || 0))) + '</b><small>مترمربع مساحت برش</small></span>'
+        + '<span><b>' + escapeCompositeHtml(formatMeasure(Number(results.utilization_percent || 0)) + '٪') + '</b><small>بهره‌وری ورق</small></span>'
+        + '<span><b>' + escapeCompositeHtml(formatMeasure(Math.max(0, 100 - Number(results.utilization_percent || 0))) + '٪') + '</b><small>پرت ورق</small></span>'
+        + '<span><b>' + escapeCompositeHtml(Number((snapshot.parts || []).length).toLocaleString('fa-IR')) + '</b><small>تعداد قطعات برش</small></span>'
+        + '</div></section>';
+      var pricingHtml = includePrices
+        ? '<table><thead><tr><th>شرح</th><th>مبنای محاسبه</th><th>نرخ واحد</th><th>هزینه</th></tr></thead><tbody>' + rowsHtml + '</tbody></table><div class="final"><span>قیمت نهایی</span><strong>' + escapeCompositeHtml(formatMoney(Number(results.final_price || 0))) + '<small>' + escapeCompositeHtml(formatMoney(Number(results.price_per_square_meter || 0)) + ' به‌ازای هر مترمربع نما') + '</small></strong></div>'
+        : '';
+      var reportTitle = includePrices ? 'برآورد قیمت تابلو کامپوزیت' : 'گزارش مصرف کامپوزیت';
+      return '<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>' + reportTitle + ' - ' + safeTitle + '</title><style>'
+        + '@page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0}body{padding:12mm;font-family:Tahoma,Arial,sans-serif;color:#171717;direction:rtl}header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #b78a2d;padding-bottom:10px;margin-bottom:15px}h1{font-size:22px;margin:0}h2{font-size:14px;margin:0 0 8px}header span{color:#6b5a32}.meta{display:grid;grid-template-columns:repeat(2,1fr);border:1px solid #bbb;margin-bottom:14px}.meta div{padding:7px 9px;border-bottom:1px solid #ddd}.meta div:nth-child(odd){border-left:1px solid #ddd}.consumption{margin:10px 0 14px;padding:10px;border:1px solid #b9c8d2;background:#f5f9fb;break-inside:avoid}.consumption>div{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.consumption span{display:flex;flex-direction:column;padding:8px;border:1px solid #d5e0e6;background:#fff}.consumption b{font-size:14px}.consumption small{margin-top:3px;color:#526873;font-size:9px}.customer-note{margin-top:12px;padding:10px;border:1px solid #b9c8d2;background:#f5f9fb;color:#405966;font-size:10px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #999;padding:6px 8px;text-align:right}th{background:#eee}td:last-child{text-align:left}.zero-rate td{background:#fff0ee;color:#a51f1a;font-weight:bold}.layout-section{margin:12px 0;padding:9px;border:1px solid #cfc7b7;background:#faf8f2}.layouts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.layouts figure{margin:0;break-inside:avoid}.layouts figcaption{font-size:9px;font-weight:bold;margin-bottom:3px}.sheet{position:relative;width:100%;aspect-ratio:3200/1250;border:1px solid #b78a2d;background:#fff;overflow:hidden}.piece{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;border:1px solid #476f8d;background:#e6f2f9;color:#24455b;font-size:7px}.piece small{font-size:6px}.piece.is-face{background:#dff2e5;border-color:#3d8151}.piece.is-drip{background:#fff0c9;border-color:#a97814}.piece.is-bottom{background:#e2ecfb;border-color:#4774ad}.piece.is-side{background:#f0e5f7;border-color:#815795}.final{display:flex;justify-content:space-between;margin-top:12px;padding:12px 14px;background:#222;color:#fff;font-size:18px;font-weight:bold}.final strong{display:grid;text-align:left}.final small{font-size:10px;color:#e8d8a7;margin-top:4px}.note{font-size:9px;color:#666;margin-top:9px}@media print{body{padding:12mm}}</style></head><body>'
+        + '<header><h1>' + reportTitle + '</h1><span>زیگورات</span></header>'
+        + '<section class="meta"><div><b>نام پروژه:</b> ' + safeTitle + '</div><div><b>ابعاد نما:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.length || 0)) + ' × ' + formatMeasure(Number(inputs.width || 0)) + ' سانتی‌متر') + '</div><div><b>آبچکان / زیر / بغل:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.drip_depth || 0)) + ' / ' + formatMeasure(Number(inputs.bottom_depth || 0)) + ' / ' + formatMeasure(Number(inputs.side_depth || 0)) + ' سانتی‌متر') + '</div><div><b>جمع خم نصب:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.install_allowance || 0)) + ' سانتی‌متر') + '</div><div><b>مساحت نما:</b> ' + escapeCompositeHtml(formatMeasure(Number(results.face_area || 0)) + ' مترمربع') + '</div><div><b>مساحت کل سطوح:</b> ' + escapeCompositeHtml(formatMeasure(Number(results.visible_area || 0)) + ' مترمربع') + '</div><div><b>مصرف ورق:</b> ' + escapeCompositeHtml(formatMeasure(Number(results.utilization_percent || 0)) + '٪ مصرف، ' + formatMeasure(100 - Number(results.utilization_percent || 0)) + '٪ پرت') + '</div><div><b>جهت زیر تابلو:</b> ' + escapeCompositeHtml(bottomDirection) + '</div></section>'
+        + consumptionHtml + compositeLayoutPrintHtml(snapshot.sheets) + pricingHtml + '<p class="note">این گزارش براساس ابعاد و اطلاعات ذخیره‌شده همین برآورد تهیه شده است.</p>'
+        + '<script>window.addEventListener("load",function(){setTimeout(function(){window.print()},300)})<\/script></body></html>';
+    }
+
+    function openCompositeEstimatePrint(projectName, snapshot, printWindow, includePrices) {
+      var popup = printWindow || window.open('', '_blank');
+      if (!popup) throw new Error('مرورگر پنجره چاپ را مسدود کرده است. اجازه Pop-up را فعال کنید.');
+      popup.document.open();
+      popup.document.write(compositeEstimatePrintHtml(projectName, snapshot, includePrices));
+      popup.document.close();
+    }
+
+    function renderCompositeEstimateRecords(records, listing) {
+      var list = document.querySelector('[data-composite-estimate-list]');
+      var count = document.querySelector('[data-composite-estimate-count]');
+      var section = document.querySelector('[data-composite-estimates]');
+      var pageLabel = document.querySelector('[data-composite-estimate-page-label]');
+      var previousButton = document.querySelector('[data-composite-estimate-page="prev"]');
+      var nextButton = document.querySelector('[data-composite-estimate-page="next"]');
+      if (!list) return;
+      list.innerHTML = '';
+      var total = listing ? Number(listing.total || 0) : records.length;
+      var currentPage = listing ? Math.max(1, Number(listing.page || 1)) : 1;
+      var totalPages = listing ? Math.max(1, Number(listing.pages || 1)) : 1;
+      if (count) count.textContent = total.toLocaleString('fa-IR') + ' مورد';
+      if (section) { section.dataset.currentPage = currentPage; section.dataset.totalPages = totalPages; }
+      if (pageLabel) pageLabel.textContent = 'صفحه ' + currentPage.toLocaleString('fa-IR') + ' از ' + totalPages.toLocaleString('fa-IR');
+      if (previousButton) previousButton.disabled = currentPage <= 1;
+      if (nextButton) nextButton.disabled = currentPage >= totalPages;
+      if (!records.length) {
+        var empty = document.createElement('p');
+        empty.className = 'manager-pricing-estimates__empty';
+        var search = document.querySelector('[data-composite-estimate-search]');
+        empty.textContent = search && search.value.trim() ? 'برآوردی با این نام پیدا نشد.' : 'هنوز محاسبه کامپوزیتی ذخیره نشده است.';
+        list.appendChild(empty);
+        return;
+      }
+      records.forEach(function (record) {
+        var article = document.createElement('article');
+        article.dataset.estimateId = record.id;
+        var info = document.createElement('div');
+        var title = document.createElement('strong'); title.textContent = record.project_name;
+        var date = document.createElement('small'); date.textContent = 'آخرین تغییر: ' + record.modified;
+        info.appendChild(title); info.appendChild(date);
+        var price = document.createElement('b'); price.textContent = Number(record.final_price || 0).toLocaleString('fa-IR') + ' ریال';
+        var detail = document.createElement('small'); detail.textContent = Number(record.perimeter_m || 0).toLocaleString('fa-IR', {maximumFractionDigits:2}) + ' مترمربع · ' + Number(record.unit_price || 0).toLocaleString('fa-IR') + ' ریال/مترمربع';
+        price.appendChild(detail);
+        var actions = document.createElement('div'); actions.className = 'manager-pricing-estimates__actions';
+        var load = document.createElement('button'); load.type = 'button'; load.dataset.compositeEstimateLoad = record.id; load.textContent = 'بازکردن و ویرایش';
+        var print = document.createElement('button'); print.type = 'button'; print.dataset.compositeEstimatePrintSaved = record.id; print.textContent = 'چاپ / PDF';
+        var customerPrint = document.createElement('button'); customerPrint.type = 'button'; customerPrint.dataset.compositeEstimatePrintCustomerSaved = record.id; customerPrint.textContent = 'چاپ مشتری';
+        print.textContent = 'چاپ داخلی';
+        actions.appendChild(load); actions.appendChild(customerPrint); actions.appendChild(print);
+        article.appendChild(info); article.appendChild(price); article.appendChild(actions); list.appendChild(article);
+      });
+    }
+
+    function loadCompositeEstimateList(requestedPage) {
+      var section = document.querySelector('[data-composite-estimates]');
+      var search = document.querySelector('[data-composite-estimate-search]');
+      var status = document.querySelector('[data-composite-estimate-list-status]');
+      var page = Math.max(1, Number(requestedPage || (section ? section.dataset.currentPage : 1)));
+      if (status) { status.textContent = 'در حال به‌روزرسانی فهرست…'; status.className = 'manager-pricing-estimates__status is-saving'; }
+      return compositeEstimateRequest('zigurat_list_pricing_estimates', {page:page,search:search ? search.value.trim() : '',calculator_type:'composite'}).then(function (data) {
+        renderCompositeEstimateRecords(data.records || [], data);
+        if (status) { status.textContent = ''; status.className = 'manager-pricing-estimates__status'; }
+        return data;
+      }).catch(function (error) {
+        if (status) { status.textContent = error.message; status.className = 'manager-pricing-estimates__status is-error'; }
+        throw error;
+      });
     }
 
     setupRatesAutosave({
@@ -338,7 +802,7 @@
     });
     form.addEventListener('submit', function (event) {
       event.preventDefault();
-      if (calculate(true)) saveLastValues();
+      if (calculate(false)) saveLastValues();
     });
     form.querySelectorAll('input').forEach(function (input) {
       input.addEventListener('input', function () { calculate(false); });
@@ -352,6 +816,86 @@
       input.addEventListener('change', function () {
         if (input.value.trim() !== '') saveLastValues();
       });
+    });
+
+    var saveEstimateButton = form.querySelector('[data-composite-estimate-save]');
+    var newEstimateButton = form.querySelector('[data-composite-estimate-new]');
+    var printEstimateButton = form.querySelector('[data-composite-estimate-print]');
+    var printCustomerEstimateButton = form.querySelector('[data-composite-estimate-print-customer]');
+    var estimateList = document.querySelector('[data-composite-estimate-list]');
+    var estimateListStatus = document.querySelector('[data-composite-estimate-list-status]');
+    var estimateSection = document.querySelector('[data-composite-estimates]');
+    var estimateSearch = document.querySelector('[data-composite-estimate-search]');
+    var estimateSearchClear = document.querySelector('[data-composite-estimate-search-clear]');
+    if (saveEstimateButton) saveEstimateButton.addEventListener('click', function () {
+      var projectName = String(field('estimate_project_name').value || '').trim();
+      if (!projectName) { setCompositeEstimateStatus('برای ذخیره، ابتدا نام پروژه را وارد کنید.', 'error'); field('estimate_project_name').focus(); return; }
+      var snapshot;
+      try { snapshot = buildCompositeEstimateSnapshot(); } catch (error) { setCompositeEstimateStatus(error.message, 'error'); return; }
+      saveEstimateButton.disabled = true;
+      setCompositeEstimateStatus('در حال ذخیره محاسبه…', 'saving');
+      compositeEstimateRequest('zigurat_save_pricing_estimate', {estimate_id:field('estimate_id').value || 0,project_name:projectName,snapshot:JSON.stringify(snapshot)}).then(function (data) {
+        field('estimate_id').value = data.id;
+        var mode = form.querySelector('[data-composite-estimate-mode]');
+        if (mode) mode.textContent = 'این برآورد ذخیره شده و تغییرات بعدی روی همین رکورد ثبت می‌شود.';
+        if (newEstimateButton) newEstimateButton.hidden = false;
+        loadCompositeEstimateList(1).catch(function () {});
+        setCompositeEstimateStatus(data.message || 'محاسبه ذخیره شد.', 'success');
+      }).catch(function (error) { setCompositeEstimateStatus(error.message, 'error'); }).finally(function () { saveEstimateButton.disabled = false; });
+    });
+    if (newEstimateButton) newEstimateButton.addEventListener('click', function () {
+      field('estimate_id').value = 0; field('estimate_project_name').value = '';
+      var mode = form.querySelector('[data-composite-estimate-mode]');
+      if (mode) mode.textContent = 'به‌عنوان یک برآورد جدید ذخیره می‌شود.';
+      newEstimateButton.hidden = true; setCompositeEstimateStatus('نام پروژه جدید را وارد و ذخیره کنید.', 'success'); field('estimate_project_name').focus();
+    });
+    if (printEstimateButton) printEstimateButton.addEventListener('click', function () {
+      try { openCompositeEstimatePrint(String(field('estimate_project_name').value || '').trim() || 'برآورد جدید', buildCompositeEstimateSnapshot(), null, true); }
+      catch (error) { setCompositeEstimateStatus(error.message, 'error'); }
+    });
+    if (printCustomerEstimateButton) printCustomerEstimateButton.addEventListener('click', function () {
+      try { openCompositeEstimatePrint(String(field('estimate_project_name').value || '').trim() || 'گزارش مصرف کامپوزیت', buildCompositeEstimateSnapshot(), null, false); }
+      catch (error) { setCompositeEstimateStatus(error.message, 'error'); }
+    });
+    if (estimateList) estimateList.addEventListener('click', function (event) {
+      var loadButton = event.target.closest('[data-composite-estimate-load]');
+      var savedPrintButton = event.target.closest('[data-composite-estimate-print-saved]');
+      var savedCustomerPrintButton = event.target.closest('[data-composite-estimate-print-customer-saved]');
+      if (!loadButton && !savedPrintButton && !savedCustomerPrintButton) return;
+      event.preventDefault();
+      var estimateId = loadButton ? loadButton.dataset.compositeEstimateLoad : (savedPrintButton ? savedPrintButton.dataset.compositeEstimatePrintSaved : savedCustomerPrintButton.dataset.compositeEstimatePrintCustomerSaved);
+      var isPrint = Boolean(savedPrintButton || savedCustomerPrintButton);
+      var printWindow = isPrint ? window.open('', '_blank') : null;
+      if (isPrint && !printWindow) { setCompositeEstimateStatus('مرورگر پنجره چاپ را مسدود کرده است. اجازه Pop-up را فعال کنید.', 'error'); return; }
+      var clickedButton = loadButton || savedPrintButton || savedCustomerPrintButton;
+      var originalText = clickedButton.textContent;
+      clickedButton.disabled = true; clickedButton.textContent = loadButton ? 'در حال بازیابی…' : 'در حال آماده‌سازی…';
+      if (estimateListStatus) { estimateListStatus.textContent = clickedButton.textContent; estimateListStatus.className = 'manager-pricing-estimates__status is-saving'; }
+      if (printWindow) printWindow.document.write('<p dir="rtl" style="font-family:Tahoma;padding:30px">در حال آماده‌سازی گزارش…</p>');
+      compositeEstimateRequest('zigurat_get_pricing_estimate', {estimate_id:estimateId}).then(function (data) {
+        if (loadButton) { restoreCompositeEstimate(data); if (estimateListStatus) { estimateListStatus.textContent = 'محاسبه برای ویرایش بازیابی شد.'; estimateListStatus.className = 'manager-pricing-estimates__status is-success'; } return; }
+        if (!data.snapshot || data.snapshot.calculator_type !== 'composite') throw new Error('این رکورد مربوط به کامپوزیت نیست.');
+        openCompositeEstimatePrint(data.project_name, data.snapshot, printWindow, !savedCustomerPrintButton);
+        if (estimateListStatus) { estimateListStatus.textContent = 'گزارش چاپ آماده شد.'; estimateListStatus.className = 'manager-pricing-estimates__status is-success'; }
+      }).catch(function (error) {
+        if (printWindow) printWindow.close(); setCompositeEstimateStatus(error.message, 'error');
+        if (estimateListStatus) { estimateListStatus.textContent = error.message; estimateListStatus.className = 'manager-pricing-estimates__status is-error'; }
+      }).finally(function () { clickedButton.disabled = false; clickedButton.textContent = originalText; });
+    });
+    if (estimateSection) estimateSection.addEventListener('click', function (event) {
+      var pageButton = event.target.closest('[data-composite-estimate-page]');
+      if (!pageButton || pageButton.disabled) return;
+      var currentPage = Math.max(1, Number(estimateSection.dataset.currentPage || 1));
+      var totalPages = Math.max(1, Number(estimateSection.dataset.totalPages || 1));
+      var nextPage = pageButton.dataset.compositeEstimatePage === 'next' ? currentPage + 1 : currentPage - 1;
+      pageButton.disabled = true; loadCompositeEstimateList(Math.max(1, Math.min(totalPages, nextPage))).catch(function () {});
+    });
+    if (estimateSearch) estimateSearch.addEventListener('input', function () {
+      window.clearTimeout(estimateSearchTimer); if (estimateSearchClear) estimateSearchClear.hidden = estimateSearch.value.trim() === '';
+      estimateSearchTimer = window.setTimeout(function () { loadCompositeEstimateList(1).catch(function () {}); }, 400);
+    });
+    if (estimateSearchClear) estimateSearchClear.addEventListener('click', function () {
+      estimateSearch.value = ''; estimateSearchClear.hidden = true; loadCompositeEstimateList(1).catch(function () {}); estimateSearch.focus();
     });
   }
 

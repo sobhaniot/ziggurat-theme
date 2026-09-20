@@ -272,6 +272,7 @@ function zigurat_invoice_page_url($args = array())
         'from_proforma' => 'invoice_from_proforma',
         'branch_from' => 'invoice_branch_from',
         'correction_from' => 'invoice_correction_from',
+        'copy_from' => 'invoice_copy_from',
     );
     foreach ($route_keys as $key => $invoice_key) {
         if (array_key_exists($key, $args)) {
@@ -868,6 +869,9 @@ function zigurat_invoice_save($data)
     $source_proforma_id = $existing
         ? absint($existing->source_proforma_id ?? 0)
         : absint($data['source_proforma_id'] ?? 0);
+    $copied_from_invoice_id = $existing
+        ? absint($existing->copied_from_invoice_id ?? 0)
+        : absint($data['copied_from_invoice_id'] ?? 0);
     $branch_source_id = $existing ? 0 : absint($data['branch_source_id'] ?? 0);
     $reference_invoice_id = $existing
         ? absint($existing->reference_invoice_id ?? 0)
@@ -889,6 +893,15 @@ function zigurat_invoice_save($data)
     }
     if ($branch_source_id && $source_proforma_id) {
         return new WP_Error('invalid_branch', 'یک سند هم‌زمان نمی‌تواند تبدیل و انشعاب باشد.');
+    }
+    if ($copied_from_invoice_id && ($branch_source_id || $source_proforma_id || $tax_subject === 'correction')) {
+        return new WP_Error('invalid_copy', 'سند کپی‌شده نمی‌تواند هم‌زمان تبدیل، انشعاب یا اصلاحیه باشد.');
+    }
+    if (!$existing && $copied_from_invoice_id) {
+        $copy_source = zigurat_invoice_get($copied_from_invoice_id);
+        if (!$copy_source || $copy_source->brand !== $brand || $copy_source->document_type !== $type) {
+            return new WP_Error('invalid_copy_source', 'فاکتور مبدأ برای کپی معتبر نیست.');
+        }
     }
     if ($tax_subject === 'correction') {
         $reference = zigurat_invoice_get($reference_invoice_id);
@@ -1134,6 +1147,7 @@ function zigurat_invoice_save($data)
         'tax_quarter'=>$tax_period['quarter'], 'status'=>$status,
         'subject'=>sanitize_text_field(wp_unslash((string) ($data['subject'] ?? ''))),
         'source_proforma_id'=>$source_proforma_id,
+        'copied_from_invoice_id'=>$copied_from_invoice_id,
         'tax_subject'=>$tax_subject,
         'reference_invoice_id'=>$reference_invoice_id,
         'seller_json'=>wp_json_encode($seller, JSON_UNESCAPED_UNICODE),

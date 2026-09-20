@@ -17,6 +17,7 @@
   var progressTimer = null;
   var progressStartedAt = 0;
   var progressMessage = '';
+  var progressColor = '';
   var filePreviewUrl = '';
   var estimateSearchTimer = null;
   var edgeLabels = {swedish: 'لبه سوئدی', plastic: 'لبه پلاستیک', channelium: 'لبه چلنیوم', metal: 'لبه فلزی'};
@@ -62,6 +63,16 @@
     var node = form.querySelector(selector);
     if (node) node.textContent = value;
   }
+  function setCostRateWarning(selector, shouldWarn) {
+    var node = form.querySelector(selector);
+    if (!node || !node.parentElement) return;
+    node.parentElement.classList.toggle('is-zero-rate', Boolean(shouldWarn));
+    if (shouldWarn) {
+      node.parentElement.setAttribute('title', 'این گزینه استفاده شده اما نرخ آن در ستون قیمت‌ها صفر است.');
+    } else {
+      node.parentElement.removeAttribute('title');
+    }
+  }
   function showError(message) {
     var error = form.querySelector('[data-letter-error]');
     error.textContent = message;
@@ -75,9 +86,15 @@
     if (!progressText) return;
     var seconds = progressStartedAt ? Math.max(0, Math.round((Date.now() - progressStartedAt) / 1000)) : 0;
     progressText.textContent = progressMessage + (seconds > 0 ? ' — ' + seconds.toLocaleString('fa-IR') + ' ثانیه' : '');
+    var colorSwatch = form.querySelector('[data-letter-progress-color]');
+    if (colorSwatch) {
+      colorSwatch.hidden = !progressColor;
+      if (progressColor) colorSwatch.style.backgroundColor = progressColor;
+    }
   }
-  function updateProgress(message) {
+  function updateProgress(message, color) {
     progressMessage = message;
+    progressColor = color || '';
     renderProgressMessage();
   }
   function setBusy(isBusy) {
@@ -99,6 +116,7 @@
     } else {
       progressStartedAt = 0;
       progressMessage = '';
+      progressColor = '';
     }
   }
   function yieldToBrowser() {
@@ -208,8 +226,7 @@
     var red = channels[0];
     var green = channels[1];
     var blue = channels[2];
-    if (red >= 145 && red >= green * 1.45 && red >= blue * 1.35) return 'pin';
-    if (blue >= 120 && blue >= red * 1.35 && blue >= green * 1.2) return 'double';
+    if (red >= 145 && red >= green * 1.45 && red >= blue * 1.35) return 'double';
     return 'primary';
   }
 
@@ -305,7 +322,7 @@
     var channels = colorChannels(normalized);
     if (channels[0] <= 75 && channels[1] <= 75 && channels[2] <= 75) return 'primary';
     var operation = pathOperation(normalized);
-    return operation === 'double' || operation === 'pin' ? operation : null;
+    return operation === 'double' ? operation : null;
   }
 
   function collectSvgGeometryMetrics(root, geometry) {
@@ -473,7 +490,7 @@
       node.setAttribute('fill', sourceFill || fillColor);
       node.setAttribute('data-zigurat-operation', operation);
       node.setAttribute('data-zigurat-material', fillColor);
-      if (operation !== 'pin' && node.localName !== 'line') {
+      if (node.localName !== 'line') {
         var jobKey = operation + '|' + fillColor;
         if (!materialJobs[jobKey]) {
           materialJobs[jobKey] = {key: jobKey, operation: operation, color: fillColor, label: plexiColorName(fillColor)};
@@ -1580,7 +1597,7 @@
     return sequence.then(function () { return best.sheets; });
   }
 
-  function packMaterialGroups(items, sheetWidth, sheetHeight, allowRotation, requestedTrials) {
+  function packMaterialGroupsSync(items, sheetWidth, sheetHeight, allowRotation, requestedTrials) {
     var groups = {};
     items.forEach(function (item) {
       var key = item.component.materialKey || item.component.materialColor || '#000000';
@@ -1620,6 +1637,134 @@
     return sequence.then(function () {
       allSheets.unplaced = allUnplaced;
       return allSheets;
+    });
+  }
+
+  function workerPackingItem(item, index) {
+    var component = item.component || {};
+    var materialColor = component.materialColor || '#000000';
+    return {
+      sourceIndex: index,
+      width: item.width,
+      height: item.height,
+      // Send a transferable copy so a Worker failure can safely fall back
+      // without leaving the main-thread packing data detached.
+      collisionBuffer: item.collisionMask.slice().buffer,
+      areaMm2: item.areaMm2,
+      perimeterMm: item.perimeterMm,
+      previewWidthMm: item.previewWidthMm,
+      previewHeightMm: item.previewHeightMm,
+      materialKey: component.materialKey || materialColor,
+      materialColor: materialColor,
+      materialLabel: component.materialLabel || plexiColorName(materialColor)
+    };
+  }
+
+  function restoreWorkerSheets(workerResult, items) {
+    var result = workerResult || {};
+    var sheets = (result.sheets || []).map(function (rawSheet) {
+      return {
+        width: rawSheet.width,
+        height: rawSheet.height,
+        usedBottom: rawSheet.usedBottom,
+        usedRight: rawSheet.usedRight,
+        materialKey: rawSheet.materialKey,
+        materialColor: rawSheet.materialColor,
+        materialLabel: rawSheet.materialLabel,
+        placements: (rawSheet.placements || []).map(function (placement) {
+          var source = items[placement.itemIndex];
+          if (!source) return null;
+          return {
+            x: placement.x,
+            y: placement.y,
+            item: Object.assign({}, source, {
+              width: placement.width,
+              height: placement.height,
+              rotation: placement.rotation || 0
+            })
+          };
+        }).filter(Boolean)
+      };
+    });
+    sheets.unplaced = (result.unplaced || []).map(function (unplaced) {
+      var source = items[unplaced.itemIndex];
+      if (!source) return null;
+      return Object.assign({}, source, {
+        materialKey: unplaced.materialKey,
+        materialColor: unplaced.materialColor,
+        materialLabel: unplaced.materialLabel
+      });
+    }).filter(Boolean);
+    return sheets;
+  }
+
+  function packMaterialGroupsWithWorker(items, sheetWidth, sheetHeight, allowRotation, requestedTrials) {
+    var workerUrl = form.dataset.letterWorkerUrl || '';
+    if (!workerUrl || typeof window.Worker !== 'function') return null;
+    var worker;
+    try {
+      worker = new window.Worker(workerUrl);
+    } catch (error) {
+      return null;
+    }
+    var payload = [];
+    var transferables = [];
+    try {
+      items.forEach(function (item, index) {
+        var raw = workerPackingItem(item, index);
+        payload.push(raw);
+        transferables.push(raw.collisionBuffer);
+      });
+    } catch (error) {
+      worker.terminate();
+      return null;
+    }
+    return new Promise(function (resolve, reject) {
+      var settled = false;
+      function finish(fn, value) {
+        if (settled) return;
+        settled = true;
+        worker.terminate();
+        fn(value);
+      }
+      worker.onmessage = function (event) {
+        var data = event.data || {};
+        if (data.type === 'progress') {
+          var groupText = data.groups > 1 ? ' — گروه ' + Number(data.group || 1).toLocaleString('fa-IR') + ' از ' + Number(data.groups).toLocaleString('fa-IR') : '';
+          var trialText = data.trials ? ' — چیدمان ' + Number(data.trial || 1).toLocaleString('fa-IR') + ' از ' + Number(data.trials).toLocaleString('fa-IR') : '';
+          updateProgress('مرحله ۳ از ۴: پردازش Worker' + groupText + trialText, data.color || '');
+          return;
+        }
+        if (data.type === 'error') {
+          finish(reject, new Error(data.message || 'پردازش Worker ناموفق بود.'));
+          return;
+        }
+        if (data.type === 'result') finish(resolve, restoreWorkerSheets(data.result, items));
+      };
+      worker.onerror = function (event) {
+        finish(reject, new Error(event && event.message ? event.message : 'ارتباط با Worker ناموفق بود.'));
+      };
+      try {
+        worker.postMessage({
+          type: 'pack',
+          items: payload,
+          sheetWidth: sheetWidth,
+          sheetHeight: sheetHeight,
+          allowRotation: allowRotation,
+          requestedTrials: requestedTrials
+        }, transferables);
+      } catch (error) {
+        finish(reject, error);
+      }
+    });
+  }
+
+  function packMaterialGroups(items, sheetWidth, sheetHeight, allowRotation, requestedTrials) {
+    var workerPromise = packMaterialGroupsWithWorker(items, sheetWidth, sheetHeight, allowRotation, requestedTrials);
+    if (!workerPromise) return packMaterialGroupsSync(items, sheetWidth, sheetHeight, allowRotation, requestedTrials);
+    return workerPromise.catch(function () {
+      updateProgress('مرحله ۳ از ۴: بازگشت به چیدمان داخلی');
+      return packMaterialGroupsSync(items, sheetWidth, sheetHeight, allowRotation, requestedTrials);
     });
   }
 
@@ -2171,9 +2316,11 @@
     var areaSquareMeters = state.areaMm2 / 1000000;
     var lightingAreaSquareMeters = (state.lightingAreaMm2 || state.areaMm2) / 1000000;
     var consumedSquareMeters = state.consumedAreaMm2 / 1000000;
+    var fullSheetSquareMeters = (state.sheetWidthMm * state.sheetHeightMm) / 1000000;
+    var consumedSheetPercent = fullSheetSquareMeters > 0 ? (consumedSquareMeters / fullSheetSquareMeters) * 100 : 0;
     var perimeterMeters = roundUpToOneDecimal(state.perimeterMm / 1000);
     var doublePerimeterMeters = roundUpToOneDecimal(state.doublePerimeterMm / 1000);
-    var pinPerimeterMeters = roundUpToOneDecimal(state.pinPerimeterMm / 1000);
+    var pinPerimeterMeters = 0;
     var laserPerimeterMeters = roundUpToOneDecimal(state.laserPerimeterMm / 1000);
     var usesMetalFace = edgeType === 'metal';
     var plexiCost = usesMetalFace ? 0 : Math.round(consumedSquareMeters * plexiSquareMeterRate);
@@ -2255,18 +2402,21 @@
       laser_perimeter_m: laserPerimeterMeters,
       area_square_meters: areaSquareMeters,
       lighting_area_square_meters: lightingAreaSquareMeters,
-      consumed_square_meters: consumedSquareMeters
+      consumed_square_meters: consumedSquareMeters,
+      full_sheet_square_meters: fullSheetSquareMeters,
+      consumed_sheet_percent: consumedSheetPercent
     };
 
-    setText('[data-letter-plexi-cost]', usesMetalFace ? 'محاسبه نمی‌شود' : formatMeasure(consumedSquareMeters, 3) + ' مترمربع — ' + formatMoney(plexiCost));
-    setText('[data-letter-metal-sheet-cost]', usesMetalFace ? formatMeasure(consumedSquareMeters, 3) + ' مترمربع — ' + formatMoney(metalSheet07Cost) : 'محاسبه نمی‌شود');
+    var sheetConsumptionText = formatMeasure(consumedSquareMeters, 3) + ' مترمربع (' + formatMeasure(consumedSheetPercent, 1) + '٪ از ورق کامل)';
+    setText('[data-letter-plexi-cost]', usesMetalFace ? 'محاسبه نمی‌شود' : sheetConsumptionText + ' — ' + formatMoney(plexiCost));
+    setText('[data-letter-metal-sheet-cost]', usesMetalFace ? sheetConsumptionText + ' — ' + formatMoney(metalSheet07Cost) : 'محاسبه نمی‌شود');
     setText('[data-letter-powder-coating-cost]', usesMetalFace ? formatMeasure(areaSquareMeters, 3) + ' مترمربع — ' + formatMoney(powderCoatingCost) : 'محاسبه نمی‌شود');
     setText('[data-letter-edge-label]', 'قیمت ' + edgeLabels[edgeType]);
     setText('[data-letter-edge-labor-label]', 'اجرت ساخت ' + edgeLabels[edgeType]);
     setText('[data-letter-edge-cost]', formatMeasure(perimeterMeters, 1) + ' متر — ' + formatMoney(edgeCost));
     setText('[data-letter-build-cost]', formatMeasure(perimeterMeters, 1) + ' متر — ' + formatMoney(buildCost));
     setText('[data-letter-plexi-cut-cost]', usesMetalFace ? 'محاسبه نمی‌شود' : formatMeasure(laserPerimeterMeters, 1) + ' متر برش — ' + formatMoney(plexiCutCost));
-    setText('[data-letter-pvc-cost]', formatMeasure(consumedSquareMeters, 3) + ' مترمربع — ' + formatMoney(pvcCost));
+    setText('[data-letter-pvc-cost]', sheetConsumptionText + ' — ' + formatMoney(pvcCost));
     setText('[data-letter-pvc-cut-cost]', formatMeasure(perimeterMeters, 1) + ' متر — ' + formatMoney(pvcCutCost));
     setText('[data-letter-glue-cost]', formatMeasure(perimeterMeters, 1) + ' متر — ' + formatMoney(glueCost));
     setText('[data-letter-double-labor-cost]', doublePerimeterMeters > 0 ? formatMeasure(doublePerimeterMeters, 1) + ' متر — ' + formatMoney(doubleLaborCost) : 'محاسبه نمی‌شود');
@@ -2286,6 +2436,20 @@
     setText('[data-letter-insurance-tax]', insuranceTaxPercent > 0 ? formatMoney(insuranceTax) + ' (' + formatMeasure(insuranceTaxPercent) + '٪)' : 'محاسبه نشده');
     setText('[data-letter-final]', formatMoney(finalPrice));
     setText('[data-letter-unit-price]', perimeterMeters > 0 ? formatMoney(Math.round(finalPrice / perimeterMeters)) + ' به‌ازای هر متر' : 'محیط قابل محاسبه نیست');
+    setCostRateWarning('[data-letter-plexi-cost]', !usesMetalFace && consumedSquareMeters > 0 && plexiSquareMeterRate === 0);
+    setCostRateWarning('[data-letter-metal-sheet-cost]', usesMetalFace && consumedSquareMeters > 0 && metalSheet07SquareMeterRate === 0);
+    setCostRateWarning('[data-letter-powder-coating-cost]', usesMetalFace && areaSquareMeters > 0 && powderCoatingRate === 0);
+    setCostRateWarning('[data-letter-edge-cost]', perimeterMeters > 0 && edgeRate === 0);
+    setCostRateWarning('[data-letter-build-cost]', perimeterMeters > 0 && edgeLaborRate === 0);
+    setCostRateWarning('[data-letter-plexi-cut-cost]', !usesMetalFace && laserPerimeterMeters > 0 && plexiCutRate === 0);
+    setCostRateWarning('[data-letter-pvc-cost]', consumedSquareMeters > 0 && pvcRate === 0);
+    setCostRateWarning('[data-letter-pvc-cut-cost]', perimeterMeters > 0 && pvcCutRate === 0);
+    setCostRateWarning('[data-letter-glue-cost]', perimeterMeters > 0 && glueRate === 0);
+    setCostRateWarning('[data-letter-double-labor-cost]', doublePerimeterMeters > 0 && doubleLayerLaborRate === 0);
+    setCostRateWarning('[data-letter-led-cost]', smdType !== 'none' && smdRate === 0);
+    setCostRateWarning('[data-letter-transformer-cost]', useTransformer && transformerPlan.items.some(function (item) {
+      return item.count > 0 && item.rate === 0;
+    }));
     drawSmdPreview(state, smdLayout, smdType);
   }
 
@@ -2318,22 +2482,25 @@
     }, 0);
     var wasteArea = Math.max(0, state.consumedAreaMm2 - state.placedMaterialAreaMm2);
     var utilization = state.consumedAreaMm2 > 0 ? (state.placedMaterialAreaMm2 / state.consumedAreaMm2) * 100 : 0;
+    var fullSheetAreaMm2 = state.sheetWidthMm * state.sheetHeightMm;
+    var totalSheetPercent = fullSheetAreaMm2 > 0 ? (state.consumedAreaMm2 / fullSheetAreaMm2) * 100 : 0;
     setText('[data-letter-design-size]', formatMeasure(state.designWidthMm) + ' × ' + formatMeasure(state.designHeightMm) + ' میلی‌متر');
     setText('[data-letter-parts]', state.components.length.toLocaleString('fa-IR') + ' قطعه برش؛ ' + state.doubleParts.toLocaleString('fa-IR') + ' قطعه دوبل؛ ' + (state.lightingComponents || []).length.toLocaleString('fa-IR') + ' قطعه مستقل روشنایی' + (state.unplacedItems.length ? '؛ ' + state.unplacedItems.length.toLocaleString('fa-IR') + ' قطعه جا‌نشده' : ''));
     setText('[data-letter-area]', formatMeasure(state.areaMm2 / 1000000, 3) + ' مترمربع');
     setText('[data-letter-lighting-area]', formatMeasure((state.lightingAreaMm2 || state.areaMm2) / 1000000, 3) + ' مترمربع');
     setText('[data-letter-perimeter]', formatMeasure(roundUpToOneDecimal(state.perimeterMm / 1000), 1) + ' متر');
-    setText('[data-letter-special-paths]', formatMeasure(roundUpToOneDecimal(state.doublePerimeterMm / 1000), 1) + ' متر دوبل؛ ' + formatMeasure(roundUpToOneDecimal(state.pinPerimeterMm / 1000), 1) + ' متر پین‌کات');
+    setText('[data-letter-special-paths]', formatMeasure(roundUpToOneDecimal(state.doublePerimeterMm / 1000), 1) + ' متر مسیر قرمزِ دوبل');
     setText('[data-letter-sheets]', state.sheets.length.toLocaleString('fa-IR') + ' ورق ' + formatMeasure(state.sheetWidthMm, 0) + ' × ' + formatMeasure(state.sheetHeightMm, 0));
-    setText('[data-letter-waste]', formatMeasure(state.consumedAreaMm2 / 1000000, 3) + ' مترمربع مصرف مستطیلی؛ ' + formatMeasure(wasteArea / 1000000, 3) + ' مترمربع پرت داخل آن');
+    setText('[data-letter-waste]', formatMeasure(state.consumedAreaMm2 / 1000000, 3) + ' مترمربع (' + formatMeasure(totalSheetPercent, 1) + '٪ از ورق کامل)؛ ' + formatMeasure(wasteArea / 1000000, 3) + ' مترمربع پرت داخل آن');
     setText('[data-letter-utilization]', 'بهره‌وری ' + formatMeasure(utilization, 1) + '٪');
     setText('[data-letter-accuracy]', 'تفکیک ' + state.materialUsage.length.toLocaleString('fa-IR') + ' رنگ/لایه پلکسی؛ ' + state.layoutTrials.toLocaleString('fa-IR') + ' چیدمان آزمایشی؛ دقت تقریبی: ' + formatMeasure(state.stepMm, 1) + ' میلی‌متر');
     var materials = form.querySelector('[data-letter-materials]');
     if (materials) {
       materials.innerHTML = '<strong>مصرف پلکسی به تفکیک رنگ و لایه</strong>' + state.materialUsage.map(function (usage) {
+        var usageSheetPercent = fullSheetAreaMm2 > 0 ? (usage.consumedAreaMm2 / fullSheetAreaMm2) * 100 : 0;
         return '<div><i style="--material-color:' + usage.color + '"></i><span><b>' + usage.label + '</b><small>'
           + usage.parts.toLocaleString('fa-IR') + ' قطعه؛ ' + usage.sheets.toLocaleString('fa-IR') + ' ورق؛ '
-          + formatMeasure(usage.consumedAreaMm2 / 1000000, 3) + ' مترمربع مصرف</small></span></div>';
+          + formatMeasure(usage.consumedAreaMm2 / 1000000, 3) + ' مترمربع (' + formatMeasure(usageSheetPercent, 1) + '٪ از ورق کامل)</small></span></div>';
       }).join('');
       materials.hidden = !state.materialUsage.length;
     }
@@ -2467,6 +2634,8 @@
         parts: analysisState.components.length,
         sheets: analysisState.sheets.length,
         unplaced_parts: analysisState.unplacedItems.length,
+        sheet_width_mm: analysisState.sheetWidthMm,
+        sheet_height_mm: analysisState.sheetHeightMm,
         design_width_mm: analysisState.designWidthMm,
         design_height_mm: analysisState.designHeightMm
       },
@@ -2699,6 +2868,12 @@
     var pinPerimeterMeters = Number(breakdown.pin_perimeter_m || ((analysis.pin_perimeter_mm || 0) / 1000));
     var laserPerimeterMeters = Number(breakdown.laser_perimeter_m || ((analysis.laser_perimeter_mm || 0) / 1000) || analysis.rounded_perimeter_m || 0);
     var usesMetalFace = edgeKey === 'metal';
+    var savedConsumedSquareMeters = Number(analysis.consumed_area_mm2 || 0) / 1000000;
+    var savedSheetWidthMm = Number(analysis.sheet_width_mm || rates.sheet_width_mm || 0);
+    var savedSheetHeightMm = Number(analysis.sheet_height_mm || rates.sheet_height_mm || 0);
+    var savedFullSheetAreaMm2 = savedSheetWidthMm * savedSheetHeightMm;
+    var savedSheetPercent = savedFullSheetAreaMm2 > 0 ? (Number(analysis.consumed_area_mm2 || 0) / savedFullSheetAreaMm2) * 100 : 0;
+    var savedConsumptionBasis = formatMeasure(savedConsumedSquareMeters, 3) + ' مترمربع (' + formatMeasure(savedSheetPercent, 1) + '٪ از ورق کامل)';
     var smdDensityCount = Number(breakdown.smd_density_count || breakdown.smd_count || 0);
     var smdMinimumNote = Number(breakdown.smd_count || 0) > smdDensityCount
       ? '؛ با اعمال حداقل یک واحد برای هر قطعه مستقل'
@@ -2719,23 +2894,23 @@
         + smdModuleDescription + smdMinimumNote;
     }
     var faceRows = usesMetalFace ? [
-      ['ورق فلزی ۰٫۷', formatMeasure((analysis.consumed_area_mm2 || 0) / 1000000, 3) + ' مترمربع', rates.metal_sheet_07_sqm_rate, breakdown.metal_sheet_07],
-      ['رنگ کوره‌ای', formatMeasure((analysis.area_mm2 || 0) / 1000000, 3) + ' مترمربع', rates.metal_powder_coating_rate, breakdown.powder_coating]
+      ['ورق فلزی ۰٫۷', savedConsumptionBasis, rates.metal_sheet_07_sqm_rate, breakdown.metal_sheet_07, savedConsumedSquareMeters > 0 && Number(rates.metal_sheet_07_sqm_rate || 0) === 0],
+      ['رنگ کوره‌ای', formatMeasure((analysis.area_mm2 || 0) / 1000000, 3) + ' مترمربع', rates.metal_powder_coating_rate, breakdown.powder_coating, Number(analysis.area_mm2 || 0) > 0 && Number(rates.metal_powder_coating_rate || 0) === 0]
     ] : [
-      ['مصرف پلکسی', formatMeasure((analysis.consumed_area_mm2 || 0) / 1000000, 3) + ' مترمربع', rates.plexi_sqm_rate, breakdown.plexi],
-      ['برش پلکسی', formatMeasure(laserPerimeterMeters, 1) + ' متر؛ شامل برش زیر و رو و پین‌کات', rates.plexi_cut_rate, breakdown.plexi_cut]
+      ['مصرف پلکسی', savedConsumptionBasis, rates.plexi_sqm_rate, breakdown.plexi, savedConsumedSquareMeters > 0 && Number(rates.plexi_sqm_rate || 0) === 0],
+      ['برش پلکسی', formatMeasure(laserPerimeterMeters, 1) + ' متر؛ شامل برش زیر و رو', rates.plexi_cut_rate, breakdown.plexi_cut, laserPerimeterMeters > 0 && Number(rates.plexi_cut_rate || 0) === 0]
     ];
     var rows = faceRows.concat([
-      ['قیمت ' + edgeName, formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates['edge_' + edgeKey + '_material_rate'], breakdown.edge],
-      ['اجرت ساخت ' + edgeName, formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates['edge_' + edgeKey + '_labor_rate'], breakdown.edge_labor],
+      ['قیمت ' + edgeName, formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates['edge_' + edgeKey + '_material_rate'], breakdown.edge, Number(analysis.rounded_perimeter_m || 0) > 0 && Number(rates['edge_' + edgeKey + '_material_rate'] || 0) === 0],
+      ['اجرت ساخت ' + edgeName, formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates['edge_' + edgeKey + '_labor_rate'], breakdown.edge_labor, Number(analysis.rounded_perimeter_m || 0) > 0 && Number(rates['edge_' + edgeKey + '_labor_rate'] || 0) === 0],
     ]).concat(doublePerimeterMeters > 0 ? [
-      ['اجرت دوبل', formatMeasure(doublePerimeterMeters, 1) + ' متر مسیر آبی', rates.double_layer_labor_rate, breakdown.double_labor]
+      ['اجرت دوبل', formatMeasure(doublePerimeterMeters, 1) + ' متر مسیر قرمز', rates.double_layer_labor_rate, breakdown.double_labor, Number(rates.double_layer_labor_rate || 0) === 0]
     ] : []).concat([
-      ['PVC', formatMeasure((analysis.consumed_area_mm2 || 0) / 1000000, 3) + ' مترمربع', rates.pvc_rate, breakdown.pvc],
-      ['برش PVC', formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates.pvc_cut_rate, breakdown.pvc_cut],
-      ['چسب', formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates.glue_rate, breakdown.glue],
-      [smdName, smdBasis, smdKey !== 'none' ? rates['smd_' + smdKey + '_rate'] : 0, breakdown.smd],
-      ['ترانس پیشنهادی', useTransformer ? transformerPlanText(transformerPlan) : 'استفاده نمی‌شود', null, breakdown.transformer],
+      ['PVC', savedConsumptionBasis, rates.pvc_rate, breakdown.pvc, savedConsumedSquareMeters > 0 && Number(rates.pvc_rate || 0) === 0],
+      ['برش PVC', formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates.pvc_cut_rate, breakdown.pvc_cut, Number(analysis.rounded_perimeter_m || 0) > 0 && Number(rates.pvc_cut_rate || 0) === 0],
+      ['چسب', formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates.glue_rate, breakdown.glue, Number(analysis.rounded_perimeter_m || 0) > 0 && Number(rates.glue_rate || 0) === 0],
+      [smdName, smdBasis, smdKey !== 'none' ? rates['smd_' + smdKey + '_rate'] : 0, breakdown.smd, smdKey !== 'none' && Number(rates['smd_' + smdKey + '_rate'] || 0) === 0],
+      ['ترانس پیشنهادی', useTransformer ? transformerPlanText(transformerPlan) : 'استفاده نمی‌شود', null, breakdown.transformer, useTransformer && transformerPlan.items.some(function (item) { return item.count > 0 && item.rate === 0; })],
       ['نصب', installationBasis, installationRate, breakdown.installation], ['ایاب و ذهاب', '', null, breakdown.travel],
       ['سیم و لوازم مصرفی', '', null, breakdown.wire_supplies],
       ['جمع هزینه‌های جانبی', '', null, Number(breakdown.installation || 0) + Number(breakdown.travel || 0) + Number(breakdown.wire_supplies || 0)],
@@ -2745,14 +2920,15 @@
     ]);
     var rowsHtml = rows.map(function (row) {
       var rate = row[2] === null ? '—' : formatMoney(Number(row[2] || 0));
-      return '<tr><td>' + escapeEstimateHtml(row[0]) + '</td><td>' + escapeEstimateHtml(row[1]) + '</td><td>' + escapeEstimateHtml(rate) + '</td><td>' + escapeEstimateHtml(formatMoney(Number(row[3] || 0))) + '</td></tr>';
+      return '<tr' + (row[4] ? ' class="zero-rate"' : '') + '><td>' + escapeEstimateHtml(row[0]) + '</td><td>' + escapeEstimateHtml(row[1]) + '</td><td>' + escapeEstimateHtml(rate) + '</td><td>' + escapeEstimateHtml(formatMoney(Number(row[3] || 0))) + '</td></tr>';
     }).join('');
     var svgPreview = snapshot.svg ? '<img class="design" src="data:image/svg+xml;charset=utf-8,' + encodeURIComponent(snapshot.svg) + '" alt="طرح پروژه">' : '';
     var layoutPreviews = Array.isArray(snapshot.layout_previews) ? snapshot.layout_previews : [];
     var materialRows = Array.isArray(snapshot.materials) ? snapshot.materials : [];
     var materialsHtml = materialRows.length ? '<section class="material-section"><h2>مصرف پلکسی به تفکیک رنگ و لایه</h2><div class="materials">' + materialRows.map(function (material) {
+      var materialSheetPercent = savedFullSheetAreaMm2 > 0 ? (Number(material.consumed_area_mm2 || 0) / savedFullSheetAreaMm2) * 100 : 0;
       return '<div><i style="background:' + escapeEstimateHtml(material.color || '#777777') + '"></i><span><b>' + escapeEstimateHtml(material.label || material.color || 'پلکسی') + '</b><small>'
-        + escapeEstimateHtml(Number(material.parts || 0).toLocaleString('fa-IR') + ' قطعه؛ ' + Number(material.sheets || 0).toLocaleString('fa-IR') + ' ورق؛ ' + formatMeasure(Number(material.consumed_area_mm2 || 0) / 1000000, 3) + ' مترمربع مصرف')
+        + escapeEstimateHtml(Number(material.parts || 0).toLocaleString('fa-IR') + ' قطعه؛ ' + Number(material.sheets || 0).toLocaleString('fa-IR') + ' ورق؛ ' + formatMeasure(Number(material.consumed_area_mm2 || 0) / 1000000, 3) + ' مترمربع (' + formatMeasure(materialSheetPercent, 1) + '٪ از ورق کامل)')
         + '</small></span></div>';
     }).join('') + '</div></section>' : '';
     var layoutsHtml = layoutPreviews.length ? '<section class="layout-section"><h2>پیش‌نمایش چیدمان ورق‌ها</h2><div class="layouts">' + layoutPreviews.map(function (source, index) {
@@ -2771,7 +2947,7 @@
       : '';
     var safeTitle = escapeEstimateHtml(projectName || 'برآورد قیمت حروف');
     return '<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>برآورد قیمت - ' + safeTitle + '</title><style>'
-      + '@page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0}body{padding:12mm;font-family:Tahoma,Arial,sans-serif;color:#171717;direction:rtl}header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #b78a2d;padding-bottom:10px;margin-bottom:15px}h1{font-size:22px;margin:0}h2{margin:0 0 8px;font-size:14px}header span{color:#6b5a32}.meta{display:grid;grid-template-columns:repeat(2,1fr);border:1px solid #bbb;margin-bottom:14px}.meta div{padding:8px 10px;border-bottom:1px solid #ddd}.meta div:nth-child(odd){border-left:1px solid #ddd}.design{display:block;max-width:100%;max-height:145px;margin:10px auto 14px}.material-section,.layout-section,.smd-section{margin:10px 0 14px;padding:9px;border:1px solid #cfc7b7;background:#faf8f2;break-inside:avoid}.smd-section{border-color:#aec5d5;background:#f3f8fb;text-align:center}.smd-section img{display:block;width:auto;max-width:100%;max-height:90mm;margin:0 auto 6px;object-fit:contain}.smd-section p{margin:4px 0 0;color:#31536c;font-size:10px;font-weight:bold}.materials{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.materials>div{display:flex;gap:7px;align-items:center;padding:6px;background:#fff;border:1px solid #ddd}.materials i{width:18px;height:18px;border-radius:4px;border:1px solid #999;flex:none}.materials span{display:flex;flex-direction:column}.materials small{font-size:9px;color:#666}.layouts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.layouts figure{margin:0;padding:5px;border:1px solid #d8d1c3;background:#fff;text-align:center;break-inside:avoid}.layouts img{display:block;width:auto;max-width:100%;height:34mm;margin:auto;object-fit:contain}.layouts figcaption{margin-top:4px;color:#665b46;font-size:9px;font-weight:bold}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #999;padding:6px 8px;text-align:right}th{background:#eee}td:last-child{text-align:left}.final{display:flex;justify-content:space-between;margin-top:12px;padding:12px 14px;background:#222;color:#fff;font-size:19px;font-weight:bold}.final strong{display:grid;text-align:left}.final small{margin-top:4px;color:#e8d8a7;font-size:11px}.unplaced-notice{margin:10px 0;padding:8px;border:1px solid #d67b70;background:#fff4f2;color:#8a271d;font-size:10px;font-weight:bold}.note{margin-top:10px;color:#666;font-size:10px}@media print{body{padding:12mm}.no-print{display:none!important}}</style></head><body>'
+      + '@page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0}body{padding:12mm;font-family:Tahoma,Arial,sans-serif;color:#171717;direction:rtl}header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #b78a2d;padding-bottom:10px;margin-bottom:15px}h1{font-size:22px;margin:0}h2{margin:0 0 8px;font-size:14px}header span{color:#6b5a32}.meta{display:grid;grid-template-columns:repeat(2,1fr);border:1px solid #bbb;margin-bottom:14px}.meta div{padding:8px 10px;border-bottom:1px solid #ddd}.meta div:nth-child(odd){border-left:1px solid #ddd}.design{display:block;max-width:100%;max-height:145px;margin:10px auto 14px}.material-section,.layout-section,.smd-section{margin:10px 0 14px;padding:9px;border:1px solid #cfc7b7;background:#faf8f2;break-inside:avoid}.smd-section{border-color:#aec5d5;background:#f3f8fb;text-align:center}.smd-section img{display:block;width:auto;max-width:100%;max-height:90mm;margin:0 auto 6px;object-fit:contain}.smd-section p{margin:4px 0 0;color:#31536c;font-size:10px;font-weight:bold}.materials{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.materials>div{display:flex;gap:7px;align-items:center;padding:6px;background:#fff;border:1px solid #ddd}.materials i{width:18px;height:18px;border-radius:4px;border:1px solid #999;flex:none}.materials span{display:flex;flex-direction:column}.materials small{font-size:9px;color:#666}.layouts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.layouts figure{margin:0;padding:5px;border:1px solid #d8d1c3;background:#fff;text-align:center;break-inside:avoid}.layouts img{display:block;width:auto;max-width:100%;height:34mm;margin:auto;object-fit:contain}.layouts figcaption{margin-top:4px;color:#665b46;font-size:9px;font-weight:bold}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #999;padding:6px 8px;text-align:right}th{background:#eee}td:last-child{text-align:left}.zero-rate td{background:#fff0ee;color:#a51f1a;font-weight:bold}.final{display:flex;justify-content:space-between;margin-top:12px;padding:12px 14px;background:#222;color:#fff;font-size:19px;font-weight:bold}.final strong{display:grid;text-align:left}.final small{margin-top:4px;color:#e8d8a7;font-size:11px}.unplaced-notice{margin:10px 0;padding:8px;border:1px solid #d67b70;background:#fff4f2;color:#8a271d;font-size:10px;font-weight:bold}.note{margin-top:10px;color:#666;font-size:10px}@media print{body{padding:12mm}.no-print{display:none!important}}</style></head><body>'
       + '<header><h1>برآورد قیمت ساخت حروف</h1><span>زیگورات</span></header>'
       + '<section class="meta"><div><b>نام پروژه:</b> ' + safeTitle + '</div><div><b>فایل طرح:</b> ' + escapeEstimateHtml(snapshot.source_file || '—') + '</div><div><b>ابعاد:</b> ' + escapeEstimateHtml(formatMeasure(analysis.design_width_mm || 0, 2) + ' × ' + formatMeasure(analysis.design_height_mm || 0, 2) + ' میلی‌متر') + '</div><div><b>مساحت واقعی رویه:</b> ' + escapeEstimateHtml(formatMeasure((analysis.area_mm2 || 0) / 1000000, 3) + ' مترمربع') + '</div><div><b>محیط محاسباتی:</b> ' + escapeEstimateHtml(formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر') + '</div><div><b>نوع SMD:</b> ' + escapeEstimateHtml(smdName) + '</div></section>'
       + svgPreview + smdPreviewHtml + materialsHtml + layoutsHtml + unplacedNotice + '<table><thead><tr><th>شرح</th><th>مبنای محاسبه</th><th>نرخ واحد</th><th>هزینه</th></tr></thead><tbody>' + rowsHtml + '</tbody></table>'
@@ -2806,7 +2982,7 @@
     updateProgress('مرحله ۱ از ۴: خواندن و بررسی فایل SVG');
     return readFile(file).then(function (text) {
       var prepared = prepareSvg(text);
-      if (!prepared.materialJobs.length) throw new Error('هیچ قطعه مشکی یا آبی قابل چیدمان در SVG پیدا نشد.');
+      if (!prepared.materialJobs.length) throw new Error('هیچ قطعه مشکی یا قرمز قابل چیدمان در SVG پیدا نشد.');
       var vectorPerimeters = {
         primary: measureSvgPerimeter(prepared, designWidth, designHeight, 'primary'),
         double: measureSvgPerimeter(prepared, designWidth, designHeight, 'double'),
@@ -2882,9 +3058,9 @@
       var rasterDoublePerimeter = doubleComponents.reduce(function (sum, component) { return sum + component.perimeterMm; }, 0);
       var primaryPerimeterMm = data.vectorPerimeters.primary > 0 ? data.vectorPerimeters.primary : rasterPrimaryPerimeter;
       var doublePerimeterMm = data.vectorPerimeters.double > 0 ? data.vectorPerimeters.double : rasterDoublePerimeter;
-      var pinPerimeterMm = data.vectorPerimeters.pin;
+      var pinPerimeterMm = 0;
       var perimeterMm = primaryPerimeterMm > 0 ? primaryPerimeterMm : doublePerimeterMm;
-      var laserPerimeterMm = primaryPerimeterMm + (2 * doublePerimeterMm) + pinPerimeterMm;
+      var laserPerimeterMm = primaryPerimeterMm + (2 * doublePerimeterMm);
       return packMaterialGroups(items, usableWidth, usableHeight, true, layoutTrials).then(function (sheets) {
         analysisState = {
           components: components,

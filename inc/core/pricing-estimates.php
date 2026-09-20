@@ -25,13 +25,13 @@ function zigurat_pricing_estimate_date($post)
     return mysql2date('Y/m/d H:i', $post->post_modified);
 }
 
-function zigurat_get_pricing_estimate_records($limit = 100)
+function zigurat_get_pricing_estimate_records($limit = 100, $calculator_type = 'letters')
 {
-    $page = zigurat_get_pricing_estimate_page(1, $limit);
+    $page = zigurat_get_pricing_estimate_page(1, $limit, '', $calculator_type);
     return $page['records'];
 }
 
-function zigurat_get_pricing_estimate_page($page = 1, $per_page = 10, $search = '')
+function zigurat_get_pricing_estimate_page($page = 1, $per_page = 10, $search = '', $calculator_type = 'letters')
 {
     if (!zigurat_is_manager()) {
         return array('records' => array(), 'total' => 0, 'page' => 1, 'pages' => 1, 'per_page' => 10);
@@ -39,6 +39,7 @@ function zigurat_get_pricing_estimate_page($page = 1, $per_page = 10, $search = 
     $page = max(1, absint($page));
     $per_page = max(5, min(50, absint($per_page)));
     $search = sanitize_text_field((string) $search);
+    $calculator_type = in_array($calculator_type, array('letters','composite'), true) ? $calculator_type : 'letters';
     $query = new WP_Query(array(
         'post_type' => 'zig_price_estimate',
         'post_status' => 'private',
@@ -48,10 +49,14 @@ function zigurat_get_pricing_estimate_page($page = 1, $per_page = 10, $search = 
         'orderby' => 'modified',
         'order' => 'DESC',
         'no_found_rows' => false,
+        'meta_query' => array(array(
+            'key' => '_zigurat_pricing_type',
+            'value' => $calculator_type,
+        )),
     ));
     $pages = max(1, (int) $query->max_num_pages);
     if ($page > $pages) {
-        return zigurat_get_pricing_estimate_page($pages, $per_page, $search);
+        return zigurat_get_pricing_estimate_page($pages, $per_page, $search, $calculator_type);
     }
     $records = array_map(static function ($post) {
         $final_price = (int) get_post_meta($post->ID, '_zigurat_pricing_final', true);
@@ -323,6 +328,77 @@ function zigurat_sanitize_letter_estimate_snapshot($snapshot)
     return $clean;
 }
 
+function zigurat_sanitize_composite_estimate_snapshot($snapshot)
+{
+    if (!is_array($snapshot)) {
+        return new WP_Error('invalid_snapshot', 'اطلاعات محاسبه معتبر نیست.');
+    }
+    $input_keys = array(
+        'length','width','drip_depth','bottom_depth','side_depth','install_allowance',
+        'freight','bracing_cost','profit_percent','insurance_tax_percent',
+    );
+    $rate_keys = array('iron_rate','composite_rate','installer_rate','supplies_rate');
+    $result_keys = array(
+        'face_area','visible_area','cut_area','sheet_count','purchased_area','utilization_percent',
+        'iron_cost','composite_cost','installer_cost','supplies_cost','freight','bracing_cost',
+        'base_total','profit_percent','profit_amount','insurance_tax_percent','insurance_tax_amount',
+        'price_per_square_meter','final_price',
+    );
+    $clean = array(
+        'version' => 1,
+        'calculator_type' => 'composite',
+        'inputs' => array(),
+        'rates' => array(),
+        'results' => array(),
+        'bottom_direction' => in_array(($snapshot['bottom_direction'] ?? ''), array('none','vertical','horizontal'), true)
+            ? $snapshot['bottom_direction'] : 'none',
+        'parts' => array(),
+        'sheets' => array(),
+    );
+    foreach ($input_keys as $key) {
+        $clean['inputs'][$key] = zigurat_pricing_estimate_number($snapshot['inputs'][$key] ?? 0);
+    }
+    foreach ($rate_keys as $key) {
+        $clean['rates'][$key] = zigurat_pricing_estimate_number($snapshot['rates'][$key] ?? 0);
+    }
+    foreach ($result_keys as $key) {
+        $clean['results'][$key] = zigurat_pricing_estimate_number($snapshot['results'][$key] ?? 0);
+    }
+    foreach (array_slice((array) ($snapshot['parts'] ?? array()), 0, 1000) as $part) {
+        if (!is_array($part)) continue;
+        $type = in_array(($part['type'] ?? ''), array('face','drip','bottom','side'), true) ? $part['type'] : '';
+        if ($type === '') continue;
+        $clean['parts'][] = array(
+            'type'=>$type,
+            'title'=>sanitize_text_field((string) ($part['title'] ?? '')),
+            'label'=>sanitize_text_field((string) ($part['label'] ?? '')),
+            'width'=>zigurat_pricing_estimate_number($part['width'] ?? 0, 100000),
+            'height'=>zigurat_pricing_estimate_number($part['height'] ?? 0, 100000),
+        );
+    }
+    foreach (array_slice((array) ($snapshot['sheets'] ?? array()), 0, 200) as $sheet) {
+        $placements = array();
+        foreach (array_slice((array) ($sheet['placements'] ?? array()), 0, 1000) as $placement) {
+            if (!is_array($placement)) continue;
+            $type = in_array(($placement['type'] ?? ''), array('face','drip','bottom','side'), true) ? $placement['type'] : '';
+            if ($type === '') continue;
+            $placements[] = array(
+                'type'=>$type,
+                'label'=>sanitize_text_field((string) ($placement['label'] ?? '')),
+                'x'=>zigurat_pricing_estimate_number($placement['x'] ?? 0, 3200),
+                'y'=>zigurat_pricing_estimate_number($placement['y'] ?? 0, 1250),
+                'width'=>zigurat_pricing_estimate_number($placement['width'] ?? 0, 3200),
+                'height'=>zigurat_pricing_estimate_number($placement['height'] ?? 0, 1250),
+            );
+        }
+        $clean['sheets'][] = array('placements'=>$placements);
+    }
+    if ($clean['inputs']['length'] <= 0 || $clean['inputs']['width'] <= 0 || $clean['results']['final_price'] < 0) {
+        return new WP_Error('invalid_snapshot', 'ابعاد یا نتیجه محاسبه کامپوزیت معتبر نیست.');
+    }
+    return $clean;
+}
+
 /**
  * Read an estimate snapshot and repair records saved before JSON was wp_slash()ed.
  */
@@ -375,7 +451,10 @@ function zigurat_ajax_save_pricing_estimate()
         wp_send_json_error(array('message' => 'نام پروژه را وارد کنید.'), 400);
     }
     $decoded = json_decode(wp_unslash((string) ($_POST['snapshot'] ?? '')), true);
-    $snapshot = zigurat_sanitize_letter_estimate_snapshot($decoded);
+    $calculator_type = is_array($decoded) && ($decoded['calculator_type'] ?? '') === 'composite' ? 'composite' : 'letters';
+    $snapshot = $calculator_type === 'composite'
+        ? zigurat_sanitize_composite_estimate_snapshot($decoded)
+        : zigurat_sanitize_letter_estimate_snapshot($decoded);
     if (is_wp_error($snapshot)) {
         wp_send_json_error(array('message' => $snapshot->get_error_message()), 400);
     }
@@ -384,6 +463,10 @@ function zigurat_ajax_save_pricing_estimate()
         $existing = get_post($estimate_id);
         if (!$existing || $existing->post_type !== 'zig_price_estimate') {
             wp_send_json_error(array('message' => 'رکورد موردنظر پیدا نشد.'), 404);
+        }
+        $existing_type = (string) get_post_meta($estimate_id, '_zigurat_pricing_type', true);
+        if ($existing_type !== '' && $existing_type !== $calculator_type) {
+            wp_send_json_error(array('message' => 'نوع برآورد ذخیره‌شده با این محاسبه‌گر یکسان نیست.'), 400);
         }
     }
     $post_data = array(
@@ -401,11 +484,16 @@ function zigurat_ajax_save_pricing_estimate()
     if (is_wp_error($result)) {
         wp_send_json_error(array('message' => $result->get_error_message()), 500);
     }
-    update_post_meta($result, '_zigurat_pricing_type', 'letters');
-    update_post_meta($result, '_zigurat_pricing_final', (int) round($snapshot['breakdown']['final']));
-    $perimeter_m = (float) ($snapshot['analysis']['rounded_perimeter_m'] ?? $snapshot['breakdown']['rounded_perimeter_m'] ?? 0);
-    update_post_meta($result, '_zigurat_pricing_perimeter', $perimeter_m);
-    update_post_meta($result, '_zigurat_pricing_unit_price', $perimeter_m > 0 ? (int) round($snapshot['breakdown']['final'] / $perimeter_m) : 0);
+    update_post_meta($result, '_zigurat_pricing_type', $calculator_type);
+    $final_price = $calculator_type === 'composite'
+        ? (float) ($snapshot['results']['final_price'] ?? 0)
+        : (float) ($snapshot['breakdown']['final'] ?? 0);
+    $measure = $calculator_type === 'composite'
+        ? (float) ($snapshot['results']['face_area'] ?? 0)
+        : (float) ($snapshot['analysis']['rounded_perimeter_m'] ?? $snapshot['breakdown']['rounded_perimeter_m'] ?? 0);
+    update_post_meta($result, '_zigurat_pricing_final', (int) round($final_price));
+    update_post_meta($result, '_zigurat_pricing_perimeter', $measure);
+    update_post_meta($result, '_zigurat_pricing_unit_price', $measure > 0 ? (int) round($final_price / $measure) : 0);
     update_post_meta($result, '_zigurat_pricing_snapshot', wp_slash(wp_json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)));
     wp_send_json_success(array(
         'id' => (int) $result,
@@ -444,6 +532,7 @@ function zigurat_ajax_list_pricing_estimates()
     }
     $page = absint($_POST['page'] ?? 1);
     $search = sanitize_text_field(wp_unslash((string) ($_POST['search'] ?? '')));
-    wp_send_json_success(zigurat_get_pricing_estimate_page($page, 10, $search));
+    $calculator_type = sanitize_key(wp_unslash((string) ($_POST['calculator_type'] ?? 'letters')));
+    wp_send_json_success(zigurat_get_pricing_estimate_page($page, 10, $search, $calculator_type));
 }
 add_action('wp_ajax_zigurat_list_pricing_estimates', 'zigurat_ajax_list_pricing_estimates');

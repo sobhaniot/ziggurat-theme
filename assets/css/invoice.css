@@ -269,6 +269,7 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
 .invoice-notice { margin-bottom: 18px; padding: 13px 15px; border: 1px solid; border-radius: 8px; }
 .invoice-notice.is-error { border-color: #e3b4b4; background: #fff2f2; color: #8b2222; }
 .invoice-notice.is-success { border-color: #a9d5b4; background: #edf9f0; color: #17652b; }
+.invoice-notice.is-copy { border-color: #d6b35e; background: #fff9e8; color: #61470f; }
 .invoice-save-result { margin: 12px 0 0; }
 .invoice-notice.is-branch { border-color: #b6c5df; background: #f0f4fb; color: #344c74; }
 .invoice-list-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -356,6 +357,8 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
 .invoice-trash-table tbody tr { background: #fafafa; }
 .invoice-list-table td:last-child .invoice-convert-action { border-color: #237447; background: #edf8f1; color: #176238; font-weight: 800; }
 .invoice-list-table td:last-child .invoice-converted-link { border-color: #5a6f94; background: #f0f4fb; color: #344c74; font-weight: 800; }
+.invoice-editor-actions .invoice-copy-action,
+.invoice-list-table td:last-child .invoice-copy-action { border-color: #a47a1f; background: #fff8e6; color: #66480b; font-weight: 800; }
 .invoice-editor-actions .invoice-branch-action,
 .invoice-list-table td:last-child .invoice-branch-action { border-color: #5a6f94; background: #eef3fb; color: #2e4770; font-weight: 800; }
 .invoice-list-row--branch td:first-child { padding-right: 22px; background: #f7f9fc; }

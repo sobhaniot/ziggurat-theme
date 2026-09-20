@@ -248,15 +248,165 @@ add_action('wp_ajax_zigurat_save_composite_last_values', 'zigurat_ajax_save_comp
 function zigurat_calculate_composite_price($data, $settings = null)
 {
     $settings = is_array($settings) ? $settings : zigurat_get_composite_pricing_settings();
-    $length = zigurat_pricing_decimal($data['length'] ?? 0);
-    $width = zigurat_pricing_decimal($data['width'] ?? 0);
+    $length = zigurat_pricing_decimal($data['length'] ?? 0) / 100;
+    $width = zigurat_pricing_decimal($data['width'] ?? 0) / 100;
     if ($length <= 0 || $width <= 0) {
         return new WP_Error('invalid_dimensions', 'طول و عرض باید بیشتر از صفر باشند.');
     }
 
-    $area = $length * $width;
-    $iron_cost = (int) round($area * max(0, (int) ($settings['iron_rate'] ?? 0)));
-    $composite_cost = (int) round($area * max(0, (int) ($settings['composite_rate'] ?? 0)));
+    $sheet_width = 3200.0;
+    $sheet_height = 1250.0;
+    $sheet_area = 4.0;
+    $cut_gap = 4.0;
+    $drip_depth = zigurat_pricing_decimal($data['drip_depth'] ?? 0) / 100;
+    $bottom_depth = zigurat_pricing_decimal($data['bottom_depth'] ?? 0) / 100;
+    $side_depth = zigurat_pricing_decimal($data['side_depth'] ?? 0) / 100;
+    $install_allowance = zigurat_pricing_decimal($data['install_allowance'] ?? 8) / 100;
+    if (($width + $install_allowance) * 1000 > $sheet_width) {
+        return new WP_Error('horizontal_groove_required', 'ارتفاع نما با احتساب خم نصب بیشتر از ۳۲۰ سانتی‌متر است و بدون شیار افقی چیدمان نما ممکن نیست.');
+    }
+    $face_area = $length * $width;
+    $area = $face_area + ($length * $drip_depth) + ($length * $bottom_depth) + (2 * $width * $side_depth);
+
+    $install_allowance_mm = $install_allowance * 1000;
+    $split_surface = static function ($surface_width, $surface_height, $type, $forced_direction = '') use ($sheet_width, $sheet_height, $install_allowance_mm) {
+        if ($surface_width <= 0 || $surface_height <= 0) {
+            return array();
+        }
+        $usable_sheet_width = max(1, $sheet_width - $install_allowance_mm);
+        $usable_sheet_height = max(1, $sheet_height - $install_allowance_mm);
+        $variants = $type === 'face'
+            ? array($surface_height + $install_allowance_mm <= $sheet_height
+                ? array('columns'=>(int) ceil($surface_width / $usable_sheet_width), 'rows'=>1)
+                : array('columns'=>(int) ceil($surface_width / $usable_sheet_height), 'rows'=>1))
+            : ($forced_direction === 'vertical'
+                ? array(array('columns'=>(int) ceil($surface_width / $usable_sheet_height), 'rows'=>(int) ceil($surface_height / $usable_sheet_width)))
+                : ($forced_direction === 'horizontal'
+                    ? array(array('columns'=>(int) ceil($surface_width / $usable_sheet_width), 'rows'=>(int) ceil($surface_height / $usable_sheet_height)))
+                    : array(
+                array('columns'=>(int) ceil($surface_width / $usable_sheet_width), 'rows'=>(int) ceil($surface_height / $usable_sheet_height)),
+                array('columns'=>(int) ceil($surface_width / $usable_sheet_height), 'rows'=>(int) ceil($surface_height / $usable_sheet_width)),
+                    )));
+        foreach ($variants as &$variant) {
+            $variant['count'] = $variant['columns'] * $variant['rows'];
+            $variant['seams'] = (($variant['columns'] - 1) * $surface_height) + (($variant['rows'] - 1) * $surface_width);
+        }
+        unset($variant);
+        usort($variants, static function ($a, $b) {
+            return ($a['count'] <=> $b['count']) ?: ($a['seams'] <=> $b['seams']);
+        });
+        $chosen = $variants[0];
+        $parts = array();
+        for ($row = 0; $row < $chosen['rows']; ++$row) {
+            for ($column = 0; $column < $chosen['columns']; ++$column) {
+                $part_width = $column === $chosen['columns'] - 1
+                    ? $surface_width - ($surface_width / $chosen['columns']) * $column
+                    : $surface_width / $chosen['columns'];
+                $part_height = $row === $chosen['rows'] - 1
+                    ? $surface_height - ($surface_height / $chosen['rows']) * $row
+                    : $surface_height / $chosen['rows'];
+                $parts[] = array('type'=>$type, 'width'=>(int) round($part_width + $install_allowance_mm), 'height'=>(int) round($part_height + $install_allowance_mm));
+            }
+        }
+        return $parts;
+    };
+
+    $surfaces = array(
+        array('type'=>'face', 'width'=>$length * 1000, 'height'=>$width * 1000),
+        array('type'=>'drip', 'width'=>$length * 1000, 'height'=>$drip_depth * 1000),
+        array('type'=>'side', 'width'=>$width * 1000, 'height'=>$side_depth * 1000),
+        array('type'=>'side', 'width'=>$width * 1000, 'height'=>$side_depth * 1000),
+    );
+    $base_parts = array();
+    foreach ($surfaces as $surface) {
+        $base_parts = array_merge($base_parts, $split_surface($surface['width'], $surface['height'], $surface['type']));
+    }
+    $bottom_trials = $bottom_depth > 0
+        ? array(
+            array('direction'=>'vertical', 'parts'=>$split_surface($length * 1000, $bottom_depth * 1000, 'bottom', 'vertical')),
+            array('direction'=>'horizontal', 'parts'=>$split_surface($length * 1000, $bottom_depth * 1000, 'bottom', 'horizontal')),
+        )
+        : array(array('direction'=>'none', 'parts'=>array()));
+
+    $place_piece = static function (&$sheet, $piece) use ($cut_gap) {
+        $best = null;
+        foreach ($sheet['free'] as $space_index=>$space) {
+            foreach (array(array($piece['width'],$piece['height']), array($piece['height'],$piece['width'])) as $option) {
+                if ($option[0] > $space['width'] || $option[1] > $space['height']) {
+                    continue;
+                }
+                $footprint_width = min($space['width'], $option[0] + $cut_gap);
+                $footprint_height = min($space['height'], $option[1] + $cut_gap);
+                $score = ($space['width'] * $space['height']) - ($footprint_width * $footprint_height)
+                    + min($space['width'] - $footprint_width, $space['height'] - $footprint_height) * 10;
+                if ($best === null || $score < $best['score']) {
+                    $best = compact('score','space_index','footprint_width','footprint_height');
+                }
+            }
+        }
+        if ($best === null) {
+            return false;
+        }
+        $space = $sheet['free'][$best['space_index']];
+        array_splice($sheet['free'], $best['space_index'], 1);
+        $remaining_width = $space['width'] - $best['footprint_width'];
+        $remaining_height = $space['height'] - $best['footprint_height'];
+        if ($remaining_width > $remaining_height) {
+            $sheet['free'][] = array('x'=>$space['x']+$best['footprint_width'], 'y'=>$space['y'], 'width'=>$remaining_width, 'height'=>$space['height']);
+            $sheet['free'][] = array('x'=>$space['x'], 'y'=>$space['y']+$best['footprint_height'], 'width'=>$best['footprint_width'], 'height'=>$remaining_height);
+        } else {
+            $sheet['free'][] = array('x'=>$space['x']+$best['footprint_width'], 'y'=>$space['y'], 'width'=>$remaining_width, 'height'=>$best['footprint_height']);
+            $sheet['free'][] = array('x'=>$space['x'], 'y'=>$space['y']+$best['footprint_height'], 'width'=>$space['width'], 'height'=>$remaining_height);
+        }
+        $sheet['free'] = array_values(array_filter($sheet['free'], static function ($space) {
+            return $space['width'] >= 1 && $space['height'] >= 1;
+        }));
+        return true;
+    };
+    $nest_parts = static function ($parts) use ($place_piece, $sheet_width, $sheet_height) {
+        usort($parts, static function ($a, $b) {
+            return (max($b['width'], $b['height']) <=> max($a['width'], $a['height']))
+                ?: (($b['width'] * $b['height']) <=> ($a['width'] * $a['height']));
+        });
+        $sheets = array();
+        foreach ($parts as $piece) {
+            $placed = false;
+            foreach ($sheets as &$sheet) {
+                if ($place_piece($sheet, $piece)) {
+                    $placed = true;
+                    break;
+                }
+            }
+            unset($sheet);
+            if (!$placed) {
+                $sheet = array('free'=>array(array('x'=>0.0,'y'=>0.0,'width'=>$sheet_width,'height'=>$sheet_height)));
+                if ($place_piece($sheet, $piece)) {
+                    $sheets[] = $sheet;
+                }
+            }
+        }
+        return array('parts'=>$parts, 'sheets'=>$sheets);
+    };
+    $chosen_trial = null;
+    foreach ($bottom_trials as $trial) {
+        $nested = $nest_parts(array_merge($base_parts, $trial['parts']));
+        $trial['all_parts'] = $nested['parts'];
+        $trial['sheets'] = $nested['sheets'];
+        if ($chosen_trial === null || count($trial['sheets']) < count($chosen_trial['sheets'])) {
+            $chosen_trial = $trial;
+        }
+    }
+    $parts = $chosen_trial['all_parts'];
+    $sheets = $chosen_trial['sheets'];
+    $cut_area = array_reduce($parts, static function ($total, $part) {
+        return $total + ($part['width'] * $part['height'] / 1000000);
+    }, 0.0);
+    $sheet_count = count($sheets);
+    $purchased_area = $sheet_count * $sheet_area;
+    $utilization_percent = $purchased_area > 0 ? ($cut_area / $purchased_area) * 100 : 0;
+
+    $iron_cost = (int) round($face_area * max(0, (int) ($settings['iron_rate'] ?? 0)));
+    $composite_cost = (int) round($purchased_area * max(0, (int) ($settings['composite_rate'] ?? 0)));
     $installer_cost = (int) round($area * max(0, (int) ($settings['installer_rate'] ?? 0)));
     $supplies_cost = (int) round($area * max(0, (int) ($settings['supplies_rate'] ?? 0)));
     $freight = zigurat_pricing_money($data['freight'] ?? 0);
@@ -274,7 +424,14 @@ function zigurat_calculate_composite_price($data, $settings = null)
     return array(
         'length' => $length,
         'width' => $width,
+        'face_area' => $face_area,
         'area' => $area,
+        'cut_area' => $cut_area,
+        'sheet_count' => $sheet_count,
+        'bottom_direction' => $chosen_trial['direction'],
+        'purchased_area' => $purchased_area,
+        'utilization_percent' => $utilization_percent,
+        'parts' => $parts,
         'iron_cost' => $iron_cost,
         'composite_cost' => $composite_cost,
         'installer_cost' => $installer_cost,
@@ -287,7 +444,7 @@ function zigurat_calculate_composite_price($data, $settings = null)
         'after_profit' => $after_profit,
         'insurance_tax_percent' => $insurance_tax_percent,
         'insurance_tax_amount' => $insurance_tax_amount,
-        'price_per_square_meter' => $area > 0 ? (int) round($final_price / $area) : 0,
+        'price_per_square_meter' => $face_area > 0 ? (int) round($final_price / $face_area) : 0,
         'final_price' => $final_price,
     );
 }

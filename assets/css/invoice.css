@@ -220,6 +220,29 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
   cursor: pointer;
 }
 .invoice-calculator-toggle svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.manager-pricing-rates .invoice-calculator-toggle {
+  display: inline-flex;
+  width: 43px;
+  min-width: 43px;
+  min-height: 43px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: 1px solid #c89b3c;
+  border-radius: 7px;
+  background: #fff8e9;
+  color: #60450e;
+}
+.manager-pricing-rates .invoice-calculator-toggle svg {
+  display: block;
+  width: 23px;
+  min-width: 23px;
+  height: 23px;
+  min-height: 23px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+}
 .invoice-calculator-backdrop { position: fixed; inset: 0; z-index: 9998; background: transparent; }
 .invoice-calculator {
   display: grid;

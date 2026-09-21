@@ -180,7 +180,7 @@ $transformer_types = array(
                 </select>
                 <small>تعداد بیشتر ممکن است چیدمان بهتری پیدا کند، اما زمان تحلیل را افزایش می‌دهد.</small>
             </label>
-            <label>هزینه سیم و لوازم مصرفی (ریال)<input name="wire_supplies" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_values['wire_supplies']); ?>"></label>
+            <label>قیمت سیم و لوازم مصرفی هر متر محیط (ریال)<input name="wire_supplies_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_values['wire_supplies_rate']); ?>"></label>
             <label>درصد سود<input name="profit_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['profit_percent']); ?>"></label>
             <label>درصد بیمه و مالیات<input name="insurance_tax_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['insurance_tax_percent']); ?>" placeholder="اگر لازم نیست صفر بگذارید"></label>
             <div class="manager-pricing-check">
@@ -226,18 +226,18 @@ $transformer_types = array(
             </div>
 
             <section class="manager-pricing-result manager-pricing-result--letters">
-                <div><span>هزینه مصرف پلکسی</span><strong data-letter-plexi-cost>۰ ریال</strong></div>
-                <div><span>هزینه ورق فلزی ۰٫۷</span><strong data-letter-metal-sheet-cost>محاسبه نشده</strong></div>
-                <div><span>هزینه رنگ کوره‌ای</span><strong data-letter-powder-coating-cost>محاسبه نمی‌شود</strong></div>
-                <div><span data-letter-edge-label>قیمت لبه</span><strong data-letter-edge-cost>۰ ریال</strong></div>
-                <div><span data-letter-edge-labor-label>اجرت ساخت لبه</span><strong data-letter-build-cost>۰ ریال</strong></div>
+                <div><span>مصرف پلکسی</span><strong data-letter-plexi-cost>۰ ریال</strong></div>
                 <div><span>برش پلکسی</span><strong data-letter-plexi-cut-cost>۰ ریال</strong></div>
-                <div><span>هزینه PVC</span><strong data-letter-pvc-cost>محاسبه نشده</strong></div>
-                <div><span>برش PVC</span><strong data-letter-pvc-cut-cost>محاسبه نشده</strong></div>
-                <div><span>هزینه چسب</span><strong data-letter-glue-cost>۰ ریال</strong></div>
-                <div><span>اجرت ساخت دوبل</span><strong data-letter-double-labor-cost>محاسبه نمی‌شود</strong></div>
-                <div><span data-letter-smd-label>هزینه SMD با نصب</span><strong data-letter-led-cost>محاسبه نشده</strong></div>
-                <div><span>هزینه ترانس</span><strong data-letter-transformer-cost>محاسبه نشده</strong></div>
+                <div><span>هزینه پی‌وی‌سی</span><strong data-letter-pvc-cost>محاسبه نشده</strong></div>
+                <div><span>برش پی‌وی‌سی</span><strong data-letter-pvc-cut-cost>محاسبه نشده</strong></div>
+                <div><span>ورق فلزی ۰٫۷</span><strong data-letter-metal-sheet-cost>محاسبه نشده</strong></div>
+                <div><span>رنگ کوره‌ای</span><strong data-letter-powder-coating-cost>محاسبه نمی‌شود</strong></div>
+                <div><span data-letter-edge-label>هزینه لبه</span><strong data-letter-edge-cost>۰ ریال</strong></div>
+                <div><span data-letter-edge-labor-label>هزینه اجرت لبه</span><strong data-letter-build-cost>۰ ریال</strong></div>
+                <div><span>اجرت دوبل</span><strong data-letter-double-labor-cost>محاسبه نمی‌شود</strong></div>
+                <div><span>چسب</span><strong data-letter-glue-cost>۰ ریال</strong></div>
+                <div><span data-letter-smd-label>اس‌ام‌دی با نصب</span><strong data-letter-led-cost>محاسبه نشده</strong></div>
+                <div><span>ترانس</span><strong data-letter-transformer-cost>محاسبه نشده</strong></div>
                 <div class="manager-pricing-result__extra"><span>هزینه نصب</span><strong data-letter-installation-cost>۰ ریال</strong></div>
                 <div class="manager-pricing-result__extra"><span>هزینه ایاب و ذهاب</span><strong data-letter-travel-cost>۰ ریال</strong></div>
                 <div class="manager-pricing-result__extra"><span>هزینه سیم و لوازم مصرفی</span><strong data-letter-wire-supplies>۰ ریال</strong></div>

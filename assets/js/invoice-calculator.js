@@ -96,7 +96,7 @@
     controller = new AbortController();
     document.querySelectorAll('[data-invoice-calculator-root]').forEach(function (node) { node.remove(); });
 
-    var editor = (root || document).querySelector('[data-invoice-editor]');
+    var editor = (root || document).querySelector('[data-invoice-editor], [data-pricing-calculator-editor]');
     if (!editor) return;
 
     var shell = document.createElement('div');
@@ -122,6 +122,8 @@
     var backdrop = shell.querySelector('[data-calculator-backdrop]');
     var expression = shell.querySelector('[data-calculator-expression]');
     var result = shell.querySelector('[data-calculator-result]');
+    var title = shell.querySelector('#invoice-calculator-title');
+    var applyButton = shell.querySelector('[data-calculator-apply]');
     var activeInput = null;
     var activeButton = null;
     var lastResult = 0;
@@ -171,6 +173,9 @@
     function openCalculator(input, button) {
       activeInput = input;
       activeButton = button;
+      var fieldLabel = input.dataset.calculatorLabel || 'مبلغ واحد';
+      title.textContent = 'ماشین‌حساب ' + fieldLabel;
+      applyButton.textContent = 'قرار دادن در ' + fieldLabel;
       var current = normalize(input.value).replace(/[^0-9]/g, '');
       expression.value = current === '0' ? '' : current;
       justEvaluated = false;
@@ -229,23 +234,30 @@
       input.parentNode.insertBefore(wrapper, input);
       wrapper.appendChild(input);
       var button = document.createElement('button');
+      var fieldLabel = input.dataset.calculatorLabel || 'مبلغ واحد';
       button.type = 'button';
       button.className = 'invoice-calculator-toggle';
-      button.setAttribute('aria-label', 'باز کردن ماشین‌حساب مبلغ واحد');
+      button.setAttribute('aria-label', 'باز کردن ماشین‌حساب ' + fieldLabel);
       button.setAttribute('aria-expanded', 'false');
-      button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2.5" width="16" height="19" rx="2"/><path d="M7.5 6h9v3h-9zM8 13h1M12 13h1M16 13h1M8 17h1M12 17h1M16 17h1"/></svg>';
+      button.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><rect x="7" y="5" width="10" height="4" rx="0.5"/><path d="M8 13h1M12 13h1M16 13h1M8 17h1M12 17h1M16 17h1"/></svg>';
       wrapper.appendChild(button);
       button.addEventListener('click', function () { openCalculator(input, button); }, {signal:controller.signal});
     }
 
     function bindAllInputs() {
-      editor.querySelectorAll('[name="item_unit_price[]"]').forEach(bindUnitPrice);
+      editor.querySelectorAll('[name="item_unit_price[]"], [data-calculator-input]').forEach(bindUnitPrice);
     }
 
     bindAllInputs();
-    var observer = new MutationObserver(bindAllInputs);
-    observer.observe(editor.querySelector('[data-invoice-items]'), {childList:true, subtree:true});
-    controller.signal.addEventListener('abort', function () { observer.disconnect(); }, {once:true});
+    var itemsContainer = editor.querySelector('[data-invoice-items]');
+    var observer = null;
+    if (itemsContainer) {
+      observer = new MutationObserver(bindAllInputs);
+      observer.observe(itemsContainer, {childList:true, subtree:true});
+    }
+    controller.signal.addEventListener('abort', function () {
+      if (observer) observer.disconnect();
+    }, {once:true});
 
     expression.addEventListener('input', function () {
       justEvaluated = false;

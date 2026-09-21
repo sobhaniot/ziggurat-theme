@@ -43,6 +43,15 @@ $submitted_at = $meta['submitted_at'] ?: get_the_date('Y/m/d H:i', $application_
     <div class="manager-applications__toolbar no-print">
         <a href="<?php echo esc_url($list_url); ?>">بازگشت به درخواست‌ها</a>
         <button type="button" onclick="window.print()">چاپ رزومه</button>
+        <?php if (current_user_can('manage_options')): ?>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('این رزومه به زباله‌دان منتقل شود؟');">
+                <input type="hidden" name="action" value="zigurat_delete_partner_application">
+                <input type="hidden" name="application_id" value="<?php echo esc_attr($application_id); ?>">
+                <input type="hidden" name="redirect_to" value="<?php echo esc_url($list_url); ?>">
+                <?php wp_nonce_field('zigurat_delete_partner_application_' . $application_id); ?>
+                <button class="manager-application-delete" type="submit">حذف رزومه</button>
+            </form>
+        <?php endif; ?>
     </div>
 
     <article class="manager-resume" aria-labelledby="application-resume-title">

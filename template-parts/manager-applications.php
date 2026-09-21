@@ -12,6 +12,16 @@ $selected_province = $read_filter('application_province');
 $selected_profession = $read_filter('application_profession');
 $selected_type = $read_filter('application_type');
 $application_page = max(1, absint($read_filter('application_page')));
+$application_action = $read_filter('application-action');
+$smtp_ready = !function_exists('zigurat_smtp_is_configured') || zigurat_smtp_is_configured();
+$last_mail_status = get_option('zigurat_application_last_mail_status', array());
+$current_list_url = add_query_arg(array_filter(array(
+    'manager-section'        => 'applications',
+    'application_province'   => $selected_province,
+    'application_profession' => $selected_profession,
+    'application_type'       => $selected_type,
+    'application_page'       => $application_page > 1 ? $application_page : null,
+)), zigurat_manager_login_url());
 
 $all_application_ids = get_posts(array(
     'post_type'      => 'partner_application',
@@ -73,6 +83,20 @@ $unread_application_ids = function_exists('zigurat_application_unread_ids')
             <p><?php echo esc_html(number_format_i18n($applications->found_posts)); ?> درخواست مطابق فیلترها</p>
         </div>
     </div>
+
+    <?php if ($application_action === 'deleted'): ?>
+        <div class="manager-applications__notice is-success" role="status">رزومه به زباله‌دان منتقل شد.</div>
+    <?php elseif ($application_action === 'delete-error'): ?>
+        <div class="manager-applications__notice is-error" role="alert">حذف رزومه انجام نشد؛ دوباره تلاش کنید.</div>
+    <?php endif; ?>
+    <?php if (!$smtp_ready): ?>
+        <div class="manager-applications__notice is-warning" role="alert">
+            ارسال ایمیل سایت آماده نیست؛ رمز SMTP ثبت نشده یا تنظیمات کامل نیست.
+            <?php if (current_user_can('manage_options')): ?><a href="<?php echo esc_url(admin_url('options-general.php?page=zigurat-email-settings')); ?>">تکمیل تنظیمات و ارسال ایمیل آزمایشی</a><?php endif; ?>
+        </div>
+    <?php elseif (is_array($last_mail_status) && !empty($last_mail_status['application_id']) && empty($last_mail_status['sent'])): ?>
+        <div class="manager-applications__notice is-error" role="alert">آخرین اعلان ایمیلی درخواست همکاری ارسال نشد. تنظیمات ایمیل را آزمایش کنید.</div>
+    <?php endif; ?>
 
     <form class="manager-application-filters no-print" method="get" action="<?php echo esc_url(home_url('/login/')); ?>">
         <input type="hidden" name="manager-section" value="applications">
@@ -138,7 +162,18 @@ $unread_application_ids = function_exists('zigurat_application_unread_ids')
                             <td class="ltr-cell"><?php echo esc_html(get_post_meta($application_id, '_application_phone', true)); ?></td>
                             <td><?php echo $nationwide ? 'سراسر ایران' : esc_html($work_cities ?: '—'); ?></td>
                             <td class="no-print">
-                                <a class="manager-application-view" href="<?php echo esc_url(zigurat_application_resume_url($application_id)); ?>" target="_blank" rel="noopener">مشاهده رزومه</a>
+                                <div class="manager-application-actions">
+                                    <a class="manager-application-view" href="<?php echo esc_url(zigurat_application_resume_url($application_id)); ?>" target="_blank" rel="noopener">مشاهده رزومه</a>
+                                    <?php if (current_user_can('manage_options')): ?>
+                                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('این رزومه به زباله‌دان منتقل شود؟');">
+                                            <input type="hidden" name="action" value="zigurat_delete_partner_application">
+                                            <input type="hidden" name="application_id" value="<?php echo esc_attr($application_id); ?>">
+                                            <input type="hidden" name="redirect_to" value="<?php echo esc_url($current_list_url); ?>">
+                                            <?php wp_nonce_field('zigurat_delete_partner_application_' . $application_id); ?>
+                                            <button class="manager-application-delete" type="submit">حذف</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                     <?php endwhile; wp_reset_postdata(); ?>

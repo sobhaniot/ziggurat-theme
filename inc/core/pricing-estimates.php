@@ -59,11 +59,29 @@ function zigurat_get_pricing_estimate_page($page = 1, $per_page = 10, $search = 
         return zigurat_get_pricing_estimate_page($pages, $per_page, $search, $calculator_type);
     }
     $records = array_map(static function ($post) {
+        $calculator_type = (string) get_post_meta($post->ID, '_zigurat_pricing_type', true);
         $final_price = (int) get_post_meta($post->ID, '_zigurat_pricing_final', true);
         $perimeter_m = (float) get_post_meta($post->ID, '_zigurat_pricing_perimeter', true);
         $unit_price = (int) get_post_meta($post->ID, '_zigurat_pricing_unit_price', true);
-        if ($perimeter_m <= 0 || $unit_price <= 0) {
+        $purchased_area = 0.0;
+        $visible_area = 0.0;
+        $price_per_purchased_sqm = 0;
+        $price_per_visible_sqm = 0;
+        $snapshot = null;
+        if ($calculator_type === 'composite') {
             $snapshot = zigurat_get_pricing_estimate_snapshot($post->ID);
+            if (is_array($snapshot)) {
+                $results = is_array($snapshot['results'] ?? null) ? $snapshot['results'] : array();
+                $purchased_area = (float) ($results['purchased_area'] ?? 0);
+                $visible_area = (float) ($results['visible_area'] ?? 0);
+                $price_per_purchased_sqm = $purchased_area > 0
+                    ? (int) round($final_price / $purchased_area) : 0;
+                $price_per_visible_sqm = $visible_area > 0
+                    ? (int) round($final_price / $visible_area) : 0;
+            }
+        }
+        if ($perimeter_m <= 0 || $unit_price <= 0) {
+            $snapshot = is_array($snapshot) ? $snapshot : zigurat_get_pricing_estimate_snapshot($post->ID);
             if (is_array($snapshot)) {
                 $perimeter_m = (float) ($snapshot['analysis']['rounded_perimeter_m'] ?? $snapshot['breakdown']['rounded_perimeter_m'] ?? 0);
                 $unit_price = $perimeter_m > 0 ? (int) round($final_price / $perimeter_m) : 0;
@@ -72,10 +90,14 @@ function zigurat_get_pricing_estimate_page($page = 1, $per_page = 10, $search = 
         return array(
             'id' => (int) $post->ID,
             'project_name' => get_the_title($post),
-            'calculator_type' => (string) get_post_meta($post->ID, '_zigurat_pricing_type', true),
+            'calculator_type' => $calculator_type,
             'final_price' => $final_price,
             'perimeter_m' => $perimeter_m,
             'unit_price' => $unit_price,
+            'purchased_area' => $purchased_area,
+            'visible_area' => $visible_area,
+            'price_per_purchased_sqm' => $price_per_purchased_sqm,
+            'price_per_visible_sqm' => $price_per_visible_sqm,
             'modified' => zigurat_pricing_estimate_date($post),
         );
     }, $query->posts);
@@ -232,7 +254,7 @@ function zigurat_sanitize_letter_estimate_snapshot($snapshot)
     }
     $input_keys = array(
         'design_width_mm', 'design_height_mm', 'installation', 'travel',
-        'wire_supplies', 'profit_percent', 'insurance_tax_percent', 'use_transformer', 'layout_trials',
+        'wire_supplies', 'wire_supplies_rate', 'profit_percent', 'insurance_tax_percent', 'use_transformer', 'layout_trials',
     );
     $rate_keys = array(
         'sheet_width_mm', 'sheet_height_mm', 'plexi_sqm_rate', 'metal_sheet_07_sqm_rate', 'edge_swedish_material_rate',
@@ -260,7 +282,7 @@ function zigurat_sanitize_letter_estimate_snapshot($snapshot)
     );
     $breakdown_keys = array(
         'plexi', 'metal_sheet_07', 'powder_coating', 'edge', 'edge_labor', 'double_labor', 'plexi_cut', 'pvc', 'pvc_cut', 'glue', 'smd',
-        'installation', 'travel', 'transformer', 'use_transformer', 'wire_supplies', 'base', 'profit',
+        'installation', 'travel', 'transformer', 'use_transformer', 'wire_supplies_rate', 'wire_supplies', 'base', 'profit',
         'insurance_tax_percent', 'insurance_tax',
         'final', 'smd_count', 'smd_density_count', 'smd_component_count', 'smd_length_m', 'smd_purchase_length_m',
         'smd_roll_count', 'smd_power_watts', 'smd_double_track_length_m', 'smd_multi_track_length_m',
@@ -334,15 +356,17 @@ function zigurat_sanitize_composite_estimate_snapshot($snapshot)
         return new WP_Error('invalid_snapshot', 'اطلاعات محاسبه معتبر نیست.');
     }
     $input_keys = array(
-        'length','width','drip_depth','bottom_depth','side_depth','install_allowance',
+        'length','width','drip_depth','drip_start_fold','drip_end_fold','bottom_depth','side_depth','install_allowance',
+        'fold_left','fold_right','fold_top','fold_bottom',
+        'bottom_fold_left','bottom_fold_right','bottom_fold_top','bottom_fold_bottom',
         'freight','bracing_cost','profit_percent','insurance_tax_percent',
     );
     $rate_keys = array('iron_rate','composite_rate','installer_rate','supplies_rate');
     $result_keys = array(
-        'face_area','visible_area','cut_area','sheet_count','purchased_area','utilization_percent',
+        'face_area','visible_area','cut_area','sheet_count','horizontal_seams','purchased_area','utilization_percent',
         'iron_cost','composite_cost','installer_cost','supplies_cost','freight','bracing_cost',
         'base_total','profit_percent','profit_amount','insurance_tax_percent','insurance_tax_amount',
-        'price_per_square_meter','final_price',
+        'price_per_purchased_square_meter','price_per_visible_square_meter','price_per_square_meter','final_price',
     );
     $clean = array(
         'version' => 1,
@@ -350,6 +374,8 @@ function zigurat_sanitize_composite_estimate_snapshot($snapshot)
         'inputs' => array(),
         'rates' => array(),
         'results' => array(),
+        'drip_direction' => in_array(($snapshot['drip_direction'] ?? ''), array('none','vertical','horizontal'), true)
+            ? $snapshot['drip_direction'] : 'none',
         'bottom_direction' => in_array(($snapshot['bottom_direction'] ?? ''), array('none','vertical','horizontal'), true)
             ? $snapshot['bottom_direction'] : 'none',
         'parts' => array(),
@@ -489,11 +515,19 @@ function zigurat_ajax_save_pricing_estimate()
         ? (float) ($snapshot['results']['final_price'] ?? 0)
         : (float) ($snapshot['breakdown']['final'] ?? 0);
     $measure = $calculator_type === 'composite'
-        ? (float) ($snapshot['results']['face_area'] ?? 0)
+        ? (float) ($snapshot['results']['visible_area'] ?? 0)
         : (float) ($snapshot['analysis']['rounded_perimeter_m'] ?? $snapshot['breakdown']['rounded_perimeter_m'] ?? 0);
     update_post_meta($result, '_zigurat_pricing_final', (int) round($final_price));
     update_post_meta($result, '_zigurat_pricing_perimeter', $measure);
     update_post_meta($result, '_zigurat_pricing_unit_price', $measure > 0 ? (int) round($final_price / $measure) : 0);
+    if ($calculator_type === 'composite') {
+        $purchased_area = (float) ($snapshot['results']['purchased_area'] ?? 0);
+        $visible_area = (float) ($snapshot['results']['visible_area'] ?? 0);
+        update_post_meta($result, '_zigurat_pricing_purchased_area', $purchased_area);
+        update_post_meta($result, '_zigurat_pricing_visible_area', $visible_area);
+        update_post_meta($result, '_zigurat_pricing_unit_price_purchased', $purchased_area > 0 ? (int) round($final_price / $purchased_area) : 0);
+        update_post_meta($result, '_zigurat_pricing_unit_price_visible', $visible_area > 0 ? (int) round($final_price / $visible_area) : 0);
+    }
     update_post_meta($result, '_zigurat_pricing_snapshot', wp_slash(wp_json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)));
     wp_send_json_success(array(
         'id' => (int) $result,

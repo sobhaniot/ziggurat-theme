@@ -170,6 +170,14 @@ function zigurat_email_managers_for_application($application_id, $data)
     $site_name = wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES);
     $subject = sprintf('[%s] درخواست همکاری جدید: %s', $site_name, $display_name ?: $type_label);
     $recipients = array();
+    $sent_count = 0;
+    $mail_errors = array();
+    $failure_listener = static function ($error) use (&$mail_errors) {
+        if ($error instanceof WP_Error) {
+            $mail_errors[] = $error->get_error_message();
+        }
+    };
+    add_action('wp_mail_failed', $failure_listener);
     foreach (zigurat_application_manager_users() as $manager) {
         $email = sanitize_email($manager->user_email);
         if ($email === '' || isset($recipients[strtolower($email)])) {
@@ -184,20 +192,56 @@ function zigurat_email_managers_for_application($application_id, $data)
         $message .= 'زمینه فعالیت: ' . ((string) ($data['profession'] ?? '') ?: 'ثبت نشده') . "\n";
         $message .= 'محل فعالیت: ' . trim((string) ($data['province'] ?? '') . '، ' . (string) ($data['city'] ?? ''), '، ') . "\n\n";
         $message .= "برای بررسی اطلاعات و مدارک، وارد پنل مدیران شوید:\n" . $list_url;
-        wp_mail($email, $subject, $message, array('Content-Type: text/plain; charset=UTF-8'));
+        if (wp_mail($email, $subject, $message, array('Content-Type: text/plain; charset=UTF-8'))) {
+            ++$sent_count;
+        }
     }
     if (!$recipients) {
         $fallback_email = sanitize_email(get_option('admin_email'));
         if ($fallback_email !== '') {
-            wp_mail(
+            if (wp_mail(
                 $fallback_email,
                 $subject,
                 "یک درخواست همکاری جدید ثبت شده است.\n\n" . $list_url,
                 array('Content-Type: text/plain; charset=UTF-8')
-            );
+            )) {
+                ++$sent_count;
+            }
         }
     }
+    remove_action('wp_mail_failed', $failure_listener);
+    update_option('zigurat_application_last_mail_status', array(
+        'application_id' => $application_id,
+        'attempted'      => count($recipients) ?: ($fallback_email ?? '' ? 1 : 0),
+        'sent'           => $sent_count,
+        'errors'         => array_values(array_unique(array_filter($mail_errors))),
+        'created_at'     => current_time('mysql'),
+    ), false);
+    return $sent_count > 0;
 }
+
+/** انتقال درخواست همکاری به زباله‌دان؛ فقط مدیر کل اجازه این کار را دارد. */
+function zigurat_delete_partner_application()
+{
+    if (!current_user_can('manage_options')) {
+        wp_die('فقط مدیر کل می‌تواند رزومه را حذف کند.', 403);
+    }
+    $application_id = isset($_POST['application_id']) ? absint($_POST['application_id']) : 0;
+    check_admin_referer('zigurat_delete_partner_application_' . $application_id);
+    $application = $application_id ? get_post($application_id) : null;
+    if (!$application || $application->post_type !== 'partner_application' || $application->post_status !== 'private') {
+        wp_die('رزومه موردنظر پیدا نشد.', 404);
+    }
+    $deleted = wp_trash_post($application_id);
+    $fallback = add_query_arg('manager-section', 'applications', zigurat_manager_login_url());
+    $requested_redirect = isset($_POST['redirect_to']) && is_string($_POST['redirect_to'])
+        ? wp_unslash($_POST['redirect_to'])
+        : '';
+    $redirect = wp_validate_redirect($requested_redirect, $fallback);
+    wp_safe_redirect(add_query_arg('application-action', $deleted ? 'deleted' : 'delete-error', $redirect));
+    exit;
+}
+add_action('admin_post_zigurat_delete_partner_application', 'zigurat_delete_partner_application');
 
 /** بازکردن رزومه، اعلان همان درخواست را فقط برای مدیر جاری خوانده‌شده می‌کند. */
 function zigurat_mark_application_seen_from_resume()

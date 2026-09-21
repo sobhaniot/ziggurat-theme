@@ -58,9 +58,11 @@ function zigurat_enqueue_assets()
     }
     if (is_page('login') || is_page_template('page-login.php')) {
         zigurat_enqueue_theme_style('manager');
+        zigurat_enqueue_theme_style('invoice');
         zigurat_enqueue_theme_script('manager-login');
         zigurat_enqueue_theme_script('manager-views');
         zigurat_enqueue_theme_script('pricing-calculator');
+        zigurat_enqueue_theme_script('invoice-calculator');
         zigurat_enqueue_theme_script('letter-calculator', array('zigurat-pricing-calculator'));
         $manager_section = isset($_GET['manager-section']) ? sanitize_key(wp_unslash($_GET['manager-section'])) : '';
         if ($manager_section === 'letters' && zigurat_is_manager()) {

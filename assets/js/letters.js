@@ -21,6 +21,66 @@
     return element.scrollHeight > element.clientHeight + 2;
   }
 
+  function initPreviewPan(viewport) {
+    if (!viewport || viewport.dataset.previewPanReady === '1') return;
+    viewport.dataset.previewPanReady = '1';
+    var pointerId = null;
+    var startX = 0;
+    var startY = 0;
+    var startScrollLeft = 0;
+    var dragging = false;
+    var ignoreClick = false;
+
+    function finish(event) {
+      if (pointerId === null || (event && event.pointerId !== pointerId)) return;
+      var activePointerId = pointerId;
+      pointerId = null;
+      if (viewport.hasPointerCapture && viewport.hasPointerCapture(activePointerId)) viewport.releasePointerCapture(activePointerId);
+      viewport.classList.remove('is-dragging');
+      if (dragging) {
+        ignoreClick = true;
+        window.setTimeout(function () { ignoreClick = false; }, 0);
+      }
+      dragging = false;
+    }
+
+    viewport.addEventListener('pointerdown', function (event) {
+      if ((event.pointerType === 'mouse' && event.button !== 0) || event.target.closest('a,button,input,select,textarea')) return;
+      if (viewport.scrollWidth <= viewport.clientWidth + 1) return;
+      pointerId = event.pointerId;
+      startX = event.clientX;
+      startY = event.clientY;
+      startScrollLeft = viewport.scrollLeft;
+      dragging = false;
+      viewport.setPointerCapture(pointerId);
+    });
+    viewport.addEventListener('pointermove', function (event) {
+      if (event.pointerId !== pointerId) return;
+      var deltaX = event.clientX - startX;
+      var deltaY = event.clientY - startY;
+      if (!dragging) {
+        if (Math.abs(deltaX) < 5 && Math.abs(deltaY) < 5) return;
+        if (event.pointerType !== 'mouse' && Math.abs(deltaY) > Math.abs(deltaX)) {
+          finish(event);
+          return;
+        }
+        dragging = true;
+        viewport.classList.add('is-dragging');
+      }
+      event.preventDefault();
+      viewport.scrollLeft = startScrollLeft - deltaX;
+    });
+    viewport.addEventListener('pointerup', finish);
+    viewport.addEventListener('pointercancel', finish);
+    viewport.addEventListener('lostpointercapture', finish);
+    viewport.addEventListener('click', function (event) {
+      if (!ignoreClick) return;
+      event.preventDefault();
+      event.stopPropagation();
+    }, true);
+    viewport.addEventListener('dragstart', function (event) { event.preventDefault(); });
+  }
+
   function normalizedBlocks(html) {
     var holder = document.createElement('div');
     holder.innerHTML = html;
@@ -548,6 +608,7 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     initLetterStampEditors();
+    document.querySelectorAll('.manager-letter-preview__scroll').forEach(initPreviewPan);
     var editorDocuments = [];
     document.querySelectorAll('[data-letter-editor]').forEach(function (root) {
       var documentNode = root.querySelector('[data-letter-document]');

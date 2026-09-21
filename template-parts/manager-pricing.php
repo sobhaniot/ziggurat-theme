@@ -10,7 +10,7 @@ if (!in_array($calculator, array('', 'lightbox', 'composite', 'flexi', 'letters'
 }
 $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login_url());
 ?>
-<section class="manager-pricing" aria-labelledby="manager-pricing-title">
+<section class="manager-pricing" aria-labelledby="manager-pricing-title"<?php echo $calculator === 'composite' ? ' data-pricing-calculator-editor' : ''; ?>>
     <div class="manager-pricing__toolbar no-print">
         <a href="<?php echo esc_url($calculator ? $pricing_url : zigurat_manager_login_url()); ?>"><?php echo $calculator ? 'بازگشت به محصولات' : 'بازگشت به پنل مدیران'; ?></a>
     </div>
@@ -126,14 +126,14 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                 <h3>تنظیم نرخ‌های هر مترمربع</h3>
                 <p>این نرخ‌ها به ریال ذخیره می‌شوند و تا زمان ویرایش بعدی باقی می‌مانند.</p>
                 <form data-pricing-rates-form="composite" data-ajax-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>" data-rates-nonce="<?php echo esc_attr(wp_create_nonce('zigurat_composite_rates')); ?>">
-                    <label>قیمت آهن هر مترمربع (ریال)
-                        <input name="iron_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['iron_rate']); ?>" required>
-                    </label>
                     <label>قیمت کامپوزیت هر مترمربع (ریال)
                         <input name="composite_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['composite_rate']); ?>" required>
                     </label>
                     <label>دستمزد نصاب هر مترمربع (ریال)
                         <input name="installer_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['installer_rate']); ?>" required>
+                    </label>
+                    <label>قیمت آهن هر مترمربع (ریال)
+                        <input name="iron_rate" type="text" inputmode="numeric" data-money-input data-calculator-input data-calculator-label="قیمت آهن" value="<?php echo esc_attr((int) $settings['iron_rate']); ?>" required>
                     </label>
                     <label>لوازم مصرفی هر مترمربع (ریال)
                         <input name="supplies_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['supplies_rate']); ?>" required>
@@ -147,15 +147,45 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                 <div class="manager-composite-fields">
                     <div class="manager-composite-dimensions">
                         <div class="manager-composite-dimensions__heading"><strong>ابعاد تابلو</strong><small>طول آبچکان و زیر تابلو برابر طول تابلو است.</small></div>
-                        <label>طول تابلو (سانتی‌متر) *<input name="length" type="text" inputmode="decimal" placeholder="مثلاً ۶۵۰" required></label>
-                        <label>ارتفاع نما (سانتی‌متر) *<input name="width" type="text" inputmode="decimal" placeholder="مثلاً ۱۲۰" required></label>
-                        <label>عرض آبچکان (سانتی‌متر)<input name="drip_depth" type="text" inputmode="decimal" value="0" placeholder="مثلاً ۴۰"></label>
-                        <label>عرض زیر تابلو (سانتی‌متر)<input name="bottom_depth" type="text" inputmode="decimal" value="0" placeholder="مثلاً ۴۰"></label>
-                        <label>عرض بغل‌ها (سانتی‌متر)<input name="side_depth" type="text" inputmode="decimal" value="0" placeholder="مثلاً ۴۰"></label>
-                        <label>جمع خم نصب (سانتی‌متر)<input name="install_allowance" type="text" inputmode="decimal" value="8" aria-describedby="composite-install-allowance-help"><small id="composite-install-allowance-help">به طول و عرض برش هر قطعه اضافه می‌شود؛ مقدار پیش‌فرض ۸ سانتی‌متر جمع دو لبه است.</small></label>
+                        <label>طول تابلو (سانتی‌متر) *<input name="length" type="text" inputmode="decimal" value="<?php echo $last_values['length'] > 0 ? esc_attr($last_values['length']) : ''; ?>" placeholder="مثلاً ۶۵۰" required></label>
+                        <label>ارتفاع نما (سانتی‌متر) *<input name="width" type="text" inputmode="decimal" value="<?php echo $last_values['width'] > 0 ? esc_attr($last_values['width']) : ''; ?>" placeholder="مثلاً ۱۲۰" required></label>
+                        <label>عرض آبچکان (سانتی‌متر)<input name="drip_depth" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['drip_depth']); ?>" placeholder="مثلاً ۴۰"></label>
+                        <label>عرض زیر تابلو (سانتی‌متر)<input name="bottom_depth" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['bottom_depth']); ?>" placeholder="مثلاً ۴۰"></label>
+                        <label>عرض بغل‌ها (سانتی‌متر)<input name="side_depth" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['side_depth']); ?>" placeholder="مثلاً ۴۰"></label>
+                        <fieldset class="manager-composite-drip-ends">
+                            <legend>خم ابتدا و انتهای آبچکان (سانتی‌متر)</legend>
+                            <div class="manager-composite-drip-ends__diagram">
+                                <label><span>خم ابتدا</span><input name="drip_start_fold" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['drip_start_fold']); ?>"></label>
+                                <div aria-hidden="true"><span>طول تابلو</span><i>شیارهای وسط بدون خم</i></div>
+                                <label><span>خم انتها</span><input name="drip_end_fold" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['drip_end_fold']); ?>"></label>
+                            </div>
+                            <small>این دو مقدار فقط به ابتدا و انتهای کل آبچکان اضافه می‌شوند و روی شیارهای میانی تکرار نمی‌شوند.</small>
+                        </fieldset>
+                        <fieldset class="manager-composite-folds">
+                            <legend>خم نمای تابلو (سانتی‌متر)</legend>
+                            <div class="manager-composite-folds__diagram">
+                                <label class="is-top"><span>خم بالا</span><input name="fold_top" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['fold_top']); ?>"></label>
+                                <label class="is-right"><span>خم راست</span><input name="fold_right" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['fold_right']); ?>"></label>
+                                <div class="manager-composite-folds__sheet" aria-hidden="true"><span>ورق</span></div>
+                                <label class="is-left"><span>خم چپ</span><input name="fold_left" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['fold_left']); ?>"></label>
+                                <label class="is-bottom"><span>خم پایین</span><input name="fold_bottom" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['fold_bottom']); ?>"></label>
+                            </div>
+                            <small>این خم‌ها فقط روی نمای تابلو اعمال می‌شوند. آبچکان و بغل‌های تابلو بدون خم محاسبه می‌شوند.</small>
+                        </fieldset>
+                        <fieldset class="manager-composite-folds manager-composite-folds--bottom">
+                            <legend>خم زیر تابلو (سانتی‌متر)</legend>
+                            <div class="manager-composite-folds__diagram">
+                                <label class="is-top"><span>خم بالای زیر تابلو</span><input name="bottom_fold_top" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['bottom_fold_top']); ?>"></label>
+                                <label class="is-right"><span>خم راست</span><input name="bottom_fold_right" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['bottom_fold_right']); ?>"></label>
+                                <div class="manager-composite-folds__sheet" aria-hidden="true"><span>زیر تابلو</span></div>
+                                <label class="is-left"><span>خم چپ</span><input name="bottom_fold_left" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['bottom_fold_left']); ?>"></label>
+                                <label class="is-bottom"><span>خم پایین زیر تابلو</span><input name="bottom_fold_bottom" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['bottom_fold_bottom']); ?>"></label>
+                            </div>
+                            <small>این خم‌ها فقط روی قطعات زیر تابلو اعمال می‌شوند. آبچکان بدون خم محاسبه می‌شود.</small>
+                        </fieldset>
                     </div>
                     <label>کرایه (ریال)<input name="freight" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_values['freight']); ?>"></label>
-                    <label>هزینه آهن‌کشی جهت مهار تابلو (ریال)<input name="bracing_cost" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_values['bracing_cost']); ?>"></label>
+                    <label>هزینه آهن‌کشی جهت مهار تابلو (ریال)<input name="bracing_cost" type="text" inputmode="numeric" data-money-input data-calculator-input data-calculator-label="هزینه آهن‌کشی مهار" value="<?php echo esc_attr((int) $last_values['bracing_cost']); ?>"></label>
                     <label>درصد سود<input name="profit_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['profit_percent']); ?>" placeholder="مثلاً ۲۵"></label>
 
                     <label>درصد بیمه و مالیات
@@ -180,11 +210,13 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                     <div><span>جمع هزینه پایه</span><strong data-composite-base>۰ ریال</strong></div>
                     <div><span>مبلغ سود</span><strong data-composite-profit>۰ ریال</strong></div>
                     <div><span>مبلغ بیمه و مالیات</span><strong data-composite-insurance-tax>۰ ریال</strong></div>
-                    <div><span>قیمت نهایی هر مترمربع</span><strong data-composite-unit>۰ ریال</strong></div>
+                    <div><span>قیمت نهایی هر مترمربع ورق مصرفی</span><strong data-composite-sheet-unit>۰ ریال</strong></div>
+                    <div><span>قیمت نهایی هر مترمربع کل سطوح</span><strong data-composite-surface-unit>۰ ریال</strong></div>
                     <div class="manager-pricing-result__final"><span>قیمت نهایی</span><strong data-composite-final>۰ ریال</strong></div>
                 </section>
                 <section class="manager-composite-layout" data-composite-layout hidden>
-                    <header><div><strong>چیدمان ورق کامپوزیت</strong><small>ورق ۳۲۰×۱۲۵ سانتی‌متر — چرخش ۹۰ درجه برای چیدمان قطعات فعال است</small><em data-composite-face-direction></em><em data-composite-bottom-direction></em></div><div class="manager-composite-legend"><span class="is-face">نما</span><span class="is-drip">آبچکان</span><span class="is-bottom">زیر</span><span class="is-side">بغل</span></div></header>
+                    <header><div><strong>چیدمان ورق کامپوزیت</strong><small>ورق ۳۲۰×۱۲۵ سانتی‌متر — چرخش ۹۰ درجه برای چیدمان قطعات فعال است</small><em data-composite-face-direction></em><em data-composite-drip-direction></em><em data-composite-bottom-direction></em></div><div class="manager-composite-legend"><span class="is-face">نما</span><span class="is-drip">آبچکان</span><span class="is-bottom">زیر</span><span class="is-side">بغل</span></div></header>
+                    <figure class="manager-composite-overview"><figcaption>نمای یکپارچه قطعات تابلو</figcaption><img data-composite-overview alt="نمای یکپارچه نما، آبچکان، زیر و بغل‌های تابلو"></figure>
                     <div class="manager-composite-sheets" data-composite-sheets></div>
                     <div class="manager-composite-parts" data-composite-parts></div>
                 </section>
@@ -200,7 +232,7 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
             <div class="manager-pricing-estimates__toolbar"><label>جستجو در نام پروژه<input type="search" data-composite-estimate-search placeholder="نام پروژه را بنویسید…" autocomplete="off"></label><button type="button" data-composite-estimate-search-clear hidden>پاک‌کردن جستجو</button></div>
             <div class="manager-pricing-estimates__list" data-composite-estimate-list>
                 <?php if (!$saved_estimates): ?><p class="manager-pricing-estimates__empty">هنوز محاسبه کامپوزیتی ذخیره نشده است.</p><?php else: foreach ($saved_estimates as $estimate): ?>
-                    <article data-estimate-id="<?php echo esc_attr($estimate['id']); ?>"><div><strong><?php echo esc_html($estimate['project_name']); ?></strong><small>آخرین تغییر: <?php echo esc_html($estimate['modified']); ?></small></div><b><?php echo esc_html(number_format_i18n($estimate['final_price'])); ?> ریال<small><?php echo esc_html(number_format_i18n($estimate['perimeter_m'], 2)); ?> مترمربع · <?php echo esc_html(number_format_i18n($estimate['unit_price'])); ?> ریال/مترمربع</small></b><div class="manager-pricing-estimates__actions"><button type="button" data-composite-estimate-load="<?php echo esc_attr($estimate['id']); ?>">بازکردن و ویرایش</button><button type="button" data-composite-estimate-print-customer-saved="<?php echo esc_attr($estimate['id']); ?>">چاپ مشتری</button><button type="button" data-composite-estimate-print-saved="<?php echo esc_attr($estimate['id']); ?>">چاپ داخلی</button></div></article>
+                    <article data-estimate-id="<?php echo esc_attr($estimate['id']); ?>"><div><strong><?php echo esc_html($estimate['project_name']); ?></strong><small>آخرین تغییر: <?php echo esc_html($estimate['modified']); ?></small></div><b><?php echo esc_html(number_format_i18n($estimate['final_price'])); ?> ریال<small><?php echo esc_html(number_format_i18n($estimate['purchased_area'], 2)); ?> مترمربع ورق · <?php echo esc_html(number_format_i18n($estimate['price_per_purchased_sqm'])); ?> ریال/مترمربع</small><small><?php echo esc_html(number_format_i18n($estimate['visible_area'], 2)); ?> مترمربع سطوح · <?php echo esc_html(number_format_i18n($estimate['price_per_visible_sqm'])); ?> ریال/مترمربع</small></b><div class="manager-pricing-estimates__actions"><button type="button" data-composite-estimate-load="<?php echo esc_attr($estimate['id']); ?>">بازکردن و ویرایش</button><button type="button" data-composite-estimate-print-customer-saved="<?php echo esc_attr($estimate['id']); ?>">چاپ مشتری</button><button type="button" data-composite-estimate-print-saved="<?php echo esc_attr($estimate['id']); ?>">چاپ داخلی</button></div></article>
                 <?php endforeach; endif; ?>
             </div>
             <p class="manager-pricing-estimates__status" data-composite-estimate-list-status role="status"></p>

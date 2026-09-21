@@ -245,7 +245,9 @@ body.letter-stamp-editor-opened { overflow: hidden; }
 .manager-letter-preview__heading div { display: grid; gap: 2px; }
 .manager-letter-preview__heading small { color: #777; }
 .manager-letter-preview__heading > span { padding: 4px 9px; border-radius: 999px; background: #fff; color: #666; font-size: 11px; }
-.manager-letter-preview__scroll { overflow: auto; max-height: 820px; padding: 12px; border-radius: 10px; background: #c9c7c2; }
+.manager-letter-preview__scroll { overflow: auto; max-height: 820px; padding: 12px; border-radius: 10px; background: #c9c7c2; direction: ltr; cursor: grab; touch-action: pan-y; overscroll-behavior: contain; }
+.manager-letter-preview__scroll.is-dragging { cursor: grabbing; user-select: none; }
+.manager-letter-preview__scroll.is-dragging img { pointer-events: none; -webkit-user-drag: none; }
 .manager-letter-preview .letter-page { margin-inline: auto; box-shadow: 0 8px 28px rgba(0, 0, 0, .18); }
 .manager-letter-overflow { margin-top: 11px; padding: 10px 12px; border: 1px solid #dfad77; border-radius: 9px; background: #fff6e9; color: #86480a; font-size: 12px; line-height: 1.7; }
 
@@ -522,6 +524,9 @@ body.letter-leave-dialog-open { overflow: hidden; }
 @media (max-width: 1450px) {
   .manager-letter-editor-layout { grid-template-columns: 1fr; }
   .manager-letter-preview__scroll { max-height: 680px; }
+}
+@media (min-width: 651px) {
+  .manager-letter-preview__scroll { max-height: none; overflow-y: hidden; }
 }
 @media (max-width: 650px) {
   .manager-letters__toolbar,

@@ -2352,7 +2352,8 @@
       : {items: [], count: 0, capacity: 0, cost: 0};
     var transformerCount = transformerPlan.count;
     var transformer = transformerPlan.cost;
-    var wireSupplies = money(field('wire_supplies').value);
+    var wireSuppliesRate = money(field('wire_supplies_rate').value);
+    var wireSupplies = Math.round(perimeterMeters * wireSuppliesRate);
     var extras = installation + travel + wireSupplies;
     var base = plexiCost + metalSheet07Cost + powderCoatingCost + edgeCost + buildCost + doubleLaborCost + plexiCutCost + pvcCost + pvcCutCost + glueCost + smdCost + transformer + extras;
     var profitPercent = Math.min(1000, decimal(field('profit_percent').value));
@@ -2390,6 +2391,7 @@
       use_transformer: useTransformer ? 1 : 0,
       transformer_count: transformerCount,
       transformer_capacity: transformerPlan.capacity,
+      wire_supplies_rate: wireSuppliesRate,
       wire_supplies: wireSupplies,
       base: base,
       profit: profit,
@@ -2411,8 +2413,8 @@
     setText('[data-letter-plexi-cost]', usesMetalFace ? 'محاسبه نمی‌شود' : sheetConsumptionText + ' — ' + formatMoney(plexiCost));
     setText('[data-letter-metal-sheet-cost]', usesMetalFace ? sheetConsumptionText + ' — ' + formatMoney(metalSheet07Cost) : 'محاسبه نمی‌شود');
     setText('[data-letter-powder-coating-cost]', usesMetalFace ? formatMeasure(areaSquareMeters, 3) + ' مترمربع — ' + formatMoney(powderCoatingCost) : 'محاسبه نمی‌شود');
-    setText('[data-letter-edge-label]', 'قیمت ' + edgeLabels[edgeType]);
-    setText('[data-letter-edge-labor-label]', 'اجرت ساخت ' + edgeLabels[edgeType]);
+    setText('[data-letter-edge-label]', 'هزینه ' + edgeLabels[edgeType]);
+    setText('[data-letter-edge-labor-label]', 'هزینه اجرت ' + edgeLabels[edgeType]);
     setText('[data-letter-edge-cost]', formatMeasure(perimeterMeters, 1) + ' متر — ' + formatMoney(edgeCost));
     setText('[data-letter-build-cost]', formatMeasure(perimeterMeters, 1) + ' متر — ' + formatMoney(buildCost));
     setText('[data-letter-plexi-cut-cost]', usesMetalFace ? 'محاسبه نمی‌شود' : formatMeasure(laserPerimeterMeters, 1) + ' متر برش — ' + formatMoney(plexiCutCost));
@@ -2429,7 +2431,7 @@
     setText('[data-letter-transformer-cost]', !useTransformer
       ? 'استفاده نمی‌شود'
       : (transformerCount > 0 ? transformerPlanText(transformerPlan) + ' — ' + formatMoney(transformer) : 'بدون SMD'));
-    setText('[data-letter-wire-supplies]', formatMoney(wireSupplies));
+    setText('[data-letter-wire-supplies]', formatMeasure(perimeterMeters, 1) + ' متر — ' + formatMoney(wireSupplies));
     setText('[data-letter-extras]', formatMoney(extras));
     setText('[data-letter-base]', formatMoney(base));
     setText('[data-letter-profit]', formatMoney(profit) + ' (' + formatMeasure(profitPercent) + '٪)');
@@ -2450,6 +2452,7 @@
     setCostRateWarning('[data-letter-transformer-cost]', useTransformer && transformerPlan.items.some(function (item) {
       return item.count > 0 && item.rate === 0;
     }));
+    setCostRateWarning('[data-letter-wire-supplies]', perimeterMeters > 0 && wireSuppliesRate === 0);
     drawSmdPreview(state, smdLayout, smdType);
   }
 
@@ -2611,7 +2614,7 @@
         design_height_mm: decimal(field('design_height_mm').value),
         installation: money(field('installation').value),
         travel: money(field('travel').value),
-        wire_supplies: money(field('wire_supplies').value),
+        wire_supplies_rate: money(field('wire_supplies_rate').value),
         profit_percent: decimal(field('profit_percent').value),
         insurance_tax_percent: decimal(field('insurance_tax_percent').value),
         use_transformer: field('use_transformer').checked ? 1 : 0,
@@ -2893,26 +2896,29 @@
         + formatMeasure(Number(analysis.lighting_area_mm2 || analysis.area_mm2 || 0) / 1000000, 3) + ' مترمربع'
         + smdModuleDescription + smdMinimumNote;
     }
-    var faceRows = usesMetalFace ? [
-      ['ورق فلزی ۰٫۷', savedConsumptionBasis, rates.metal_sheet_07_sqm_rate, breakdown.metal_sheet_07, savedConsumedSquareMeters > 0 && Number(rates.metal_sheet_07_sqm_rate || 0) === 0],
-      ['رنگ کوره‌ای', formatMeasure((analysis.area_mm2 || 0) / 1000000, 3) + ' مترمربع', rates.metal_powder_coating_rate, breakdown.powder_coating, Number(analysis.area_mm2 || 0) > 0 && Number(rates.metal_powder_coating_rate || 0) === 0]
-    ] : [
+    var faceRows = usesMetalFace ? [] : [
       ['مصرف پلکسی', savedConsumptionBasis, rates.plexi_sqm_rate, breakdown.plexi, savedConsumedSquareMeters > 0 && Number(rates.plexi_sqm_rate || 0) === 0],
       ['برش پلکسی', formatMeasure(laserPerimeterMeters, 1) + ' متر؛ شامل برش زیر و رو', rates.plexi_cut_rate, breakdown.plexi_cut, laserPerimeterMeters > 0 && Number(rates.plexi_cut_rate || 0) === 0]
     ];
-    var rows = faceRows.concat([
-      ['قیمت ' + edgeName, formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates['edge_' + edgeKey + '_material_rate'], breakdown.edge, Number(analysis.rounded_perimeter_m || 0) > 0 && Number(rates['edge_' + edgeKey + '_material_rate'] || 0) === 0],
-      ['اجرت ساخت ' + edgeName, formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates['edge_' + edgeKey + '_labor_rate'], breakdown.edge_labor, Number(analysis.rounded_perimeter_m || 0) > 0 && Number(rates['edge_' + edgeKey + '_labor_rate'] || 0) === 0],
+    var pvcRows = [
+      ['پی‌وی‌سی', savedConsumptionBasis, rates.pvc_rate, breakdown.pvc, savedConsumedSquareMeters > 0 && Number(rates.pvc_rate || 0) === 0],
+      ['برش پی‌وی‌سی', formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates.pvc_cut_rate, breakdown.pvc_cut, Number(analysis.rounded_perimeter_m || 0) > 0 && Number(rates.pvc_cut_rate || 0) === 0]
+    ];
+    var metalRows = usesMetalFace ? [
+      ['ورق فلزی ۰٫۷', savedConsumptionBasis, rates.metal_sheet_07_sqm_rate, breakdown.metal_sheet_07, savedConsumedSquareMeters > 0 && Number(rates.metal_sheet_07_sqm_rate || 0) === 0],
+      ['رنگ کوره‌ای', formatMeasure((analysis.area_mm2 || 0) / 1000000, 3) + ' مترمربع', rates.metal_powder_coating_rate, breakdown.powder_coating, Number(analysis.area_mm2 || 0) > 0 && Number(rates.metal_powder_coating_rate || 0) === 0]
+    ] : [];
+    var rows = faceRows.concat(pvcRows).concat(metalRows).concat([
+      ['هزینه ' + edgeName, formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates['edge_' + edgeKey + '_material_rate'], breakdown.edge, Number(analysis.rounded_perimeter_m || 0) > 0 && Number(rates['edge_' + edgeKey + '_material_rate'] || 0) === 0],
+      ['هزینه اجرت ' + edgeName, formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates['edge_' + edgeKey + '_labor_rate'], breakdown.edge_labor, Number(analysis.rounded_perimeter_m || 0) > 0 && Number(rates['edge_' + edgeKey + '_labor_rate'] || 0) === 0],
     ]).concat(doublePerimeterMeters > 0 ? [
       ['اجرت دوبل', formatMeasure(doublePerimeterMeters, 1) + ' متر مسیر قرمز', rates.double_layer_labor_rate, breakdown.double_labor, Number(rates.double_layer_labor_rate || 0) === 0]
     ] : []).concat([
-      ['PVC', savedConsumptionBasis, rates.pvc_rate, breakdown.pvc, savedConsumedSquareMeters > 0 && Number(rates.pvc_rate || 0) === 0],
-      ['برش PVC', formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates.pvc_cut_rate, breakdown.pvc_cut, Number(analysis.rounded_perimeter_m || 0) > 0 && Number(rates.pvc_cut_rate || 0) === 0],
       ['چسب', formatMeasure(analysis.rounded_perimeter_m || 0, 1) + ' متر', rates.glue_rate, breakdown.glue, Number(analysis.rounded_perimeter_m || 0) > 0 && Number(rates.glue_rate || 0) === 0],
       [smdName, smdBasis, smdKey !== 'none' ? rates['smd_' + smdKey + '_rate'] : 0, breakdown.smd, smdKey !== 'none' && Number(rates['smd_' + smdKey + '_rate'] || 0) === 0],
       ['ترانس پیشنهادی', useTransformer ? transformerPlanText(transformerPlan) : 'استفاده نمی‌شود', null, breakdown.transformer, useTransformer && transformerPlan.items.some(function (item) { return item.count > 0 && item.rate === 0; })],
       ['نصب', installationBasis, installationRate, breakdown.installation], ['ایاب و ذهاب', '', null, breakdown.travel],
-      ['سیم و لوازم مصرفی', '', null, breakdown.wire_supplies],
+      ['سیم و لوازم مصرفی', formatMeasure(Number(analysis.rounded_perimeter_m || breakdown.rounded_perimeter_m || 0), 1) + ' متر محیط', Number(inputs.wire_supplies_rate || breakdown.wire_supplies_rate || 0), breakdown.wire_supplies, Number(analysis.rounded_perimeter_m || breakdown.rounded_perimeter_m || 0) > 0 && Number(inputs.wire_supplies_rate || breakdown.wire_supplies_rate || 0) === 0],
       ['جمع هزینه‌های جانبی', '', null, Number(breakdown.installation || 0) + Number(breakdown.travel || 0) + Number(breakdown.wire_supplies || 0)],
       ['جمع هزینه پایه', '', null, breakdown.base],
       ['سود (' + formatMeasure(inputs.profit_percent || 0, 2) + '٪)', '', null, breakdown.profit],
@@ -3160,7 +3166,7 @@
     var body = new URLSearchParams({
       action: 'zigurat_save_letter_last_values', nonce: form.dataset.valuesNonce || '',
       installation: money(field('installation').value), travel: money(field('travel').value),
-      wire_supplies: money(field('wire_supplies').value),
+      wire_supplies_rate: money(field('wire_supplies_rate').value),
       profit_percent: decimal(field('profit_percent').value),
       insurance_tax_percent: decimal(field('insurance_tax_percent').value),
       use_transformer: field('use_transformer').checked ? 1 : 0,
@@ -3238,7 +3244,7 @@
   rateField('active_smd_type').addEventListener('change', function () { showSelectedRatePanel('smd', rateField('active_smd_type').value); });
   rateField('active_transformer_type').addEventListener('change', function () { showSelectedRatePanel('transformer', rateField('active_transformer_type').value); });
 
-  ['installation','travel','wire_supplies','profit_percent','insurance_tax_percent'].forEach(function (name) {
+  ['installation','travel','wire_supplies_rate','profit_percent','insurance_tax_percent'].forEach(function (name) {
     var input = field(name);
     input.addEventListener('input', function () { calculateCosts(); if (input.value.trim() !== '') scheduleValuesSave(); });
     input.addEventListener('change', function () { calculateCosts(); if (input.value.trim() !== '') saveLastValues(); });

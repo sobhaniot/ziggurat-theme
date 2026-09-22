@@ -158,7 +158,7 @@ $unread_application_ids = function_exists('zigurat_application_unread_ids')
                             <td><strong><?php the_title(); ?></strong><?php if ($is_unread): ?><span class="manager-application-new">جدید برای شما</span><?php endif; ?><?php if ($business): ?><small><?php echo esc_html($business); ?></small><?php endif; ?></td>
                             <td><?php echo esc_html(zigurat_application_type_label($type)); ?></td>
                             <td><?php echo esc_html(get_post_meta($application_id, '_application_profession', true)); ?></td>
-                            <td><?php echo esc_html(trim($province . '، ' . $city, '، ')); ?></td>
+                            <td><?php echo esc_html(zigurat_application_location_label($province, $city)); ?></td>
                             <td class="ltr-cell"><?php echo esc_html(get_post_meta($application_id, '_application_phone', true)); ?></td>
                             <td><?php echo $nationwide ? 'سراسر ایران' : esc_html($work_cities ?: '—'); ?></td>
                             <td class="no-print">

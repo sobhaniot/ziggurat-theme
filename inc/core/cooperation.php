@@ -51,6 +51,19 @@ function zigurat_application_type_label($type)
     return $type === 'supplier' ? 'تأمین‌کننده' : 'همکار اجرایی';
 }
 
+/** ترکیب امن استان و شهر بدون استفاده از trim چندبایتی. */
+function zigurat_application_location_label($province, $city)
+{
+    $parts = array_filter(array(
+        trim((string) $province),
+        trim((string) $city),
+    ), static function ($value) {
+        return $value !== '';
+    });
+
+    return implode('، ', $parts);
+}
+
 function zigurat_application_private_file_url($application_id, $token)
 {
     return wp_nonce_url(
@@ -190,7 +203,7 @@ function zigurat_email_managers_for_application($application_id, $data)
         $message .= 'متقاضی: ' . ($display_name ?: 'ثبت نشده') . "\n";
         $message .= 'نوع: ' . $type_label . "\n";
         $message .= 'زمینه فعالیت: ' . ((string) ($data['profession'] ?? '') ?: 'ثبت نشده') . "\n";
-        $message .= 'محل فعالیت: ' . trim((string) ($data['province'] ?? '') . '، ' . (string) ($data['city'] ?? ''), '، ') . "\n\n";
+        $message .= 'محل فعالیت: ' . zigurat_application_location_label($data['province'] ?? '', $data['city'] ?? '') . "\n\n";
         $message .= "برای بررسی اطلاعات و مدارک، وارد پنل مدیران شوید:\n" . $list_url;
         if (wp_mail($email, $subject, $message, array('Content-Type: text/plain; charset=UTF-8'))) {
             ++$sent_count;
@@ -331,7 +344,10 @@ function zigurat_application_column_content($column, $post_id)
     } elseif ($column === 'profession') {
         echo esc_html(get_post_meta($post_id, '_application_profession', true));
     } elseif ($column === 'location') {
-        echo esc_html(trim(get_post_meta($post_id, '_application_province', true) . '، ' . get_post_meta($post_id, '_application_city', true), '، '));
+        echo esc_html(zigurat_application_location_label(
+            get_post_meta($post_id, '_application_province', true),
+            get_post_meta($post_id, '_application_city', true)
+        ));
     } elseif ($column === 'phone') {
         echo esc_html(get_post_meta($post_id, '_application_phone', true));
     }

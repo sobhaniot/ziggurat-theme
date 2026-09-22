@@ -84,7 +84,7 @@ $submitted_at = $meta['submitted_at'] ?: get_the_date('Y/m/d H:i', $application_
         <div class="manager-resume__contact-strip">
             <div><small>شماره تماس</small><strong class="ltr-cell"><?php echo esc_html($meta['phone'] ?: '—'); ?></strong></div>
             <div><small>ایمیل</small><strong class="ltr-cell"><?php echo esc_html($meta['email'] ?: '—'); ?></strong></div>
-            <div><small>محل فعالیت</small><strong><?php echo esc_html(trim($meta['province'] . '، ' . $meta['city'], '، ') ?: '—'); ?></strong></div>
+            <div><small>محل فعالیت</small><strong><?php echo esc_html(zigurat_application_location_label($meta['province'], $meta['city']) ?: '—'); ?></strong></div>
         </div>
 
         <div class="manager-resume__grid">

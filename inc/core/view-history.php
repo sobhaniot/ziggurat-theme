@@ -39,13 +39,17 @@ function zigurat_record_daily_view($content_type)
     global $wpdb;
     $table = zigurat_view_history_table_name();
     $date = current_time('Y-m-d');
-    $wpdb->query($wpdb->prepare(
+    $updated = $wpdb->query($wpdb->prepare(
         "INSERT INTO {$table} (view_date, content_type, views)
          VALUES (%s, %s, 1)
          ON DUPLICATE KEY UPDATE views = views + 1",
         $date,
         $content_type
     ));
+    if ($updated !== false) {
+        /** امکان ارسال رخداد به سرویس WebSocket مستقل. */
+        do_action('zigurat_view_recorded', $content_type);
+    }
 }
 
 /** تبدیل تاریخ جلالی به میلادی برای ساخت بازه‌های ماهانه و سالانه شمسی. */

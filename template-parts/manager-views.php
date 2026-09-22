@@ -15,10 +15,11 @@ foreach ($statistics['top_content'] as $content_item) {
     $top_max = max($top_max, (int) $content_item->views);
 }
 ?>
-<section class="manager-views" aria-labelledby="manager-views-title">
+<section class="manager-views" data-live-views-root data-initial-total="<?php echo esc_attr($total_views); ?>" aria-labelledby="manager-views-title">
     <div class="manager-views__toolbar no-print">
         <a href="<?php echo esc_url(zigurat_manager_login_url()); ?>">بازگشت به پنل مدیران</a>
         <span>آمار تجمعی ثبت‌شده تا این لحظه</span>
+        <span class="manager-views__live-state" data-live-state><i aria-hidden="true"></i><b>در حال اتصال زنده…</b></span>
     </div>
 
     <header class="manager-views__heading">
@@ -32,30 +33,31 @@ foreach ($statistics['top_content'] as $content_item) {
     <div class="manager-view-cards">
         <article class="manager-view-card manager-view-card--total">
             <span>مجموع بازدید و دانلود</span>
-            <strong><?php echo esc_html(number_format_i18n($total_views)); ?></strong>
+            <strong data-live-metric="total_views"><?php echo esc_html(number_format_i18n($total_views)); ?></strong>
             <small>مطالب، پروژه‌ها و دریافت فایل</small>
+            <div class="manager-view-card__toast" data-live-card-toast hidden></div>
         </article>
         <article class="manager-view-card">
             <span>بازدید مطالب</span>
-            <strong><?php echo esc_html(number_format_i18n($statistics['article_views'])); ?></strong>
+            <strong data-live-metric="article_views"><?php echo esc_html(number_format_i18n($statistics['article_views'])); ?></strong>
             <small><?php echo esc_html(number_format_i18n($statistics['article_count'])); ?> مطلب منتشرشده</small>
         </article>
         <article class="manager-view-card">
             <span>بازدید پروژه‌ها</span>
-            <strong><?php echo esc_html(number_format_i18n($statistics['project_views'])); ?></strong>
+            <strong data-live-metric="project_views"><?php echo esc_html(number_format_i18n($statistics['project_views'])); ?></strong>
             <small><?php echo esc_html(number_format_i18n($statistics['project_count'])); ?> پروژه منتشرشده</small>
         </article>
         <article class="manager-view-card manager-view-card--download">
             <span>دانلود فایل‌ها</span>
-            <strong><?php echo esc_html(number_format_i18n($statistics['download_views'])); ?></strong>
+            <strong data-live-metric="download_views"><?php echo esc_html(number_format_i18n($statistics['download_views'])); ?></strong>
             <small><?php echo esc_html(number_format_i18n($statistics['download_count'])); ?> فایل منتشرشده</small>
         </article>
         <article class="manager-view-card">
             <span>میانگین بازدید</span>
             <div class="manager-view-card__averages">
-                <small>هر مطلب <b><?php echo esc_html(number_format_i18n($statistics['article_average'])); ?></b></small>
-                <small>هر پروژه <b><?php echo esc_html(number_format_i18n($statistics['project_average'])); ?></b></small>
-                <small>هر فایل <b><?php echo esc_html(number_format_i18n($statistics['download_average'])); ?></b></small>
+                <small>هر مطلب <b data-live-metric="article_average"><?php echo esc_html(number_format_i18n($statistics['article_average'])); ?></b></small>
+                <small>هر پروژه <b data-live-metric="project_average"><?php echo esc_html(number_format_i18n($statistics['project_average'])); ?></b></small>
+                <small>هر فایل <b data-live-metric="download_average"><?php echo esc_html(number_format_i18n($statistics['download_average'])); ?></b></small>
             </div>
         </article>
     </div>
@@ -88,13 +90,13 @@ foreach ($statistics['top_content'] as $content_item) {
                 <h3>سهم بخش‌ها از بازدید</h3>
                 <small>مقایسه مطالب، پروژه‌ها و دانلودها</small>
             </div>
-            <div class="manager-view-donut <?php echo $total_views ? '' : 'is-empty'; ?>" style="--article-share: <?php echo esc_attr($article_share); ?>%;--project-share-end: <?php echo esc_attr($project_share_end); ?>%;" role="img" aria-label="<?php echo esc_attr('سهم مطالب ' . $article_share . ' درصد، سهم پروژه‌ها ' . $project_share . ' درصد و سهم دانلودها ' . $download_share . ' درصد'); ?>">
-                <div><strong><?php echo esc_html(number_format_i18n($total_views)); ?></strong><span>کل بازدید</span></div>
+            <div class="manager-view-donut <?php echo $total_views ? '' : 'is-empty'; ?>" data-live-donut style="--article-share: <?php echo esc_attr($article_share); ?>%;--project-share-end: <?php echo esc_attr($project_share_end); ?>%;" role="img" aria-label="<?php echo esc_attr('سهم مطالب ' . $article_share . ' درصد، سهم پروژه‌ها ' . $project_share . ' درصد و سهم دانلودها ' . $download_share . ' درصد'); ?>">
+                <div><strong data-live-metric="total_views"><?php echo esc_html(number_format_i18n($total_views)); ?></strong><span>کل بازدید</span></div>
             </div>
             <ul class="manager-view-legend">
-                <li><i class="is-article"></i><span>مطالب</span><strong><?php echo esc_html(number_format_i18n($article_share, 1)); ?>٪</strong></li>
-                <li><i class="is-project"></i><span>پروژه‌ها</span><strong><?php echo esc_html(number_format_i18n($project_share, 1)); ?>٪</strong></li>
-                <li><i class="is-download"></i><span>دانلودها</span><strong><?php echo esc_html(number_format_i18n($download_share, 1)); ?>٪</strong></li>
+                <li><i class="is-article"></i><span>مطالب</span><strong data-live-share="article"> <?php echo esc_html(number_format_i18n($article_share, 1)); ?>٪</strong></li>
+                <li><i class="is-project"></i><span>پروژه‌ها</span><strong data-live-share="project"> <?php echo esc_html(number_format_i18n($project_share, 1)); ?>٪</strong></li>
+                <li><i class="is-download"></i><span>دانلودها</span><strong data-live-share="download"> <?php echo esc_html(number_format_i18n($download_share, 1)); ?>٪</strong></li>
             </ul>
         </section>
 
@@ -104,7 +106,7 @@ foreach ($statistics['top_content'] as $content_item) {
                 <small>۱۰ مطلب، پروژه یا فایل برتر</small>
             </div>
             <?php if ($statistics['top_content']): ?>
-                <ol class="manager-view-bars">
+                <ol class="manager-view-bars" data-live-top-content>
                     <?php foreach ($statistics['top_content'] as $content_item):
                         $views = max(0, (int) $content_item->views);
                         $width = ($top_max && $views > 0) ? max(2, round(($views / $top_max) * 100, 2)) : 0;
@@ -125,4 +127,5 @@ foreach ($statistics['top_content'] as $content_item) {
             <?php endif; ?>
         </section>
     </div>
+
 </section>

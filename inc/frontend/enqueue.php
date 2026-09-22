@@ -60,7 +60,6 @@ function zigurat_enqueue_assets()
         zigurat_enqueue_theme_style('manager');
         zigurat_enqueue_theme_style('invoice');
         zigurat_enqueue_theme_script('manager-login');
-        zigurat_enqueue_theme_script('manager-views');
         zigurat_enqueue_theme_script('pricing-calculator');
         zigurat_enqueue_theme_script('invoice-calculator');
         zigurat_enqueue_theme_script('letter-calculator', array('zigurat-pricing-calculator'));
@@ -139,6 +138,23 @@ function zigurat_enqueue_assets()
         ));
         wp_localize_script('zigurat-panel-ajax', 'ziguratPanelAjaxConfig', array(
             'paths' => array((string) wp_parse_url(zigurat_invoice_page_url(), PHP_URL_PATH)),
+        ));
+    }
+
+    if (function_exists('zigurat_should_show_live_views_counter') && zigurat_should_show_live_views_counter()) {
+        zigurat_enqueue_theme_style('manager-live', array());
+        zigurat_enqueue_theme_script('manager-views');
+        $views_websocket_url = defined('ZIGURAT_VIEWS_WEBSOCKET_URL')
+            ? (string) ZIGURAT_VIEWS_WEBSOCKET_URL
+            : (string) apply_filters('zigurat_views_websocket_url', '');
+        if ($views_websocket_url !== '' && !preg_match('#^wss?://#i', $views_websocket_url)) {
+            $views_websocket_url = '';
+        }
+        wp_localize_script('zigurat-manager-views', 'ziguratManagerViewsConfig', array(
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('zigurat_live_views'),
+            'pollInterval' => 30000,
+            'websocketUrl' => $views_websocket_url,
         ));
     }
 

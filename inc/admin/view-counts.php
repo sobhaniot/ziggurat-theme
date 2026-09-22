@@ -114,6 +114,83 @@ function zigurat_get_manager_views_statistics($limit = 10)
     );
 }
 
+/** داده سبک و قابل استفاده برای به‌روزرسانی زنده صفحه آمار مدیران. */
+function zigurat_get_live_views_payload()
+{
+    $statistics = zigurat_get_manager_views_statistics(10);
+    $top_content = array();
+    foreach ($statistics['top_content'] as $content_item) {
+        $top_content[] = array(
+            'id' => (int) $content_item->ID,
+            'title' => (string) ($content_item->post_title ?: 'بدون عنوان'),
+            'type' => (string) $content_item->post_type,
+            'url' => (string) get_permalink($content_item->ID),
+            'views' => max(0, (int) $content_item->views),
+        );
+    }
+
+    return array(
+        'article_views' => (int) $statistics['article_views'],
+        'project_views' => (int) $statistics['project_views'],
+        'download_views' => (int) $statistics['download_views'],
+        'total_views' => (int) $statistics['total_views'],
+        'article_count' => (int) $statistics['article_count'],
+        'project_count' => (int) $statistics['project_count'],
+        'download_count' => (int) $statistics['download_count'],
+        'article_average' => (int) $statistics['article_average'],
+        'project_average' => (int) $statistics['project_average'],
+        'download_average' => (int) $statistics['download_average'],
+        'chart' => zigurat_get_all_views_chart_data(),
+        'top_content' => $top_content,
+        'updated_at' => current_time('c'),
+    );
+}
+
+function zigurat_ajax_get_live_views()
+{
+    if (!zigurat_is_manager()) {
+        wp_send_json_error(array('message' => 'دسترسی به آمار مجاز نیست.'), 403);
+    }
+
+    check_ajax_referer('zigurat_live_views', 'nonce');
+    nocache_headers();
+    wp_send_json_success(zigurat_get_live_views_payload());
+}
+add_action('wp_ajax_zigurat_get_live_views', 'zigurat_ajax_get_live_views');
+
+/** نمایش شمارنده زنده فقط در صفحات اختصاصی مدیریت سایت. */
+function zigurat_should_show_live_views_counter()
+{
+    if (!zigurat_is_manager() || is_admin()) {
+        return false;
+    }
+
+    $inventory_pages = array('inventory-list', 'inventory-transactions', 'inventory-catalog', 'add-item', 'subtract-item');
+    return is_page('login')
+        || is_page_template('page-login.php')
+        || is_page('invoices')
+        || is_page_template('page-invoices.php')
+        || is_page($inventory_pages);
+}
+
+function zigurat_render_live_views_counter()
+{
+    if (!zigurat_should_show_live_views_counter()) {
+        return;
+    }
+    $statistics = zigurat_get_manager_views_statistics(1);
+    $total_views = max(0, (int) $statistics['total_views']);
+    ?>
+    <aside class="manager-live-counter no-print" data-live-counter data-initial-total="<?php echo esc_attr($total_views); ?>" aria-live="polite">
+        <span><i aria-hidden="true"></i> بازدید زنده</span>
+        <strong data-live-counter-value><?php echo esc_html(number_format_i18n($total_views)); ?></strong>
+        <small data-live-counter-status>در حال اتصال…</small>
+        <div class="manager-live-counter__toast" data-live-toast hidden></div>
+    </aside>
+    <?php
+}
+add_action('wp_footer', 'zigurat_render_live_views_counter', 30);
+
 function zigurat_register_views_dashboard_widget()
 {
     wp_add_dashboard_widget(

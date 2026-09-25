@@ -86,6 +86,10 @@ function ziggurat_create_default_pages()
             'title'    => 'همکاری با ما',
             'template' => 'page-cooperation.php'
         ),
+        'portfolio' => array(
+            'title'    => 'پورتفولیو',
+            'template' => 'page-portfolio.php'
+        ),
         'login' => array(
             'title'    => 'ورود',
             'template' => 'page-login.php'
@@ -164,6 +168,11 @@ function ziggurat_create_main_menu()
             'url' => home_url('/projects/')
         ),
         array(
+            'title' => 'کاتالوگ دیجیتال',
+            'object' => 'page',
+            'slug' => 'portfolio'
+        ),
+        array(
             'title' => 'مطالب',
             'url' => get_post_type_archive_link('article')
         ),
@@ -215,3 +224,55 @@ function ziggurat_create_main_menu()
         $locations
     );
 }
+
+/**
+ * Keep the public portfolio landing page available on existing installations.
+ * Existing editor content is never overwritten.
+ */
+function zigurat_ensure_portfolio_page()
+{
+    $required_version = '3';
+    if ((string) get_option('zigurat_portfolio_page_version', '') === $required_version) {
+        return;
+    }
+
+    $page = get_page_by_path('portfolio', OBJECT, 'page');
+    if (!$page) {
+        $content = '<!-- wp:paragraph {"fontSize":"medium"} -->'
+            . '<p class="has-medium-font-size">نسخه دیجیتال کاتالوگ زیگورات به‌زودی در این بخش قرار می‌گیرد.</p>'
+            . '<!-- /wp:paragraph -->';
+
+        $page_id = wp_insert_post(array(
+            'post_type'    => 'page',
+            'post_status'  => 'publish',
+            'post_title'   => 'پورتفولیو',
+            'post_name'    => 'portfolio',
+            'post_content' => $content,
+        ));
+    } else {
+        $page_id = (int) $page->ID;
+        if ($page->post_title !== 'پورتفولیو') {
+            wp_update_post(array(
+                'ID'         => $page_id,
+                'post_title' => 'پورتفولیو',
+            ));
+        }
+        if (trim((string) $page->post_content) === '') {
+            wp_update_post(array(
+                'ID'           => $page_id,
+                'post_content' => '<!-- wp:paragraph {"fontSize":"medium"} --><p class="has-medium-font-size">نسخه دیجیتال کاتالوگ زیگورات به‌زودی در این بخش قرار می‌گیرد.</p><!-- /wp:paragraph -->',
+            ));
+        } elseif (strpos((string) $page->post_content, 'برای افزودن کاتالوگ، از ویرایشگر وردپرس بلوک') !== false) {
+            wp_update_post(array(
+                'ID'           => $page_id,
+                'post_content' => '<!-- wp:paragraph {"fontSize":"medium"} --><p class="has-medium-font-size">نسخه دیجیتال کاتالوگ زیگورات به‌زودی در این بخش قرار می‌گیرد.</p><!-- /wp:paragraph -->',
+            ));
+        }
+    }
+
+    if (!empty($page_id) && !is_wp_error($page_id)) {
+        update_post_meta((int) $page_id, '_wp_page_template', 'page-portfolio.php');
+        update_option('zigurat_portfolio_page_version', $required_version, false);
+    }
+}
+add_action('init', 'zigurat_ensure_portfolio_page', 31);

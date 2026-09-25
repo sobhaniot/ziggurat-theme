@@ -59,7 +59,7 @@ function zigurat_private_page_slugs()
 
 function zigurat_legacy_nonindexable_page_slugs()
 {
-    return array('portfolio');
+    return array();
 }
 
 function zigurat_is_private_management_page()
@@ -69,7 +69,8 @@ function zigurat_is_private_management_page()
 
 function zigurat_is_nonindexable_legacy_page()
 {
-    return is_page(zigurat_legacy_nonindexable_page_slugs());
+    $slugs = zigurat_legacy_nonindexable_page_slugs();
+    return $slugs ? is_page($slugs) : false;
 }
 
 function zigurat_seo_has_archive_filters()

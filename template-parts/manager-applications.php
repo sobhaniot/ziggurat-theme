@@ -79,7 +79,7 @@ $unread_application_ids = function_exists('zigurat_application_unread_ids')
     </div>
     <div class="manager-applications__heading">
         <div>
-            <h2>درخواست‌های همکاری</h2>
+            <h2>پنل همکاران</h2>
             <p><?php echo esc_html(number_format_i18n($applications->found_posts)); ?> درخواست مطابق فیلترها</p>
         </div>
     </div>
@@ -97,6 +97,8 @@ $unread_application_ids = function_exists('zigurat_application_unread_ids')
     <?php elseif (is_array($last_mail_status) && !empty($last_mail_status['application_id']) && empty($last_mail_status['sent'])): ?>
         <div class="manager-applications__notice is-error" role="alert">آخرین اعلان ایمیلی درخواست همکاری ارسال نشد. تنظیمات ایمیل را آزمایش کنید.</div>
     <?php endif; ?>
+
+    <?php get_template_part('template-parts/manager-partner-map', null, array('application_ids' => $all_application_ids)); ?>
 
     <form class="manager-application-filters no-print" method="get" action="<?php echo esc_url(home_url('/login/')); ?>">
         <input type="hidden" name="manager-section" value="applications">

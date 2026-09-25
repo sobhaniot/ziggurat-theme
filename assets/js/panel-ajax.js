@@ -53,7 +53,7 @@
     }
   }
 
-  function showError(root, message) {
+  function showError(root, message, sourceForm) {
     if (!root) return;
     var container = root.querySelector('.invoice-workspace, .inventory-card, .invoice-brand-picker, .container');
     if (!container) return;
@@ -61,6 +61,14 @@
     notice.className = root.matches('.invoice-admin-page') ? 'invoice-notice is-error' : 'inventory-notice inventory-notice--error';
     notice.setAttribute('role', 'alert');
     notice.textContent = message;
+    if (sourceForm && root.contains(sourceForm)) {
+      var actions = sourceForm.querySelector('.invoice-editor-actions, [data-form-actions]');
+      if (actions) {
+        notice.classList.add('invoice-save-result');
+        actions.insertAdjacentElement('afterend', notice);
+        return;
+      }
+    }
     container.insertBefore(notice, container.firstChild);
   }
 
@@ -152,7 +160,7 @@
     } catch (error) {
       if (error.name !== 'AbortError') {
         setBusy(currentRoot() || root, false);
-        showError(currentRoot() || root, 'ارتباط با سرور برقرار نشد. دوباره تلاش کنید.');
+        showError(currentRoot() || root, 'ارتباط با سرور برقرار نشد. دوباره تلاش کنید.', options.form || null);
       }
     } finally {
       if (requestController === controller) {
@@ -206,7 +214,8 @@
         body: data,
         historyMode: 'replace',
         focus: !root.matches('main.invoice-admin-page'),
-        preserveScroll: root.matches('main.invoice-admin-page')
+        preserveScroll: root.matches('main.invoice-admin-page'),
+        form: form
       });
     }
   });

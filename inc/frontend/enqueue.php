@@ -56,6 +56,30 @@ function zigurat_enqueue_assets()
     if (is_page('cooperation') || is_page_template('page-cooperation.php')) {
         zigurat_enqueue_theme_style('cooperation');
     }
+    if (is_page('portfolio') || is_page_template('page-portfolio.php')) {
+        zigurat_enqueue_theme_style('portfolio');
+        $portfolio_id = get_queried_object_id();
+        $portfolio_pdf_id = $portfolio_id ? (int) get_post_meta($portfolio_id, '_zigurat_portfolio_pdf_id', true) : 0;
+        if ($portfolio_pdf_id && get_post_mime_type($portfolio_pdf_id) === 'application/pdf') {
+            $page_flip_path = get_template_directory() . '/assets/vendor/page-flip/page-flip.browser.js';
+            wp_enqueue_script(
+                'zigurat-page-flip',
+                get_template_directory_uri() . '/assets/vendor/page-flip/page-flip.browser.js',
+                array(),
+                is_file($page_flip_path) ? filemtime($page_flip_path) : null,
+                true
+            );
+            zigurat_enqueue_theme_script('portfolio-flipbook', array('zigurat-page-flip'));
+            wp_localize_script('zigurat-portfolio-flipbook', 'ziguratPortfolioConfig', array(
+                'pdfModuleUrl' => wp_make_link_relative(get_template_directory_uri() . '/assets/vendor/pdfjs/pdf.min.mjs'),
+                'workerUrl'    => wp_make_link_relative(get_template_directory_uri() . '/assets/vendor/pdfjs/pdf.worker.min.mjs'),
+                'labels'       => array(
+                    'loading' => 'در حال آماده‌سازی کاتالوگ…',
+                    'error'   => 'نمایش کاتالوگ با مشکل روبه‌رو شد. می‌توانید فایل PDF را مستقیماً دانلود کنید.',
+                ),
+            ));
+        }
+    }
     if (is_page('login') || is_page_template('page-login.php')) {
         zigurat_enqueue_theme_style('manager');
         zigurat_enqueue_theme_style('invoice');
@@ -64,6 +88,9 @@ function zigurat_enqueue_assets()
         zigurat_enqueue_theme_script('invoice-calculator');
         zigurat_enqueue_theme_script('letter-calculator', array('zigurat-pricing-calculator'));
         $manager_section = isset($_GET['manager-section']) ? sanitize_key(wp_unslash($_GET['manager-section'])) : '';
+        if ($manager_section === 'applications' && zigurat_is_manager()) {
+            zigurat_enqueue_theme_script('manager-partner-map');
+        }
         if ($manager_section === 'letters' && zigurat_is_manager()) {
             wp_enqueue_editor();
             zigurat_enqueue_theme_style('letters');

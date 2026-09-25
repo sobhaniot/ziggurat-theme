@@ -191,8 +191,8 @@ $transformer_types = array(
 
         <small class="manager-pricing-autosave">آخرین هزینه‌های جانبی، درصدها و وضعیت استفاده از ترانس به‌صورت خودکار ذخیره می‌شوند.</small>
         <div class="manager-pricing-formula"><strong>مبنای برآورد:</strong> مسیر مشکی یک‌بار و مسیر <em class="manager-pricing-double-color">قرمز</em> دوبار (برش داخلی پلکسی اصلی و برش قطعه رویی) محاسبه می‌شوند. قطعه داخلیِ هم‌رنگ پلکسی اصلی دوباره به مصرف ورق اضافه نمی‌شود. SMD بلوکی و لنزدار از سطح کامل داخل مسیر مشکی و رولوکی از مسیر میانی قابل نصب داخل حروف محاسبه می‌شود. طول رولوکی با گام برش و پرت خرید گرد می‌شود و ترانس آن براساس وات مصرفی و رزرو توان پیشنهاد می‌شود. چیدمان هر رنگ پلکسی جداگانه و همیشه با چرخش بهینه انجام می‌شود و PVC نیز محاسبه خواهد شد. برای لبه فلزی، رویه ورق فلزی ۰٫۷ و رنگ کوره‌ای براساس مترمربعِ مساحت واقعی رویه محاسبه می‌شوند.</div>
-        <div class="manager-pricing-error" data-letter-error role="alert" hidden></div>
         <button class="manager-pricing-calculate" type="submit" data-letter-calculate>تحلیل فایل و چیدمان ورق</button>
+        <div class="manager-pricing-error" data-letter-error role="alert" hidden></div>
         <small class="manager-letter-runtime-note">طرح‌های معمولی طی چند ثانیه تحلیل می‌شوند؛ مرحله جاری و زمان سپری‌شده هنگام پردازش نمایش داده خواهد شد.</small>
         <div class="manager-letter-progress" data-letter-progress role="status" hidden><span></span><i data-letter-progress-color aria-hidden="true" hidden></i><strong>مرحله ۱ از ۴: خواندن فایل SVG</strong></div>
 

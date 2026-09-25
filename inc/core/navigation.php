@@ -31,6 +31,7 @@ function zigurat_sync_main_navigation($force = false)
     $items = array(
         array('title' => 'خانه', 'slug' => 'home'),
         array('title' => 'پروژه‌ها', 'url' => get_post_type_archive_link('project') ?: home_url('/projects/')),
+        array('title' => 'کاتالوگ دیجیتال', 'slug' => 'portfolio'),
         array('title' => 'مطالب', 'url' => get_post_type_archive_link('article') ?: home_url('/articles/')),
         array('title' => 'دانلودها', 'url' => get_post_type_archive_link('zig_download') ?: home_url('/downloads/')),
         array('title' => 'همکاری با ما', 'slug' => 'cooperation'),

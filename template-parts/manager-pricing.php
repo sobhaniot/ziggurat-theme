@@ -56,8 +56,6 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
             <p>اگر یکی از اضلاع کمتر از ۱٫۵ متر باشد، متر محیط مبناست؛ در غیر این صورت قیمت براساس مترمربع محاسبه می‌شود.</p>
         </header>
 
-        <?php if ($pricing_status === 'saved'): ?><div class="manager-pricing-notice is-success" role="status">نرخ‌های پایه با موفقیت ذخیره شدند.</div><?php elseif ($pricing_status): ?><div class="manager-pricing-notice is-error" role="alert">ذخیره نرخ‌ها انجام نشد؛ دوباره تلاش کنید.</div><?php endif; ?>
-
         <div class="manager-pricing-layout">
             <aside class="manager-pricing-rates">
                 <h3>تنظیم نرخ‌های پایه</h3>
@@ -72,7 +70,7 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                     <label>نرخ PVC بر اساس مبنای محاسبه (ریال)
                         <input name="pvc_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['pvc_rate']); ?>" required>
                     </label>
-                    <small class="manager-pricing-rates__status" data-pricing-rates-status role="status">تغییر نرخ‌ها به‌صورت خودکار ذخیره می‌شود.</small>
+                    <small class="manager-pricing-rates__status <?php echo $pricing_status === 'saved' ? 'is-saved' : ($pricing_status ? 'is-error' : ''); ?>" data-pricing-rates-status role="<?php echo $pricing_status && $pricing_status !== 'saved' ? 'alert' : 'status'; ?>"><?php echo $pricing_status === 'saved' ? 'نرخ‌های پایه با موفقیت ذخیره شدند.' : ($pricing_status ? 'ذخیره نرخ‌ها انجام نشد؛ دوباره تلاش کنید.' : 'تغییر نرخ‌ها به‌صورت خودکار ذخیره می‌شود.'); ?></small>
                 </form>
                 <?php if (!empty($settings['updated_at'])): ?><small class="manager-pricing-rates__updated">آخرین به‌روزرسانی: <?php echo esc_html($settings['updated_at']); ?></small><?php endif; ?>
             </aside>
@@ -119,8 +117,6 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
             <p>تابلو به نما، آبچکان، زیر و دو بغل تفکیک می‌شود و قطعات روی ورق استاندارد کامپوزیت ۳۲۰×۱۲۵ سانتی‌متر چیده می‌شوند.</p>
         </header>
 
-        <?php if ($pricing_status === 'saved'): ?><div class="manager-pricing-notice is-success" role="status">نرخ‌های پایه کامپوزیت با موفقیت ذخیره شدند.</div><?php elseif ($pricing_status): ?><div class="manager-pricing-notice is-error" role="alert">ذخیره نرخ‌ها انجام نشد؛ دوباره تلاش کنید.</div><?php endif; ?>
-
         <div class="manager-pricing-layout">
             <aside class="manager-pricing-rates">
                 <h3>تنظیم نرخ‌های هر مترمربع</h3>
@@ -138,7 +134,7 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                     <label>لوازم مصرفی هر مترمربع (ریال)
                         <input name="supplies_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['supplies_rate']); ?>" required>
                     </label>
-                    <small class="manager-pricing-rates__status" data-pricing-rates-status role="status">تغییر نرخ‌ها به‌صورت خودکار ذخیره می‌شود.</small>
+                    <small class="manager-pricing-rates__status <?php echo $pricing_status === 'saved' ? 'is-saved' : ($pricing_status ? 'is-error' : ''); ?>" data-pricing-rates-status role="<?php echo $pricing_status && $pricing_status !== 'saved' ? 'alert' : 'status'; ?>"><?php echo $pricing_status === 'saved' ? 'نرخ‌های پایه کامپوزیت با موفقیت ذخیره شدند.' : ($pricing_status ? 'ذخیره نرخ‌ها انجام نشد؛ دوباره تلاش کنید.' : 'تغییر نرخ‌ها به‌صورت خودکار ذخیره می‌شود.'); ?></small>
                 </form>
                 <?php if (!empty($settings['updated_at'])): ?><small class="manager-pricing-rates__updated">آخرین به‌روزرسانی: <?php echo esc_html($settings['updated_at']); ?></small><?php endif; ?>
             </aside>
@@ -315,8 +311,8 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                 </div>
                 <small class="manager-pricing-autosave">مقدار اضافه چاپ فلکسی، نوع و وزن شاخه آهن فریم و مهار، کرایه، سود، بیمه و مالیات به‌صورت خودکار ذخیره می‌شوند. طول مهار مخصوص همین محاسبه است.</small>
                 <div class="manager-pricing-formula"><strong>منطق آهن‌کشی:</strong> برای طول بیشتر از ۱٫۵ متر، تودلی‌ها با فاصله حداکثر یک متر و برای ارتفاع بیشتر از ۲ متر با فاصله حداکثر دو متر محاسبه می‌شوند. آهن مهار از طول واردشده محاسبه می‌شود؛ فریم و مهار هر دو به شاخه‌های ۶ متری رو به بالا گرد می‌شوند.</div>
-                <div class="manager-pricing-error" data-flexi-error role="alert" hidden></div>
                 <button class="manager-pricing-calculate" type="submit">محاسبه قیمت فلکسی</button>
+                <div class="manager-pricing-error" data-flexi-error role="alert" hidden></div>
                 <section class="manager-pricing-result manager-pricing-result--flexi" data-flexi-result aria-live="polite">
                     <div><span>مساحت واقعی تابلو</span><strong data-flexi-area>—</strong></div>
                     <div><span>محیط تابلو</span><strong data-flexi-perimeter>—</strong></div>

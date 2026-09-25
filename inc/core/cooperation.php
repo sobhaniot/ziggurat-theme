@@ -66,16 +66,16 @@ function zigurat_application_location_label($province, $city)
 
 function zigurat_application_private_file_url($application_id, $token)
 {
-    return wp_nonce_url(
+    return html_entity_decode(wp_nonce_url(
         admin_url('admin-post.php?action=zigurat_private_application_file&application=' . absint($application_id) . '&file=' . rawurlencode($token)),
         'zigurat_application_file_' . absint($application_id)
-    );
+    ), ENT_QUOTES, 'UTF-8');
 }
 
 function zigurat_application_resume_url($application_id)
 {
     $application_id = absint($application_id);
-    return wp_nonce_url(
+    return html_entity_decode(wp_nonce_url(
         add_query_arg(
             array(
                 'manager-section' => 'application-detail',
@@ -85,7 +85,7 @@ function zigurat_application_resume_url($application_id)
         ),
         'zigurat_view_application_' . $application_id,
         'application_nonce'
-    );
+    ), ENT_QUOTES, 'UTF-8');
 }
 
 function zigurat_application_fields()

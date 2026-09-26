@@ -220,6 +220,9 @@ function zigurat_get_composite_last_values()
         'bottom_fold_right' => 4,
         'bottom_fold_top' => 4,
         'bottom_fold_bottom' => 4,
+        'iron_basis' => 'purchased_area',
+        'installer_basis' => 'purchased_area',
+        'supplies_basis' => 'purchased_area',
         'freight' => 0,
         'bracing_cost' => 0,
         'profit_percent' => 0,
@@ -254,6 +257,9 @@ function zigurat_save_composite_last_values($data)
         'bottom_fold_right' => zigurat_pricing_decimal($data['bottom_fold_right'] ?? 4),
         'bottom_fold_top' => zigurat_pricing_decimal($data['bottom_fold_top'] ?? 4),
         'bottom_fold_bottom' => zigurat_pricing_decimal($data['bottom_fold_bottom'] ?? 4),
+        'iron_basis' => in_array(($data['iron_basis'] ?? ''), array('visible_area', 'purchased_area'), true) ? $data['iron_basis'] : 'purchased_area',
+        'installer_basis' => in_array(($data['installer_basis'] ?? ''), array('visible_area', 'purchased_area'), true) ? $data['installer_basis'] : 'purchased_area',
+        'supplies_basis' => in_array(($data['supplies_basis'] ?? ''), array('visible_area', 'purchased_area'), true) ? $data['supplies_basis'] : 'purchased_area',
         'freight' => zigurat_pricing_money($data['freight'] ?? 0),
         'bracing_cost' => zigurat_pricing_money($data['bracing_cost'] ?? 0),
         'profit_percent' => min(1000, zigurat_pricing_decimal($data['profit_percent'] ?? 0)),
@@ -494,10 +500,17 @@ function zigurat_calculate_composite_price($data, $settings = null)
     $purchased_area = $sheet_count * $sheet_area;
     $utilization_percent = $purchased_area > 0 ? ($cut_area / $purchased_area) * 100 : 0;
 
-    $iron_cost = (int) round($face_area * max(0, (int) ($settings['iron_rate'] ?? 0)));
+    $basis_area = static function ($basis) use ($area, $purchased_area) {
+        return $basis === 'visible_area' ? $area : $purchased_area;
+    };
+    $iron_basis = in_array(($data['iron_basis'] ?? ''), array('visible_area', 'purchased_area'), true) ? $data['iron_basis'] : 'purchased_area';
+    $installer_basis = in_array(($data['installer_basis'] ?? ''), array('visible_area', 'purchased_area'), true) ? $data['installer_basis'] : 'purchased_area';
+    $supplies_basis = in_array(($data['supplies_basis'] ?? ''), array('visible_area', 'purchased_area'), true) ? $data['supplies_basis'] : 'purchased_area';
+
+    $iron_cost = (int) round($basis_area($iron_basis) * max(0, (int) ($settings['iron_rate'] ?? 0)));
     $composite_cost = (int) round($purchased_area * max(0, (int) ($settings['composite_rate'] ?? 0)));
-    $installer_cost = (int) round($area * max(0, (int) ($settings['installer_rate'] ?? 0)));
-    $supplies_cost = (int) round($area * max(0, (int) ($settings['supplies_rate'] ?? 0)));
+    $installer_cost = (int) round($basis_area($installer_basis) * max(0, (int) ($settings['installer_rate'] ?? 0)));
+    $supplies_cost = (int) round($basis_area($supplies_basis) * max(0, (int) ($settings['supplies_rate'] ?? 0)));
     $freight = zigurat_pricing_money($data['freight'] ?? 0);
     $bracing_cost = zigurat_pricing_money($data['bracing_cost'] ?? 0);
     $base_total = $iron_cost + $composite_cost + $installer_cost + $supplies_cost + $freight + $bracing_cost;
@@ -523,6 +536,9 @@ function zigurat_calculate_composite_price($data, $settings = null)
         'purchased_area' => $purchased_area,
         'utilization_percent' => $utilization_percent,
         'parts' => $parts,
+        'iron_basis' => $iron_basis,
+        'installer_basis' => $installer_basis,
+        'supplies_basis' => $supplies_basis,
         'iron_cost' => $iron_cost,
         'composite_cost' => $composite_cost,
         'installer_cost' => $installer_cost,

@@ -30,7 +30,7 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
             <a href="<?php echo esc_url(add_query_arg(array('manager-section'=>'pricing','calculator'=>'composite'), zigurat_manager_login_url())); ?>">
                 <span aria-hidden="true">▦</span>
                 <strong>محاسبه قیمت تابلو کامپوزیت</strong>
-                <small>محاسبه آهن، کامپوزیت، نصاب و لوازم به‌ازای مترمربع همراه با کرایه، سود و درصد مشترک بیمه و مالیات</small>
+                <small>محاسبه کامپوزیت براساس ورق مصرفی و انتخاب مستقل مبنای آهن، دستمزد نصاب و لوازم مصرفی، همراه با کرایه، سود و درصد مشترک بیمه و مالیات</small>
             </a>
             <a href="<?php echo esc_url(add_query_arg(array('manager-section'=>'pricing','calculator'=>'flexi'), zigurat_manager_login_url())); ?>">
                 <span aria-hidden="true">▤</span>
@@ -119,7 +119,7 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
 
         <div class="manager-pricing-layout">
             <aside class="manager-pricing-rates">
-                <h3>تنظیم نرخ‌های هر مترمربع</h3>
+                <h3>تنظیم نرخ‌های محاسبه</h3>
                 <p>این نرخ‌ها به ریال ذخیره می‌شوند و تا زمان ویرایش بعدی باقی می‌مانند.</p>
                 <form data-pricing-rates-form="composite" data-ajax-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>" data-rates-nonce="<?php echo esc_attr(wp_create_nonce('zigurat_composite_rates')); ?>">
                     <label>قیمت کامپوزیت هر مترمربع (ریال)
@@ -128,8 +128,8 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                     <label>دستمزد نصاب هر مترمربع (ریال)
                         <input name="installer_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['installer_rate']); ?>" required>
                     </label>
-                    <label>قیمت آهن هر مترمربع (ریال)
-                        <input name="iron_rate" type="text" inputmode="numeric" data-money-input data-calculator-input data-calculator-label="قیمت آهن" value="<?php echo esc_attr((int) $settings['iron_rate']); ?>" required>
+                    <label>هزینه آهن هر مترمربع (ریال)
+                        <input name="iron_rate" type="text" inputmode="numeric" data-money-input data-calculator-input data-calculator-label="هزینه آهن هر مترمربع" value="<?php echo esc_attr((int) $settings['iron_rate']); ?>" required>
                     </label>
                     <label>لوازم مصرفی هر مترمربع (ریال)
                         <input name="supplies_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['supplies_rate']); ?>" required>
@@ -188,27 +188,27 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                         <input name="insurance_tax_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['insurance_tax_percent']); ?>" placeholder="اگر لازم نیست صفر بگذارید">
                     </label>
                 </div>
-                <small class="manager-pricing-autosave">آخرین کرایه، هزینه آهن‌کشی مهار، درصد سود و درصد مشترک بیمه و مالیات به‌صورت خودکار ذخیره می‌شوند.</small>
-                <div class="manager-pricing-formula"><strong>مبنای محاسبه:</strong> آهن براساس مساحت نما، نصب و لوازم براساس کل سطوح، و کامپوزیت براساس تعداد ورق کامل محاسبه می‌شود.</div>
+                <small class="manager-pricing-autosave">آخرین ابعاد، مبنای هزینه‌ها، کرایه، هزینه آهن‌کشی مهار، درصد سود و درصد مشترک بیمه و مالیات به‌صورت خودکار ذخیره می‌شوند.</small>
                 <div class="manager-pricing-error" data-composite-error role="alert" hidden></div>
                 <section class="manager-pricing-result manager-pricing-result--composite" data-composite-result aria-live="polite">
+                    <div class="manager-pricing-result__full manager-pricing-basis-help"><strong>مبنای هر هزینه را از کشویی کوچک کنار نام آن انتخاب کنید.</strong><span><i class="is-visible-area"></i> آبی: کل سطوح &nbsp; <i class="is-purchased-area"></i> سبز: ورق‌های کامل مصرفی</span></div>
                     <div><span>مساحت نما</span><strong data-composite-face-area>—</strong></div>
-                    <div><span>مساحت کل سطوح</span><strong data-composite-area>—</strong></div>
+                    <div class="manager-pricing-basis-reference is-visible-area"><span>مساحت کل سطوح</span><strong data-composite-area>—</strong></div>
                     <div><span>مساحت برش با لبه نصب</span><strong data-composite-cut-area>—</strong></div>
-                    <div><span>تعداد ورق ۳۲۰×۱۲۵ سانتی‌متر</span><strong data-composite-sheet-count>۰</strong></div>
                     <div><span>مصرف و پرت ورق</span><strong data-composite-utilization>—</strong></div>
-                    <div><span>هزینه آهن</span><strong data-composite-iron>۰ ریال</strong></div>
-                    <div><span>هزینه کامپوزیت</span><strong data-composite-sheet>۰ ریال</strong></div>
-                    <div><span>دستمزد نصاب</span><strong data-composite-installer>۰ ریال</strong></div>
-                    <div><span>لوازم مصرفی</span><strong data-composite-supplies>۰ ریال</strong></div>
+                    <div class="manager-pricing-result__full manager-pricing-basis-reference is-purchased-area"><span>تعداد ورق ۳۲۰×۱۲۵ سانتی‌متر</span><strong data-composite-sheet-count>۰</strong></div>
+                    <div class="manager-pricing-result__pair-start"><span>هزینه کامپوزیت</span><strong data-composite-sheet>۰ ریال</strong></div>
+                    <div class="manager-pricing-basis-cost <?php echo $last_values['iron_basis'] === 'visible_area' ? 'is-visible-area' : 'is-purchased-area'; ?>" data-composite-basis-card="iron"><span class="manager-pricing-basis-control">هزینه آهن<select name="iron_basis" aria-label="مبنای محاسبه هزینه آهن"><option value="purchased_area" <?php selected($last_values['iron_basis'], 'purchased_area'); ?>>ورق مصرفی</option><option value="visible_area" <?php selected($last_values['iron_basis'], 'visible_area'); ?>>کل سطوح</option></select></span><strong data-composite-iron>۰ ریال</strong></div>
+                    <div class="manager-pricing-result__pair-start manager-pricing-basis-cost <?php echo $last_values['installer_basis'] === 'visible_area' ? 'is-visible-area' : 'is-purchased-area'; ?>" data-composite-basis-card="installer"><span class="manager-pricing-basis-control">دستمزد نصاب<select name="installer_basis" aria-label="مبنای محاسبه دستمزد نصاب"><option value="purchased_area" <?php selected($last_values['installer_basis'], 'purchased_area'); ?>>ورق مصرفی</option><option value="visible_area" <?php selected($last_values['installer_basis'], 'visible_area'); ?>>کل سطوح</option></select></span><strong data-composite-installer>۰ ریال</strong></div>
+                    <div class="manager-pricing-basis-cost <?php echo $last_values['supplies_basis'] === 'visible_area' ? 'is-visible-area' : 'is-purchased-area'; ?>" data-composite-basis-card="supplies"><span class="manager-pricing-basis-control">لوازم مصرفی<select name="supplies_basis" aria-label="مبنای محاسبه لوازم مصرفی"><option value="purchased_area" <?php selected($last_values['supplies_basis'], 'purchased_area'); ?>>ورق مصرفی</option><option value="visible_area" <?php selected($last_values['supplies_basis'], 'visible_area'); ?>>کل سطوح</option></select></span><strong data-composite-supplies>۰ ریال</strong></div>
+                    <div class="manager-pricing-result__pair-start"><span>آهن‌کشی جهت مهار تابلو</span><strong data-composite-bracing>۰ ریال</strong></div>
                     <div><span>کرایه</span><strong data-composite-freight>۰ ریال</strong></div>
-                    <div><span>آهن‌کشی جهت مهار تابلو</span><strong data-composite-bracing>۰ ریال</strong></div>
-                    <div><span>جمع هزینه پایه</span><strong data-composite-base>۰ ریال</strong></div>
-                    <div><span>مبلغ سود</span><strong data-composite-profit>۰ ریال</strong></div>
-                    <div><span>مبلغ بیمه و مالیات</span><strong data-composite-insurance-tax>۰ ریال</strong></div>
-                    <div><span>قیمت نهایی هر مترمربع ورق مصرفی</span><strong data-composite-sheet-unit>۰ ریال</strong></div>
-                    <div><span>قیمت نهایی هر مترمربع کل سطوح</span><strong data-composite-surface-unit>۰ ریال</strong></div>
+                    <div class="manager-pricing-result__full"><span>جمع هزینه پایه</span><strong data-composite-base>۰ ریال</strong></div>
+                    <div class="manager-pricing-result__full"><span>مبلغ سود</span><strong data-composite-profit>۰ ریال</strong></div>
+                    <div class="manager-pricing-result__full"><span>مبلغ بیمه و مالیات</span><strong data-composite-insurance-tax>۰ ریال</strong></div>
                     <div class="manager-pricing-result__final"><span>قیمت نهایی</span><strong data-composite-final>۰ ریال</strong></div>
+                    <div class="manager-pricing-result__full"><span>قیمت نهایی هر مترمربع ورق مصرفی</span><strong data-composite-sheet-unit>۰ ریال</strong></div>
+                    <div class="manager-pricing-result__full"><span>قیمت نهایی هر مترمربع کل سطوح</span><strong data-composite-surface-unit>۰ ریال</strong></div>
                 </section>
                 <section class="manager-composite-layout" data-composite-layout hidden>
                     <header><div><strong>چیدمان ورق کامپوزیت</strong><small>ورق ۳۲۰×۱۲۵ سانتی‌متر — چرخش ۹۰ درجه برای چیدمان قطعات فعال است</small><em data-composite-face-direction></em><em data-composite-drip-direction></em><em data-composite-bottom-direction></em></div><div class="manager-composite-legend"><span class="is-face">نما</span><span class="is-drip">آبچکان</span><span class="is-bottom">زیر</span><span class="is-side">بغل</span></div></header>

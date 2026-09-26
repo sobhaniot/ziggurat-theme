@@ -55,6 +55,7 @@ function zigurat_enqueue_assets()
     }
     if (is_page('cooperation') || is_page_template('page-cooperation.php')) {
         zigurat_enqueue_theme_style('cooperation');
+        zigurat_enqueue_theme_script('cooperation-uploads');
     }
     if (is_page('portfolio') || is_page_template('page-portfolio.php')) {
         zigurat_enqueue_theme_style('portfolio');
@@ -90,6 +91,10 @@ function zigurat_enqueue_assets()
         $manager_section = isset($_GET['manager-section']) ? sanitize_key(wp_unslash($_GET['manager-section'])) : '';
         if ($manager_section === 'applications' && zigurat_is_manager()) {
             zigurat_enqueue_theme_script('manager-partner-map');
+        }
+        if ($manager_section === 'application-detail' && zigurat_is_manager()) {
+            zigurat_enqueue_theme_style('cooperation');
+            zigurat_enqueue_theme_script('cooperation-uploads');
         }
         if ($manager_section === 'letters' && zigurat_is_manager()) {
             wp_enqueue_editor();

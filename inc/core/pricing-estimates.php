@@ -369,11 +369,16 @@ function zigurat_sanitize_composite_estimate_snapshot($snapshot)
         'price_per_purchased_square_meter','price_per_visible_square_meter','price_per_square_meter','final_price',
     );
     $clean = array(
-        'version' => 1,
+        'version' => min(4, max(1, absint($snapshot['version'] ?? 1))),
         'calculator_type' => 'composite',
         'inputs' => array(),
         'rates' => array(),
         'results' => array(),
+        'cost_bases' => array(
+            'iron' => (($snapshot['cost_bases']['iron'] ?? '') === 'visible_area') ? 'visible_area' : 'purchased_area',
+            'installer' => (($snapshot['cost_bases']['installer'] ?? '') === 'visible_area') ? 'visible_area' : 'purchased_area',
+            'supplies' => (($snapshot['cost_bases']['supplies'] ?? '') === 'visible_area') ? 'visible_area' : 'purchased_area',
+        ),
         'drip_direction' => in_array(($snapshot['drip_direction'] ?? ''), array('none','vertical','horizontal'), true)
             ? $snapshot['drip_direction'] : 'none',
         'bottom_direction' => in_array(($snapshot['bottom_direction'] ?? ''), array('none','vertical','horizontal'), true)

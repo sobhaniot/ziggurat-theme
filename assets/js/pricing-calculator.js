@@ -607,6 +607,9 @@
         bottom_fold_right: decimal(field('bottom_fold_right').value),
         bottom_fold_top: decimal(field('bottom_fold_top').value),
         bottom_fold_bottom: decimal(field('bottom_fold_bottom').value),
+        iron_basis: field('iron_basis').value,
+        installer_basis: field('installer_basis').value,
+        supplies_basis: field('supplies_basis').value,
         freight: money(field('freight').value),
         bracing_cost: money(field('bracing_cost').value),
         profit_percent: decimal(field('profit_percent').value),
@@ -625,7 +628,27 @@
       saveTimer = window.setTimeout(saveLastValues, 500);
     }
 
+    function selectedCostBasis(name) {
+      return field(name + '_basis').value === 'visible_area' ? 'visible_area' : 'purchased_area';
+    }
+
+    function syncCostBasisCards() {
+      var bases = {
+        iron: selectedCostBasis('iron'),
+        installer: selectedCostBasis('installer'),
+        supplies: selectedCostBasis('supplies')
+      };
+      Object.keys(bases).forEach(function (name) {
+        var card = form.querySelector('[data-composite-basis-card="' + name + '"]');
+        if (!card) return;
+        card.classList.toggle('is-visible-area', bases[name] === 'visible_area');
+        card.classList.toggle('is-purchased-area', bases[name] === 'purchased_area');
+      });
+      return bases;
+    }
+
     function calculate(shouldFocus) {
+      var costBases = syncCostBasisCards();
       var length = decimal(field('length').value) / 100;
       var width = decimal(field('width').value) / 100;
       var dripDepth = decimal(field('drip_depth').value) / 100;
@@ -704,10 +727,14 @@
       var cutArea = parts.reduce(function (total, part) { return total + part.width * part.height / 1000000; }, 0);
       var purchasedArea = sheets.length * SHEET_AREA;
       var utilization = purchasedArea > 0 ? cutArea / purchasedArea * 100 : 0;
-      var ironCost = Math.round(faceArea * money(form.dataset.ironRate));
+      var ironBasis = costBases.iron;
+      var installerBasis = costBases.installer;
+      var suppliesBasis = costBases.supplies;
+      var basisArea = function (basis) { return basis === 'visible_area' ? visibleArea : purchasedArea; };
+      var ironCost = Math.round(basisArea(ironBasis) * money(form.dataset.ironRate));
       var compositeCost = Math.round(purchasedArea * money(form.dataset.compositeRate));
-      var installerCost = Math.round(visibleArea * money(form.dataset.installerRate));
-      var suppliesCost = Math.round(visibleArea * money(form.dataset.suppliesRate));
+      var installerCost = Math.round(basisArea(installerBasis) * money(form.dataset.installerRate));
+      var suppliesCost = Math.round(basisArea(suppliesBasis) * money(form.dataset.suppliesRate));
       var freight = money(field('freight').value);
       var bracingCost = money(field('bracing_cost').value);
       var baseTotal = ironCost + compositeCost + installerCost + suppliesCost + freight + bracingCost;
@@ -730,6 +757,7 @@
         },
         drip_direction: chosenTrial.dripDirection,
         bottom_direction: chosenTrial.bottomDirection,
+        cost_bases: { iron: ironBasis, installer: installerBasis, supplies: suppliesBasis },
         parts: parts.map(function (part) {
           return {type:part.type,title:part.title,label:part.label,width:part.width,height:part.height};
         }),
@@ -820,7 +848,7 @@
     function buildCompositeEstimateSnapshot() {
       if (!calculate(false) || !compositeState) throw new Error('ابتدا ابعاد معتبر وارد کنید تا محاسبه انجام شود.');
       return {
-        version: 1,
+        version: 4,
         calculator_type: 'composite',
         inputs: {
           length: decimal(field('length').value),
@@ -845,6 +873,7 @@
         },
         rates: compositeRateSnapshot(),
         results: compositeState.results,
+        cost_bases: compositeState.cost_bases,
         drip_direction: compositeState.drip_direction,
         bottom_direction: compositeState.bottom_direction,
         parts: compositeState.parts,
@@ -881,6 +910,10 @@
       ['bottom_fold_left','bottom_fold_right','bottom_fold_top','bottom_fold_bottom'].forEach(function (name) {
         setCompositeFieldValue(name, inputs[name] !== undefined ? inputs[name] : legacyFold, false);
       });
+      var savedBases = snapshot.cost_bases || {};
+      field('iron_basis').value = savedBases.iron === 'visible_area' ? 'visible_area' : 'purchased_area';
+      field('installer_basis').value = savedBases.installer === 'visible_area' ? 'visible_area' : 'purchased_area';
+      field('supplies_basis').value = savedBases.supplies === 'visible_area' ? 'visible_area' : 'purchased_area';
       ['freight','bracing_cost'].forEach(function (name) { setCompositeFieldValue(name, inputs[name] || 0, true); });
       var ratesForm = document.querySelector('[data-pricing-rates-form="composite"]');
       var datasetMap = {iron_rate:'ironRate',composite_rate:'compositeRate',installer_rate:'installerRate',supplies_rate:'suppliesRate'};
@@ -931,13 +964,35 @@
       var results = snapshot.results || {};
       includePrices = includePrices !== false;
       var safeTitle = escapeCompositeHtml(projectName || 'برآورد کامپوزیت');
+      var pricingVersion = Number(snapshot.version || 1);
+      var costBases = snapshot.cost_bases || {};
+      var basisText = function (basis) {
+        return basis === 'visible_area'
+          ? formatMeasure(Number(results.visible_area || 0)) + ' مترمربع کل سطوح'
+          : formatMeasure(Number(results.purchased_area || 0)) + ' مترمربع ورق مصرفی';
+      };
+      var ironBasis = pricingVersion >= 4
+        ? basisText(costBases.iron)
+        : pricingVersion >= 3
+        ? formatMeasure(Number(results.purchased_area || 0)) + ' مترمربع ورق مصرفی'
+        : (pricingVersion >= 2 ? Number(results.sheet_count || 0).toLocaleString('fa-IR') + ' ورق' : formatMeasure(Number(results.face_area || 0)) + ' مترمربع');
+      var installerBasis = pricingVersion >= 4
+        ? basisText(costBases.installer)
+        : pricingVersion >= 3
+        ? formatMeasure(Number(results.purchased_area || 0)) + ' مترمربع ورق مصرفی'
+        : (pricingVersion >= 2 ? Number(results.sheet_count || 0).toLocaleString('fa-IR') + ' ورق' : formatMeasure(Number(results.visible_area || 0)) + ' مترمربع');
+      var suppliesBasis = pricingVersion >= 4
+        ? basisText(costBases.supplies)
+        : pricingVersion >= 3
+        ? formatMeasure(Number(results.purchased_area || 0)) + ' مترمربع ورق مصرفی'
+        : formatMeasure(Number(results.visible_area || 0)) + ' مترمربع';
       var dripDirection = snapshot.drip_direction === 'vertical' ? 'عمودی' : (snapshot.drip_direction === 'horizontal' ? 'طولی' : 'بدون آبچکان');
       var bottomDirection = snapshot.bottom_direction === 'vertical' ? 'عمودی' : (snapshot.bottom_direction === 'horizontal' ? 'طولی' : 'بدون زیر تابلو');
       var rows = [
-        ['آهن', formatMeasure(Number(results.face_area || 0)) + ' مترمربع', rates.iron_rate, results.iron_cost],
+        ['آهن', ironBasis, rates.iron_rate, results.iron_cost],
         ['ورق کامپوزیت', Number(results.sheet_count || 0).toLocaleString('fa-IR') + ' ورق؛ ' + formatMeasure(Number(results.purchased_area || 0)) + ' مترمربع', rates.composite_rate, results.composite_cost],
-        ['دستمزد نصاب', formatMeasure(Number(results.visible_area || 0)) + ' مترمربع', rates.installer_rate, results.installer_cost],
-        ['لوازم مصرفی', formatMeasure(Number(results.visible_area || 0)) + ' مترمربع', rates.supplies_rate, results.supplies_cost],
+        ['دستمزد نصاب', installerBasis, rates.installer_rate, results.installer_cost],
+        ['لوازم مصرفی', suppliesBasis, rates.supplies_rate, results.supplies_cost],
         ['کرایه', '', null, results.freight],
         ['آهن‌کشی جهت مهار تابلو', '', null, results.bracing_cost],
         ['جمع هزینه پایه', '', null, results.base_total],
@@ -1053,11 +1108,11 @@
       event.preventDefault();
       if (calculate(false)) saveLastValues();
     });
-    form.querySelectorAll('input').forEach(function (input) {
+    form.querySelectorAll('input, select').forEach(function (input) {
       input.addEventListener('input', function () { calculate(false); });
       input.addEventListener('change', function () { calculate(false); });
     });
-    ['length', 'width', 'drip_depth', 'drip_start_fold', 'drip_end_fold', 'bottom_depth', 'side_depth', 'fold_left', 'fold_right', 'fold_top', 'fold_bottom', 'bottom_fold_left', 'bottom_fold_right', 'bottom_fold_top', 'bottom_fold_bottom', 'freight', 'bracing_cost', 'profit_percent', 'insurance_tax_percent'].forEach(function (name) {
+    ['length', 'width', 'drip_depth', 'drip_start_fold', 'drip_end_fold', 'bottom_depth', 'side_depth', 'fold_left', 'fold_right', 'fold_top', 'fold_bottom', 'bottom_fold_left', 'bottom_fold_right', 'bottom_fold_top', 'bottom_fold_bottom', 'iron_basis', 'installer_basis', 'supplies_basis', 'freight', 'bracing_cost', 'profit_percent', 'insurance_tax_percent'].forEach(function (name) {
       var input = field(name);
       input.addEventListener('input', function () {
         if (input.value.trim() !== '') scheduleValuesSave();

@@ -58,6 +58,19 @@
 .application-checkbox input { width: auto; flex: 0 0 auto; }
 .application-files { display: grid; gap: 14px; padding: 18px; border-radius: 12px; background: #f8f8f8; }
 .application-files small { color: #777; font-weight: 400; }
+.application-dropzone { padding: 15px; border: 2px dashed #d8c9a4; border-radius: 12px; background: #fff; transition: border-color .2s, background .2s, transform .2s; }
+.application-dropzone.is-dragging { border-color: #b17f13; background: #fff9ea; transform: translateY(-2px); }
+.application-dropzone.has-upload-warning { border-color: #b52d2d; background: #fff2f2; }
+.application-dropzone label { cursor: pointer; }
+.application-dropzone__prompt { display: flex; min-height: 72px; align-items: center; justify-content: center; padding: 12px; border-radius: 9px; background: #f7f3e9; color: #765510; text-align: center; font-weight: 700; }
+.application-dropzone input[type="file"] { padding: 9px; }
+.application-upload-preview { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 10px; }
+.application-upload-preview:empty { display: none; }
+.application-upload-preview__item { position: relative; display: grid; min-width: 0; grid-template-columns: 42px minmax(0, 1fr); gap: 8px; align-items: center; padding: 8px 8px 8px 34px; border: 1px solid #e3ded2; border-radius: 9px; background: #fff; }
+.application-upload-preview__item img { width: 42px; height: 42px; border-radius: 7px; object-fit: cover; }
+.application-upload-preview__pdf { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 7px; background: #a93232; color: #fff; font-size: 11px; font-weight: 800; }
+.application-upload-preview__name { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.application-upload-preview__remove { position: absolute; top: 5px; left: 5px; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: #24201a; color: #fff; font: 700 18px/24px Arial, sans-serif; cursor: pointer; }
 .application-form > button { min-height: 54px; border: 0; border-radius: 8px; background: #111; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
 .application-notice { margin-bottom: 20px; padding: 14px; border-radius: 9px; }
 .application-notice.success { background: #e8f7eb; color: #176227; }

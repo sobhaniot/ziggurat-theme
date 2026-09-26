@@ -108,6 +108,15 @@ function zigurat_application_fields()
     );
 }
 
+function zigurat_application_provinces()
+{
+    return array(
+        'آذربایجان شرقی', 'آذربایجان غربی', 'اردبیل', 'اصفهان', 'البرز', 'ایلام', 'بوشهر', 'تهران', 'چهارمحال و بختیاری',
+        'خراسان جنوبی', 'خراسان رضوی', 'خراسان شمالی', 'خوزستان', 'زنجان', 'سمنان', 'سیستان و بلوچستان', 'فارس', 'قزوین',
+        'قم', 'کردستان', 'کرمان', 'کرمانشاه', 'کهگیلویه و بویراحمد', 'گلستان', 'گیلان', 'لرستان', 'مازندران', 'مرکزی', 'هرمزگان', 'همدان', 'یزد',
+    );
+}
+
 /** تمام کاربرانی که اجازه ورود به پنل اختصاصی مدیران را دارند. */
 function zigurat_application_manager_users()
 {
@@ -459,12 +468,170 @@ function zigurat_delete_application_files($files)
 {
     foreach ((array) $files as $group) {
         foreach ((array) $group as $file) {
-            if (!empty($file['path']) && is_file($file['path'])) {
-                unlink($file['path']);
-            }
+            zigurat_delete_private_application_file($file);
         }
     }
 }
+
+function zigurat_resolve_private_application_file_path($file)
+{
+    $path = is_array($file) ? (string) ($file['path'] ?? '') : '';
+    $base = realpath(zigurat_private_application_directory());
+    if (!$base) {
+        return false;
+    }
+
+    $resolved = $path !== '' ? realpath($path) : false;
+    if (!$resolved && $path !== '') {
+        // مسیرهای قدیمی ویندوز پیش از wp_slash بک‌اسلش‌های خود را در دیتابیس از دست داده‌اند.
+        $legacy_name = sanitize_file_name(basename(str_replace('\\', '/', $path)));
+        $resolved = $legacy_name !== '' ? realpath($base . DIRECTORY_SEPARATOR . $legacy_name) : false;
+    }
+    if (!$resolved || strpos($resolved, $base . DIRECTORY_SEPARATOR) !== 0 || !is_file($resolved)) {
+        return false;
+    }
+    return $resolved;
+}
+
+function zigurat_delete_private_application_file($file)
+{
+    $resolved = zigurat_resolve_private_application_file_path($file);
+    if (!$resolved) {
+        return false;
+    }
+    return unlink($resolved);
+}
+
+function zigurat_update_partner_application()
+{
+    if (!current_user_can('manage_options')) {
+        wp_die('فقط مدیر کل می‌تواند رزومه را ویرایش کند.', 403);
+    }
+
+    $application_id = isset($_POST['application_id']) ? absint($_POST['application_id']) : 0;
+    check_admin_referer('zigurat_update_partner_application_' . $application_id);
+    $application = $application_id ? get_post($application_id) : null;
+    if (!$application || $application->post_type !== 'partner_application' || $application->post_status !== 'private') {
+        wp_die('رزومه موردنظر پیدا نشد.', 404);
+    }
+
+    $resume_url = zigurat_application_resume_url($application_id);
+    $redirect = static function ($status) use ($resume_url) {
+        wp_safe_redirect(add_query_arg('application-edit', $status, $resume_url));
+        exit;
+    };
+
+    $type = isset($_POST['application_type']) && $_POST['application_type'] === 'supplier' ? 'supplier' : 'collaborator';
+    $data = array(
+        'application_type' => $type,
+        'first_name'       => zigurat_application_request_value('first_name'),
+        'last_name'        => zigurat_application_request_value('last_name'),
+        'business_name'    => zigurat_application_request_value('business_name'),
+        'phone'            => zigurat_application_request_value('phone'),
+        'email'            => sanitize_email(zigurat_application_request_value('email')),
+        'profession'       => zigurat_application_request_value('profession'),
+        'experience_years' => min(70, absint(zigurat_application_request_value('experience_years'))),
+        'province'         => zigurat_application_request_value('province'),
+        'city'             => zigurat_application_request_value('city'),
+        'work_cities'      => zigurat_application_request_value('work_cities', true),
+        'nationwide'       => !empty($_POST['nationwide']) ? '1' : '0',
+        'description'      => zigurat_application_request_value('description', true),
+    );
+    if (!$data['first_name'] || !$data['last_name'] || !$data['phone'] || !$data['profession'] || !$data['province'] || !$data['city']) {
+        $redirect('invalid');
+    }
+
+    $files = get_post_meta($application_id, '_application_files', true);
+    $files = is_array($files) ? $files : array();
+    foreach (array('photo', 'national_card', 'portfolio') as $group) {
+        $files[$group] = isset($files[$group]) && is_array($files[$group]) ? array_values($files[$group]) : array();
+    }
+
+    $remove_tokens = isset($_POST['remove_application_files']) && is_array($_POST['remove_application_files'])
+        ? array_map('sanitize_text_field', wp_unslash($_POST['remove_application_files']))
+        : array();
+    $remove_indexes = array('photo' => array(), 'national_card' => array(), 'portfolio' => array());
+    foreach ($remove_tokens as $token) {
+        if (preg_match('/^(photo|national_card|portfolio):(\d+)$/', $token, $matches)) {
+            $remove_indexes[$matches[1]][] = (int) $matches[2];
+        }
+    }
+    foreach ($remove_indexes as $group => $indexes) {
+        foreach (array_unique($indexes) as $index) {
+            if (isset($files[$group][$index])) {
+                unset($files[$group][$index]);
+            }
+        }
+        $files[$group] = array_values($files[$group]);
+    }
+
+    $uploads = array(
+        'photo' => isset($_FILES['edit_applicant_photo']) ? zigurat_normalize_uploads($_FILES['edit_applicant_photo']) : array(),
+        'national_card' => isset($_FILES['edit_national_card']) ? zigurat_normalize_uploads($_FILES['edit_national_card']) : array(),
+        'portfolio' => isset($_FILES['edit_portfolio']) ? zigurat_normalize_uploads($_FILES['edit_portfolio']) : array(),
+    );
+    foreach ($uploads as $group => $group_uploads) {
+        $uploads[$group] = array_values(array_filter($group_uploads, static function ($upload) {
+            return ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+        }));
+    }
+    $uploads['photo'] = array_slice($uploads['photo'], 0, 1);
+    $uploads['national_card'] = array_slice($uploads['national_card'], 0, 1);
+    if (count($files['portfolio']) + count($uploads['portfolio']) > 5) {
+        $redirect('too-many-files');
+    }
+
+    $stored = array('photo' => array(), 'national_card' => array(), 'portfolio' => array());
+    foreach ($uploads as $group => $group_uploads) {
+        foreach ($group_uploads as $upload) {
+            $new_file = zigurat_store_private_application_file($upload, $group);
+            if (is_wp_error($new_file)) {
+                zigurat_delete_application_files($stored);
+                $redirect('upload-error');
+            }
+            $stored[$group][] = $new_file;
+        }
+    }
+
+    $old_files = get_post_meta($application_id, '_application_files', true);
+    $old_files = is_array($old_files) ? $old_files : array();
+    foreach ($remove_indexes as $group => $indexes) {
+        foreach (array_unique($indexes) as $index) {
+            if (isset($old_files[$group][$index])) {
+                zigurat_delete_private_application_file($old_files[$group][$index]);
+            }
+        }
+    }
+    foreach (array('photo', 'national_card') as $group) {
+        if (!$stored[$group]) {
+            continue;
+        }
+        foreach ($files[$group] as $old_file) {
+            zigurat_delete_private_application_file($old_file);
+        }
+        $files[$group] = array($stored[$group][0]);
+    }
+    $files['portfolio'] = array_values(array_merge($files['portfolio'], $stored['portfolio']));
+    foreach ($files as $group => $group_files) {
+        foreach ($group_files as $index => $file) {
+            $resolved = zigurat_resolve_private_application_file_path($file);
+            if ($resolved) {
+                $files[$group][$index]['path'] = $resolved;
+            }
+        }
+    }
+
+    foreach ($data as $key => $value) {
+        update_post_meta($application_id, '_application_' . $key, $value);
+    }
+    update_post_meta($application_id, '_application_files', wp_slash($files));
+    wp_update_post(array(
+        'ID' => $application_id,
+        'post_title' => trim($data['first_name'] . ' ' . $data['last_name']) . ' — ' . zigurat_application_type_label($type),
+    ));
+    $redirect('saved');
+}
+add_action('admin_post_zigurat_update_partner_application', 'zigurat_update_partner_application');
 
 function zigurat_handle_partner_application()
 {
@@ -555,7 +722,7 @@ function zigurat_handle_partner_application()
     foreach ($data as $key => $value) {
         update_post_meta($post_id, '_application_' . $key, $value);
     }
-    update_post_meta($post_id, '_application_files', $stored_files);
+    update_post_meta($post_id, '_application_files', wp_slash($stored_files));
     update_post_meta($post_id, '_application_notify_managers', '1');
     set_transient($rate_key, ((int) get_transient($rate_key)) + 1, HOUR_IN_SECONDS);
     zigurat_email_managers_for_application($post_id, $data);
@@ -579,10 +746,8 @@ function zigurat_download_private_application_file()
         wp_die('فایل معتبر نیست.', 400);
     }
     $file = $files[$matches[1]][(int) $matches[2]] ?? array();
-    $path = $file['path'] ?? '';
-    $base = realpath(zigurat_private_application_directory());
-    $resolved = $path ? realpath($path) : false;
-    if (!$base || !$resolved || strpos($resolved, $base . DIRECTORY_SEPARATOR) !== 0 || !is_file($resolved)) {
+    $resolved = zigurat_resolve_private_application_file_path($file);
+    if (!$resolved) {
         wp_die('فایل پیدا نشد.', 404);
     }
     nocache_headers();

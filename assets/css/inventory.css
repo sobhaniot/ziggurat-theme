@@ -199,6 +199,18 @@
 }
 .inventory-internal-project-create h2,
 .inventory-internal-project-list h2 { margin: 0 0 14px; font-size: 19px; }
+.inventory-internal-project-list__scroll {
+  max-height: 355px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-left: 5px;
+  scrollbar-gutter: stable;
+  scrollbar-color: #c89b3c #f1ede4;
+  scrollbar-width: thin;
+}
+.inventory-internal-project-list__scroll::-webkit-scrollbar { width: 8px; }
+.inventory-internal-project-list__scroll::-webkit-scrollbar-track { border-radius: 999px; background: #f1ede4; }
+.inventory-internal-project-list__scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: #c89b3c; }
 .inventory-internal-project-empty { margin: 0; color: #777; }
 .inventory-internal-project {
   margin-bottom: 9px;

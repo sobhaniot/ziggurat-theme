@@ -147,10 +147,11 @@ get_header();
                         <section class="inventory-internal-project-list">
                             <h2>پروژه‌های داخلی</h2>
                             <?php $managed_internal_projects = array_merge($managed_project_groups['internal'], $managed_project_groups['archived']); ?>
-                            <?php if (!$managed_internal_projects): ?>
-                                <p class="inventory-internal-project-empty">هنوز پروژه داخلی تعریف نشده است.</p>
-                            <?php else: ?>
-                                <?php foreach ($managed_internal_projects as $internal_project):
+                            <div class="inventory-internal-project-list__scroll" aria-label="فهرست پروژه‌های داخلی">
+                                <?php if (!$managed_internal_projects): ?>
+                                    <p class="inventory-internal-project-empty">هنوز پروژه داخلی تعریف نشده است.</p>
+                                <?php else: ?>
+                                    <?php foreach ($managed_internal_projects as $internal_project):
                                     $is_archived = zigurat_inventory_internal_project_status($internal_project->ID) === 'archived';
                                     $client = (string) get_post_meta($internal_project->ID, '_zigurat_inventory_project_client', true);
                                     $notes = (string) get_post_meta($internal_project->ID, '_zigurat_inventory_project_notes', true);
@@ -204,8 +205,9 @@ get_header();
                                             </form>
                                         </div>
                                     </details>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </div>
                         </section>
                     </div>
                 </details>

@@ -47,7 +47,10 @@
   box-shadow: 0 12px 35px rgba(0,0,0,.22);
   backdrop-filter: blur(8px);
   direction: rtl;
+  transition: opacity .14s ease, transform .14s ease;
 }
+.manager-live-counter.is-left { right: auto; left: 22px; }
+.manager-live-counter.is-relocating { opacity: 0; pointer-events: none; transform: scale(.94); }
 .manager-live-counter > span {
   display: flex;
   align-items: center;
@@ -84,6 +87,7 @@
 .manager-live-counter__toast {
   inset: -44px auto auto 0;
 }
+.manager-live-counter.is-left .manager-live-counter__toast { right: 0; left: auto; }
 .manager-view-card__toast {
   inset: 12px auto auto 12px;
 }

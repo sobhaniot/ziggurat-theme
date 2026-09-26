@@ -11,11 +11,7 @@ $status = isset($_GET['application-status']) && is_string($_GET['application-sta
     ? sanitize_key(wp_unslash($_GET['application-status']))
     : '';
 $selected_type = isset($_GET['type']) && $_GET['type'] === 'supplier' ? 'supplier' : 'collaborator';
-$provinces = array(
-    'آذربایجان شرقی', 'آذربایجان غربی', 'اردبیل', 'اصفهان', 'البرز', 'ایلام', 'بوشهر', 'تهران', 'چهارمحال و بختیاری',
-    'خراسان جنوبی', 'خراسان رضوی', 'خراسان شمالی', 'خوزستان', 'زنجان', 'سمنان', 'سیستان و بلوچستان', 'فارس', 'قزوین',
-    'قم', 'کردستان', 'کرمان', 'کرمانشاه', 'کهگیلویه و بویراحمد', 'گلستان', 'گیلان', 'لرستان', 'مازندران', 'مرکزی', 'هرمزگان', 'همدان', 'یزد'
-);
+$provinces = zigurat_application_provinces();
 ?>
 <main class="cooperation-page">
     <section class="cooperation-hero">
@@ -113,11 +109,20 @@ $provinces = array(
                     <label>توضیحات تکمیلی<textarea name="description" rows="4" placeholder="ابزار، تجهیزات، ظرفیت تولید، خودرو یا شرایط همکاری خود را بنویسید."></textarea></label>
 
                     <div class="application-files">
-                        <label>عکس متقاضی یا مجموعه *<input type="file" name="applicant_photo" accept="image/jpeg,image/png,image/webp" required><small>JPG، PNG یا WEBP؛ حداکثر ۵ مگابایت</small></label>
+                        <div class="application-dropzone" data-upload-zone>
+                            <label>عکس متقاضی یا مجموعه *<span class="application-dropzone__prompt">فایل را اینجا رها کنید یا برای انتخاب کلیک کنید</span><input type="file" name="applicant_photo" accept="image/jpeg,image/png,image/webp" data-upload-input data-max-files="1" required><small>JPG، PNG یا WEBP؛ حداکثر ۵ مگابایت</small></label>
+                            <div class="application-upload-preview" data-upload-preview></div>
+                        </div>
                         <?php if ($selected_type !== 'supplier'): ?>
-                            <label>عکس کارت ملی *<input type="file" name="national_card" accept="image/jpeg,image/png,image/webp" required><small>این فایل فقط برای مدیر قابل مشاهده است.</small></label>
+                            <div class="application-dropzone" data-upload-zone>
+                                <label>عکس کارت ملی *<span class="application-dropzone__prompt">فایل را اینجا رها کنید یا برای انتخاب کلیک کنید</span><input type="file" name="national_card" accept="image/jpeg,image/png,image/webp" data-upload-input data-max-files="1" required><small>این فایل فقط برای مدیر قابل مشاهده است.</small></label>
+                                <div class="application-upload-preview" data-upload-preview></div>
+                            </div>
                         <?php endif; ?>
-                        <label>نمونه‌کارها *<input type="file" name="portfolio[]" accept="image/jpeg,image/png,image/webp,application/pdf" multiple required><small>حداکثر ۵ فایل تصویر یا PDF، هر فایل تا ۵ مگابایت</small></label>
+                        <div class="application-dropzone" data-upload-zone>
+                            <label>نمونه‌کارها *<span class="application-dropzone__prompt">چند فایل را باهم یا در چند مرحله انتخاب کنید</span><input type="file" name="portfolio[]" accept="image/jpeg,image/png,image/webp,application/pdf" data-upload-input data-append-files="1" data-max-files="5" multiple required><small>حداکثر ۵ فایل تصویر یا PDF، هر فایل تا ۵ مگابایت</small></label>
+                            <div class="application-upload-preview" data-upload-preview></div>
+                        </div>
                     </div>
                     <label class="application-checkbox privacy-consent"><input type="checkbox" name="privacy_consent" value="1" required> با ذخیره و بررسی محرمانه اطلاعات برای ارزیابی همکاری موافقم. *</label>
                     <button type="submit">ثبت امن درخواست همکاری</button>

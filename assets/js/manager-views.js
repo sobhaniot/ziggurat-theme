@@ -132,6 +132,19 @@
     var toastTimer = null;
     var reconnectTimer = null;
     var reconnectDelay = 1500;
+    var counterMoveTimer = null;
+
+    function moveCounterToOtherSide() {
+      if (!counter || counter.classList.contains('is-relocating')) return;
+      counter.classList.add('is-relocating');
+      window.clearTimeout(counterMoveTimer);
+      counterMoveTimer = window.setTimeout(function () {
+        counter.classList.toggle('is-left');
+        window.setTimeout(function () { counter.classList.remove('is-relocating'); }, 70);
+      }, 140);
+    }
+
+    if (counter) counter.addEventListener('mouseenter', moveCounterToOtherSide);
 
     function setStatus(mode, message) {
       if (stateElement) stateElement.dataset.status = mode;
@@ -327,7 +340,9 @@
         window.clearTimeout(pollTimer);
         window.clearTimeout(toastTimer);
         window.clearTimeout(reconnectTimer);
+        window.clearTimeout(counterMoveTimer);
         document.removeEventListener('visibilitychange', onVisibilityChange);
+        if (counter) counter.removeEventListener('mouseenter', moveCounterToOtherSide);
         if (socket) socket.close();
       }
     };

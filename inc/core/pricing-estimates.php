@@ -255,12 +255,14 @@ function zigurat_sanitize_letter_estimate_snapshot($snapshot)
     $input_keys = array(
         'design_width_mm', 'design_height_mm', 'installation', 'travel',
         'wire_supplies', 'wire_supplies_rate', 'profit_percent', 'insurance_tax_percent', 'use_transformer', 'layout_trials',
+        'stainless_backing_stroke_mm',
     );
     $rate_keys = array(
-        'sheet_width_mm', 'sheet_height_mm', 'plexi_sqm_rate', 'metal_sheet_07_sqm_rate', 'edge_swedish_material_rate',
+        'sheet_width_mm', 'sheet_height_mm', 'plexi_sqm_rate', 'metal_sheet_07_sqm_rate', 'stainless_sheet_sqm_rate', 'metal_cut_rate', 'edge_swedish_material_rate',
         'edge_swedish_labor_rate', 'edge_plastic_material_rate', 'edge_plastic_labor_rate',
         'edge_channelium_material_rate', 'edge_channelium_labor_rate', 'edge_metal_material_rate',
-        'edge_metal_labor_rate', 'metal_powder_coating_rate', 'double_layer_labor_rate', 'pvc_rate', 'plexi_cut_rate', 'pvc_cut_rate', 'glue_rate',
+        'edge_metal_labor_rate', 'edge_stainless_material_rate', 'edge_stainless_labor_rate',
+        'metal_powder_coating_rate', 'double_layer_labor_rate', 'pvc_rate', 'plexi_cut_rate', 'pvc_cut_rate', 'glue_rate',
         'smd_block_rate', 'smd_lens_rate', 'smd_roll_rate',
         'smd_block_units_per_square_meter', 'smd_lens_units_per_square_meter',
         'smd_roll_units_per_square_meter', 'smd_block_width_mm', 'smd_block_height_mm', 'smd_block_led_count',
@@ -281,24 +283,27 @@ function zigurat_sanitize_letter_estimate_snapshot($snapshot)
         'parts', 'lighting_parts', 'sheets', 'unplaced_parts', 'design_width_mm', 'design_height_mm',
     );
     $breakdown_keys = array(
-        'plexi', 'metal_sheet_07', 'powder_coating', 'edge', 'edge_labor', 'double_labor', 'plexi_cut', 'pvc', 'pvc_cut', 'glue', 'smd',
+        'plexi', 'metal_sheet_07', 'stainless_sheet', 'metal_cut', 'powder_coating', 'edge', 'edge_labor', 'double_labor', 'plexi_cut', 'pvc', 'pvc_cut', 'glue', 'smd',
         'installation', 'travel', 'transformer', 'use_transformer', 'wire_supplies_rate', 'wire_supplies', 'base', 'profit',
         'insurance_tax_percent', 'insurance_tax',
         'final', 'smd_count', 'smd_density_count', 'smd_component_count', 'smd_length_m', 'smd_purchase_length_m',
         'smd_roll_count', 'smd_power_watts', 'smd_double_track_length_m', 'smd_multi_track_length_m',
         'smd_max_lane_count', 'transformer_count', 'transformer_capacity',
         'rounded_perimeter_m', 'double_perimeter_m', 'pin_perimeter_m', 'laser_perimeter_m',
+        'backing_consumed_square_meters', 'backing_perimeter_m', 'stainless_backing_stroke_mm',
     );
+    $snapshot_stainless_backing = sanitize_key((string) ($snapshot['inputs']['stainless_backing_material'] ?? 'pvc'));
     $clean = array(
         'version' => 2,
         'calculator_type' => 'letters',
         'source_file' => sanitize_file_name((string) ($snapshot['source_file'] ?? 'طرح.svg')),
-        'edge_type' => in_array(($snapshot['edge_type'] ?? ''), array('swedish', 'plastic', 'channelium', 'metal'), true) ? $snapshot['edge_type'] : 'swedish',
+        'edge_type' => in_array(($snapshot['edge_type'] ?? ''), array('swedish', 'plastic', 'channelium', 'metal', 'stainless'), true) ? $snapshot['edge_type'] : 'swedish',
         'smd_type' => in_array(($snapshot['smd_type'] ?? ''), array('none', 'block', 'lens', 'roll'), true) ? $snapshot['smd_type'] : 'none',
         'installation_mode' => in_array(($snapshot['installation_mode'] ?? ''), array('fixed', 'perimeter'), true) ? $snapshot['installation_mode'] : 'fixed',
         'allow_rotation' => 1,
-        'include_pvc' => 1,
+        'include_pvc' => (in_array(($snapshot['edge_type'] ?? ''), array('metal', 'stainless'), true) && $snapshot_stainless_backing === 'plexi') ? 0 : 1,
         'include_metal_sheet_07' => (($snapshot['edge_type'] ?? '') === 'metal') ? 1 : 0,
+        'include_stainless_sheet' => (($snapshot['edge_type'] ?? '') === 'stainless') ? 1 : 0,
         'inputs' => array(),
         'rates' => array(),
         'analysis' => array(),
@@ -318,6 +323,8 @@ function zigurat_sanitize_letter_estimate_snapshot($snapshot)
     foreach ($input_keys as $key) {
         $clean['inputs'][$key] = zigurat_pricing_estimate_number($snapshot['inputs'][$key] ?? 0);
     }
+    $stainless_backing_material = sanitize_key((string) ($snapshot['inputs']['stainless_backing_material'] ?? 'pvc'));
+    $clean['inputs']['stainless_backing_material'] = in_array($stainless_backing_material, array('pvc', 'plexi'), true) ? $stainless_backing_material : 'pvc';
     $layout_trials = (int) ($snapshot['inputs']['layout_trials'] ?? 10);
     $clean['inputs']['layout_trials'] = in_array($layout_trials, array(5, 10, 20, 30), true) ? $layout_trials : 10;
     foreach ($rate_keys as $key) {

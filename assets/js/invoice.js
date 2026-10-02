@@ -40,8 +40,14 @@
     var dialog = ensureActionConfirmDialog();
     actionConfirmCallback = callback;
     actionConfirmLastFocus = document.activeElement;
+    var panel = dialog.querySelector('.invoice-action-dialog');
+    var icon = dialog.querySelector('.invoice-action-dialog__icon');
+    panel.classList.toggle('is-low-tax', options.variant === 'low-tax');
+    icon.textContent = options.icon || '✓';
     dialog.querySelector('#invoice-action-title').textContent = options.title;
-    dialog.querySelector('#invoice-action-message').textContent = options.message;
+    var message = dialog.querySelector('#invoice-action-message');
+    message.textContent = options.message || '';
+    message.hidden = !options.message;
     dialog.querySelector('[data-action-confirm]').textContent = options.confirmText;
     var warning = dialog.querySelector('[data-action-warning]');
     warning.textContent = options.warning || '';
@@ -598,9 +604,18 @@
   if (editor.dataset.invoiceReady === '1') return;
   editor.dataset.invoiceReady = '1';
   invoiceHasUnsavedChanges = editor.dataset.invoiceUnsaved === '1';
-  editor.addEventListener('input', function () { invoiceHasUnsavedChanges = true; });
-  editor.addEventListener('change', function () { invoiceHasUnsavedChanges = true; });
+  var savedNotice = editor.querySelector('#invoice-save-result.invoice-save-result.is-success');
+  function markInvoiceChanged() {
+    invoiceHasUnsavedChanges = true;
+    if (savedNotice && savedNotice.isConnected) savedNotice.remove();
+  }
+  editor.addEventListener('input', markInvoiceChanged);
+  editor.addEventListener('change', markInvoiceChanged);
   var submitWasClicked = false;
+  var lowTaxConfirmed = false;
+  function lowTaxWarningTitle(rate) {
+    return 'ارزش افزوده ' + rate.toLocaleString('fa-IR', { maximumFractionDigits: 2 }) + ' درصده، مطمئنی؟';
+  }
   function setQuantityValidationMode(isSubmitting) {
     editor.querySelectorAll('[name="item_quantity[]"]').forEach(function (input) {
       input.setCustomValidity(isSubmitting && quantity(input) <= 0 ? 'مقدار باید بیشتر از صفر باشد.' : '');
@@ -626,6 +641,32 @@
       event.preventDefault();
       return;
     }
+    var brandInput = editor.querySelector('[name="invoice_form_brand"]');
+    var typeInput = editor.querySelector('[name="invoice_form_document_type"]');
+    var taxRateInput = editor.querySelector('[name="tax_rate"]');
+    var isOfficialInvoice = brandInput && brandInput.value === 'official'
+      && typeInput && typeInput.value === 'invoice';
+    var taxRate = Math.max(0, parseFloat(normalize(taxRateInput && taxRateInput.value)) || 0);
+    if (isOfficialInvoice && taxRate < 10 && !lowTaxConfirmed) {
+      event.preventDefault();
+      submitWasClicked = false;
+      setQuantityValidationMode(false);
+      showActionConfirm({
+        title: lowTaxWarningTitle(taxRate),
+        message: '',
+        confirmText: 'بله، ثبت کن',
+        warning: '',
+        icon: '!',
+        variant: 'low-tax'
+      }, function () {
+        lowTaxConfirmed = true;
+        submitWasClicked = true;
+        if (typeof editor.requestSubmit === 'function') editor.requestSubmit();
+        else editor.submit();
+      });
+      return;
+    }
+    lowTaxConfirmed = false;
     submitWasClicked = false;
     invoiceHasUnsavedChanges = false;
     bypassUnsavedWarning = true;
@@ -727,7 +768,7 @@
         if (input) input.value = customer['customer_' + key] || '';
       });
       nameInput.dataset.customerLoaded = customer.customer_name || '';
-      invoiceHasUnsavedChanges = true;
+      markInvoiceChanged();
       matches = [];
       customerList.innerHTML = '';
       closeSuggestions();
@@ -897,7 +938,7 @@
     } else {
       return;
     }
-    invoiceHasUnsavedChanges = true;
+    markInvoiceChanged();
     updateRowNumbers();
     row.querySelector('[data-row-drag-handle]').focus({preventScroll:true});
   }
@@ -910,7 +951,7 @@
     if (handle) handle.setAttribute('aria-grabbed', 'false');
     document.body.classList.remove('invoice-row-sorting');
     if (nativeRowMoved) {
-      invoiceHasUnsavedChanges = true;
+      markInvoiceChanged();
       updateRowNumbers();
     }
     nativeDraggedRow = null;
@@ -998,7 +1039,7 @@
       row.classList.remove('is-row-dragging');
       document.body.classList.remove('invoice-row-sorting');
       if (moved) {
-        invoiceHasUnsavedChanges = true;
+        markInvoiceChanged();
         updateRowNumbers();
       }
       moved = false;
@@ -1014,7 +1055,7 @@
     row.querySelector('[data-remove-item]').addEventListener('click', function () {
       if (body.querySelectorAll('tr').length > 1) row.remove();
       else row.querySelectorAll('input,textarea').forEach(function (input) { input.value = input.name === 'item_quantity[]' ? '1' : ''; });
-      invoiceHasUnsavedChanges = true;
+      markInvoiceChanged();
       updateRowNumbers();
       calculate();
     });
@@ -1023,7 +1064,7 @@
     var row = document.createElement('tr');
     row.innerHTML = '<td class="invoice-row-order"><button type="button" data-row-drag-handle aria-label="جابجایی ردیف"><span data-row-number></span><i aria-hidden="true"></i></button></td><td><textarea name="item_description[]" rows="2" required></textarea></td><td><input name="item_quantity[]" type="text" inputmode="decimal" value="1" data-quantity required aria-label="مقدار"></td><td><input name="item_unit[]" value="عدد" data-clear-on-focus></td><td><input name="item_unit_price[]" type="text" inputmode="numeric" value="0" data-money data-clear-on-focus required></td><td><input name="item_discount[]" type="text" inputmode="numeric" value="0" data-money></td><td data-line-total>۰ ریال</td><td><button type="button" data-remove-item aria-label="حذف ردیف">×</button></td>';
     body.appendChild(row);
-    invoiceHasUnsavedChanges = true;
+    markInvoiceChanged();
     bindRow(row);
     updateRowNumbers();
     row.querySelector('textarea').focus();

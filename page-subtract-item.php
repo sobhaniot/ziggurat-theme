@@ -80,7 +80,7 @@ $messages = array(
     'internal_project_merge_name' => array('error', 'اتصال انجام نشد؛ نام دو پروژه یکسان نیست.'),
     'forbidden' => array('error', 'فقط مدیرکل اجازه مدیریت پروژه‌های داخلی را دارد.'),
     'insufficient' => array('error', 'تعداد درخواستی بیشتر از موجودی است.'),
-    'invalid_quantity' => array('error', 'تعداد باید بیشتر از صفر باشد.'),
+    'invalid_quantity' => array('error', 'مقدار باید بیشتر از صفر و دارای حداکثر یک رقم اعشار باشد.'),
     'invalid_item' => array('error', 'کالای انتخاب‌شده معتبر نیست.'),
     'invalid_project' => array('error', 'پروژه را انتخاب کنید.'),
     'invalid' => array('error', 'درخواست معتبر نیست.'),
@@ -232,7 +232,7 @@ get_header();
                     <select id="inventory-item" name="inventory_id" data-inventory-product required>
                         <option value="">ابتدا دسته را انتخاب کنید</option>
                         <?php foreach ($catalog as $category): foreach ($category['products'] as $product): ?>
-                            <option value="<?php echo (int) $product['inventory_id']; ?>" data-category-id="<?php echo (int) $category['id']; ?>" <?php selected($selected_inventory_id, $product['inventory_id']); ?>><?php echo esc_html($product['name'] . ' | موجودی: ' . number_format_i18n($product['quantity'])); ?></option>
+                            <option value="<?php echo (int) $product['inventory_id']; ?>" data-category-id="<?php echo (int) $category['id']; ?>" <?php selected($selected_inventory_id, $product['inventory_id']); ?>><?php echo esc_html($product['name'] . ' | موجودی: ' . zigurat_inventory_format_quantity($product['quantity'])); ?></option>
                         <?php endforeach; endforeach; ?>
                     </select>
                     <label for="inventory-project">پروژه مصرف‌کننده *</label>
@@ -253,8 +253,8 @@ get_header();
                             </optgroup>
                         <?php endif; ?>
                     </select>
-                    <label for="subtract-quantity">تعداد خروجی *</label>
-                    <input id="subtract-quantity" name="item_quantity" type="number" min="1" step="1" required>
+                    <label for="subtract-quantity">مقدار خروجی *</label>
+                    <input id="subtract-quantity" name="item_quantity" type="number" min="0.1" step="0.1" inputmode="decimal" required>
                     <label for="subtract-notes">توضیحات</label>
                     <textarea id="subtract-notes" name="notes" rows="4"></textarea>
                     <button type="submit">ثبت خروج کالا</button>

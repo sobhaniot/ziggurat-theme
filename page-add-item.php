@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['zigurat_inventory_add
 $status = isset($_GET['inventory-status']) ? sanitize_key(wp_unslash($_GET['inventory-status'])) : '';
 $messages = array(
     'added' => array('success', 'موجودی کالا افزایش یافت و گردش آن ثبت شد.'),
-    'invalid_quantity' => array('error', 'تعداد باید بیشتر از صفر باشد.'),
+    'invalid_quantity' => array('error', 'مقدار باید بیشتر از صفر و دارای حداکثر یک رقم اعشار باشد.'),
     'invalid_item' => array('error', 'دسته و کالای معتبر را انتخاب کنید.'),
     'invalid' => array('error', 'درخواست معتبر نیست؛ صفحه را تازه‌سازی کنید.'),
     'database' => array('error', 'ثبت انجام نشد و موجودی تغییری نکرد.'),
@@ -46,7 +46,7 @@ get_header();
                 <select id="inventory-category" data-inventory-category required><option value="">انتخاب دسته</option><?php foreach ($catalog as $category): if (!$category['products']) continue; ?><option value="<?php echo (int) $category['id']; ?>" <?php selected($selected_category_id, $category['id']); ?>><?php echo esc_html($category['name']); ?></option><?php endforeach; ?></select>
                 <label for="inventory-product">نام کالا *</label>
                 <select id="inventory-product" name="product_id" data-inventory-product required><option value="">ابتدا دسته را انتخاب کنید</option><?php foreach ($catalog as $category): foreach ($category['products'] as $product): ?><option value="<?php echo (int) $product['id']; ?>" data-category-id="<?php echo (int) $category['id']; ?>" <?php selected($selected_product_id, $product['id']); ?>><?php echo esc_html($product['name']); ?></option><?php endforeach; endforeach; ?></select>
-                <label for="inventory-add-quantity">تعداد ورودی *</label><input id="inventory-add-quantity" name="item_quantity" type="number" min="1" step="1" required>
+                <label for="inventory-add-quantity">مقدار ورودی *</label><input id="inventory-add-quantity" name="item_quantity" type="number" min="0.1" step="0.1" inputmode="decimal" required>
                 <label for="inventory-add-notes">توضیحات</label><textarea id="inventory-add-notes" name="notes" rows="4" placeholder="نام تأمین‌کننده یا شماره فاکتور"></textarea>
                 <button type="submit">ثبت ورود کالا</button>
             </form>

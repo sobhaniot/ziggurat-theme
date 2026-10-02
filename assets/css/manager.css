@@ -585,6 +585,36 @@
 .manager-pricing-rates__status.is-saving { background: #fff6dc; color: #75530f; }
 .manager-pricing-rates__status.is-saved { background: #eaf7ee; color: #23623a; }
 .manager-pricing-rates__status.is-error { background: #fff0f0; color: #922d2d; }
+.manager-letter-rate-group {
+  display: grid;
+  gap: 11px;
+  padding: 0 0 2px;
+  border: 1px solid #e4dccb;
+  border-radius: 11px;
+  background: #fffdf9;
+  overflow: hidden;
+}
+.manager-letter-rate-group > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+  background: #f4efe4;
+  color: #5b4312;
+  font-weight: 800;
+}
+.manager-letter-rate-group > summary::-webkit-details-marker { display: none; }
+.manager-letter-rate-group > summary::before { content: '＋'; color: #9b741c; font-size: 18px; line-height: 1; }
+.manager-letter-rate-group[open] > summary::before { content: '−'; }
+.manager-letter-rate-group > summary span { flex: 0 0 auto; }
+.manager-letter-rate-group > summary small { margin-right: auto; color: #88795c; font-size: 11px; font-weight: 400; line-height: 1.6; text-align: left; }
+.manager-letter-rate-group > :not(summary) { margin-right: 13px; margin-left: 13px; }
+.manager-letter-rate-group > .manager-letter-rate-panel { margin-right: 13px; margin-left: 13px; }
+.manager-letter-rate-group > label:first-of-type { margin-top: 2px; }
+.manager-letter-rate-group > label:last-of-type { margin-bottom: 4px; }
 .manager-lightbox-calculator,
 .manager-composite-calculator,
 .manager-flexi-calculator,
@@ -688,6 +718,7 @@
   background: #fbfaf7;
 }
 .manager-pricing-result > div { display: flex; min-height: 56px; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #e5e0d6; }
+.manager-pricing-result > div[hidden] { display: none !important; }
 .manager-pricing-result > div:nth-child(odd) { border-left: 1px solid #e5e0d6; }
 .manager-pricing-result span { color: #777; }
 .manager-pricing-result strong { color: #29220f; text-align: left; }
@@ -822,6 +853,77 @@
 .manager-letter-rate-panel[hidden] { display: none !important; }
 .manager-letter-rate-panel > strong { color: #735313; font-size: 14px; }
 .manager-letter-rate-panel label { margin: 0; }
+.manager-letter-stainless-backing {
+  grid-column: auto;
+  display: grid;
+  align-self: start;
+  min-width: 0;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+.manager-letter-stainless-backing[hidden] { display: none !important; }
+.manager-letter-stainless-backing [data-letter-stainless-stroke][hidden] { display: none !important; }
+.manager-letter-installation-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.manager-letter-backing-heading { color: #443713; font-size: inherit; font-weight: 700; }
+.manager-letter-backing-control {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 9px;
+  box-sizing: border-box;
+  border: 1px solid #d8caa8;
+  border-radius: 8px;
+  background: #fffaf0;
+}
+.manager-letter-fields .manager-letter-backing-toggle {
+  display: flex;
+  flex: 1 1 auto;
+  grid-column: auto;
+  min-width: 0;
+  min-height: 38px;
+  gap: 8px;
+  margin: 0;
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.manager-letter-fields .manager-letter-backing-toggle:hover,
+.manager-letter-fields .manager-letter-backing-toggle:has(input:checked) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.manager-letter-backing-toggle > span { display: block; min-width: 0; }
+.manager-letter-backing-toggle strong { display: block; white-space: nowrap; font-size: 13px; }
+.manager-letter-fields .manager-letter-stroke-compact {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  color: #665b47;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.manager-letter-fields .manager-letter-stroke-compact input {
+  width: 66px;
+  min-width: 66px;
+  height: 38px;
+  min-height: 38px;
+  padding: 6px 8px;
+  text-align: center;
+}
 .manager-letter-fields label > small { display: block; margin-top: 6px; color: #766e60; font-size: 11px; line-height: 1.7; }
 .manager-letter-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .manager-letter-progress { display: flex; min-height: 52px; align-items: center; justify-content: center; gap: 12px; padding: 10px; border-radius: 9px; background: #f4f1e9; color: #5f4b1a; }
@@ -888,6 +990,12 @@
   box-shadow: inset 4px 0 0 #d3aa4c;
 }
 .manager-pricing-result.manager-pricing-result--letters > div.manager-pricing-result__extra span { color: #795c1b; }
+.manager-pricing-result.manager-pricing-result--letters > div.manager-pricing-result__extra.is-zero-rate {
+  background: #fff0ee;
+  box-shadow: inset 4px 0 0 #c8322b;
+}
+.manager-pricing-result.manager-pricing-result--letters > div.manager-pricing-result__extra.is-zero-rate span,
+.manager-pricing-result.manager-pricing-result--letters > div.manager-pricing-result__extra.is-zero-rate strong { color: #a51f1a; }
 .manager-pricing-result.manager-pricing-result--letters > div.manager-pricing-result__summary { grid-column: 1 / -1; border-left: 0; }
 .manager-pricing-estimate-editor { display: grid; grid-template-columns: minmax(260px,1fr) auto; align-items: end; gap: 14px; padding: 17px; border: 1px solid #d9c690; border-radius: 12px; background: linear-gradient(135deg,#fffaf0,#fff); }
 .manager-pricing-estimate-editor > div:first-child { display: grid; gap: 6px; }
@@ -1271,6 +1379,7 @@
   .manager-composite-fields,
   .manager-flexi-fields,
   .manager-letter-fields,
+  .manager-letter-installation-row,
   .manager-pricing-options { grid-template-columns: 1fr; }
   .manager-pricing-rates { position: static; }
   .manager-pricing-result { grid-template-columns: 1fr; }

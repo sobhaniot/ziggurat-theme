@@ -13,6 +13,7 @@ $edge_types = array(
     'plastic' => 'لبه پلاستیک',
     'channelium' => 'لبه چلنیوم',
     'metal' => 'لبه فلزی',
+    'stainless' => 'حروف استیل',
 );
 $smd_types = array(
     'block' => 'SMD بلوکی',
@@ -44,13 +45,19 @@ $transformer_types = array(
         <h3>ورق و نرخ‌های پایه</h3>
         <p>ابعاد به میلی‌متر و قیمت‌ها به ریال هستند. تغییرات به‌صورت خودکار ذخیره می‌شوند.</p>
         <form data-letter-rates-form data-ajax-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>" data-rates-nonce="<?php echo esc_attr(wp_create_nonce('zigurat_letter_rates')); ?>">
-            <label>عرض ورق رویه (میلی‌متر)<input name="sheet_width_mm" type="text" inputmode="decimal" value="<?php echo esc_attr($settings['sheet_width_mm']); ?>"><small>برای پلکسی و ورق فلزی ۰٫۷ مشترک است.</small></label>
-            <label>ارتفاع ورق رویه (میلی‌متر)<input name="sheet_height_mm" type="text" inputmode="decimal" value="<?php echo esc_attr($settings['sheet_height_mm']); ?>"><small>برای پلکسی و ورق فلزی ۰٫۷ مشترک است.</small></label>
+            <details class="manager-letter-rate-group" data-letter-rate-group="sheets" open>
+                <summary><span>ورق و رویه</span><small>ابعاد ورق و قیمت پلکسی، فلزی و استیل</small></summary>
+            <label>عرض ورق رویه (میلی‌متر)<input name="sheet_width_mm" type="text" inputmode="decimal" value="<?php echo esc_attr($settings['sheet_width_mm']); ?>"><small>برای پلکسی، ورق فلزی ۰٫۷ و ورق استیل مشترک است.</small></label>
+            <label>ارتفاع ورق رویه (میلی‌متر)<input name="sheet_height_mm" type="text" inputmode="decimal" value="<?php echo esc_attr($settings['sheet_height_mm']); ?>"><small>برای پلکسی، ورق فلزی ۰٫۷ و ورق استیل مشترک است.</small></label>
             <label>قیمت پلکسی هر مترمربع (ریال)<input name="plexi_sqm_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['plexi_sqm_rate']); ?>"><small>در مساحت مستطیل مصرف پلکسی ضرب می‌شود.</small></label>
             <label>قیمت ورق فلزی ۰٫۷ هر مترمربع (ریال)<input name="metal_sheet_07_sqm_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['metal_sheet_07_sqm_rate']); ?>"><small>ابعاد و مقدار مصرف آن برابر ورق پلکسی در نظر گرفته می‌شود.</small></label>
-                    <label>اجرت دوبل هر متر مسیر قرمز (ریال)<input name="double_layer_labor_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['double_layer_labor_rate']); ?>"><small>مسیر قرمز یک بار داخل پلکسی اصلی و یک بار برای قطعه رویی برش می‌خورد؛ قطعه داخلی هم‌رنگ جداگانه محاسبه نمی‌شود.</small></label>
+            <label>قیمت ورق استیل هر مترمربع (ریال)<input name="stainless_sheet_sqm_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['stainless_sheet_sqm_rate']); ?>"><small>هنگام انتخاب حروف استیل، به‌جای پلکسی و براساس مقدار مصرف ورق محاسبه می‌شود.</small></label>
+            </details>
 
-            <label>نوع لبه برای تنظیم نرخ
+            <details class="manager-letter-rate-group" data-letter-rate-group="edges" open>
+                <summary><span>لبه و ساخت</span><small>نوع حروف، قیمت لبه و اجرت ساخت</small></summary>
+
+            <label>نوع ساخت حروف برای تنظیم نرخ
                 <select name="active_edge_type" data-letter-edge-rate-select>
                     <?php foreach ($edge_types as $key => $label): ?><option value="<?php echo esc_attr($key); ?>" <?php selected($settings['active_edge_type'], $key); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
                 </select>
@@ -66,11 +73,20 @@ $transformer_types = array(
                 </div>
             <?php endforeach; ?>
 
+            </details>
+            <details class="manager-letter-rate-group" data-letter-rate-group="cutting">
+                <summary><span>برش و مواد مصرفی</span><small>دوبل، PVC، برش‌ها و چسب</small></summary>
+            <label>اجرت دوبل هر متر مسیر قرمز (ریال)<input name="double_layer_labor_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['double_layer_labor_rate']); ?>"><small>مسیر قرمز یک بار داخل پلکسی اصلی و یک بار برای قطعه رویی برش می‌خورد؛ قطعه داخلی هم‌رنگ جداگانه محاسبه نمی‌شود.</small></label>
+            <label>اجرت برش فلزات هر متر مسیر (ریال)<input name="metal_cut_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['metal_cut_rate']); ?>"><small>برای رویه حروف فلزی و استیل، براساس طول مسیر برش محاسبه می‌شود.</small></label>
+
             <label>قیمت PVC هر مترمربع (ریال)<input name="pvc_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['pvc_rate']); ?>"></label>
             <label>اجرت برش پلکسی هر متر مسیر (ریال)<input name="plexi_cut_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['plexi_cut_rate']); ?>"></label>
             <label>اجرت برش PVC هر متر محیط (ریال)<input name="pvc_cut_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['pvc_cut_rate']); ?>"></label>
             <label>هزینه چسب هر متر محیط (ریال)<input name="glue_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['glue_rate']); ?>"></label>
+            </details>
 
+            <details class="manager-letter-rate-group" data-letter-rate-group="smd">
+                <summary><span>روشنایی SMD</span><small>نوع SMD، تراکم، ابعاد بلوک و رولوکی</small></summary>
             <label>نوع SMD برای تنظیم نرخ
                 <select name="active_smd_type" data-letter-smd-rate-select>
                     <?php foreach ($smd_types as $key => $label): ?><option value="<?php echo esc_attr($key); ?>" <?php selected($settings['active_smd_type'], $key); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
@@ -104,6 +120,9 @@ $transformer_types = array(
                 </div>
             <?php endforeach; ?>
 
+            </details>
+            <details class="manager-letter-rate-group" data-letter-rate-group="transformer">
+                <summary><span>ترانس</span><small>قیمت و ظرفیت ترانس‌ها</small></summary>
             <label>ترانس برای تنظیم قیمت و ظرفیت
                 <select name="active_transformer_type" data-letter-transformer-rate-select>
                     <?php foreach ($transformer_types as $watts => $label): ?><option value="<?php echo esc_attr($watts); ?>" <?php selected($settings['active_transformer_type'], $watts); ?>>ترانس <?php echo esc_html($label); ?></option><?php endforeach; ?>
@@ -116,8 +135,12 @@ $transformer_types = array(
                     <label>ظرفیت ترانس <?php echo esc_html($label); ?> (تعداد SMD)<input name="transformer_<?php echo esc_attr($watts); ?>_capacity" type="text" inputmode="numeric" value="<?php echo esc_attr((int) $settings['transformer_' . $watts . '_capacity']); ?>"><small>این ظرفیت برای بلوکی و لنزدار است؛ رولوکی با وات مصرفی محاسبه می‌شود.</small></label>
                 </div>
             <?php endforeach; ?>
+            </details>
+            <details class="manager-letter-rate-group" data-letter-rate-group="layout">
+                <summary><span>تنظیمات چیدمان</span><small>فاصله قطعات و حاشیه امن ورق</small></summary>
             <label>فاصله قطعات از هم (میلی‌متر)<input name="cut_gap_mm" type="text" inputmode="decimal" value="<?php echo esc_attr($settings['cut_gap_mm']); ?>"></label>
             <label>حاشیه امن دور ورق (میلی‌متر)<input name="sheet_margin_mm" type="text" inputmode="decimal" value="<?php echo esc_attr($settings['sheet_margin_mm']); ?>"></label>
+            </details>
             <small class="manager-pricing-rates__status" data-letter-rates-status role="status">تغییر نرخ‌ها به‌صورت خودکار ذخیره می‌شود.</small>
         </form>
         <?php if (!empty($settings['updated_at'])): ?><small class="manager-pricing-rates__updated">آخرین به‌روزرسانی: <?php echo esc_html($settings['updated_at']); ?></small><?php endif; ?>
@@ -150,12 +173,34 @@ $transformer_types = array(
         <div class="manager-letter-fields">
             <label>عرض واقعی کل طرح (میلی‌متر) *<input name="design_width_mm" type="text" inputmode="decimal" placeholder="از فایل خوانده می‌شود" required></label>
             <label>ارتفاع واقعی کل طرح (میلی‌متر) *<input name="design_height_mm" type="text" inputmode="decimal" placeholder="از فایل خوانده می‌شود" required></label>
-            <label>نوع لبه
+            <label>نوع ساخت حروف
                 <select name="edge_type" data-letter-edge-type>
                     <?php foreach ($edge_types as $key => $label): ?><option value="<?php echo esc_attr($key); ?>" <?php selected($last_values['edge_type'], $key); ?>><?php echo esc_html($label); ?></option><?php endforeach; ?>
                 </select>
                 <small data-letter-edge-rate-summary></small>
             </label>
+            <div class="manager-letter-stainless-backing" data-letter-stainless-backing <?php echo in_array($last_values['edge_type'], array('metal', 'stainless'), true) ? '' : 'hidden'; ?>>
+                <strong class="manager-letter-backing-heading" data-letter-metal-backing-title><?php echo $last_values['edge_type'] === 'metal' ? 'پشت حروف فلزی' : 'پشت حروف استیل'; ?></strong>
+                <div class="manager-letter-backing-control">
+                    <label class="manager-pricing-check manager-letter-backing-toggle">
+                        <input name="stainless_backing_material" type="checkbox" value="plexi" <?php checked($last_values['stainless_backing_material'], 'plexi'); ?> aria-label="استفاده از پلکسی پشت‌نور">
+                        <span><strong data-letter-backing-toggle-label><?php echo $last_values['stainless_backing_material'] === 'plexi' ? 'پلکسی پشت‌نور' : 'پشت PVC'; ?></strong></span>
+                    </label>
+                    <label class="manager-letter-stroke-compact" data-letter-stainless-stroke <?php echo $last_values['stainless_backing_material'] === 'plexi' ? '' : 'hidden'; ?>>
+                        <input name="stainless_backing_stroke_mm" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['stainless_backing_stroke_mm']); ?>" aria-label="استروک بیرونی پلکسی">
+                        <span>میلی‌متر</span>
+                    </label>
+                </div>
+            </div>
+            <div class="manager-letter-installation-row">
+                <label>روش محاسبه نصب
+                    <select name="installation_mode" data-letter-installation-mode>
+                        <option value="fixed" <?php selected($last_values['installation_mode'], 'fixed'); ?>>هزینه نصب کلی</option>
+                        <option value="perimeter" <?php selected($last_values['installation_mode'], 'perimeter'); ?>>براساس متر محیط حروف</option>
+                    </select>
+                </label>
+                <label><span data-letter-installation-input-label>هزینه نصب کلی (ریال)</span><input name="installation" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_values['installation']); ?>"></label>
+            </div>
             <label>نوع SMD
                 <select name="smd_type" data-letter-smd-type>
                     <option value="none" <?php selected($last_values['smd_type'], 'none'); ?>>بدون SMD</option>
@@ -163,14 +208,8 @@ $transformer_types = array(
                 </select>
                 <small data-letter-smd-rate-summary></small>
             </label>
-            <label>روش محاسبه نصب
-                <select name="installation_mode" data-letter-installation-mode>
-                    <option value="fixed" <?php selected($last_values['installation_mode'], 'fixed'); ?>>هزینه نصب کلی</option>
-                    <option value="perimeter" <?php selected($last_values['installation_mode'], 'perimeter'); ?>>براساس متر محیط حروف</option>
-                </select>
-            </label>
-            <label><span data-letter-installation-input-label>هزینه نصب کلی (ریال)</span><input name="installation" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_values['installation']); ?>"></label>
             <label>هزینه ایاب و ذهاب (ریال)<input name="travel" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_values['travel']); ?>"></label>
+            <label>قیمت سیم و لوازم مصرفی هر متر محیط (ریال)<input name="wire_supplies_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_values['wire_supplies_rate']); ?>"></label>
             <label>تعداد چیدمان آزمایشی
                 <select name="layout_trials">
                     <option value="5" <?php selected((int) $last_values['layout_trials'], 5); ?>>۵ بار — سریع</option>
@@ -180,7 +219,6 @@ $transformer_types = array(
                 </select>
                 <small>تعداد بیشتر ممکن است چیدمان بهتری پیدا کند، اما زمان تحلیل را افزایش می‌دهد.</small>
             </label>
-            <label>قیمت سیم و لوازم مصرفی هر متر محیط (ریال)<input name="wire_supplies_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_values['wire_supplies_rate']); ?>"></label>
             <label>درصد سود<input name="profit_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['profit_percent']); ?>"></label>
             <label>درصد بیمه و مالیات<input name="insurance_tax_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['insurance_tax_percent']); ?>" placeholder="اگر لازم نیست صفر بگذارید"></label>
             <div class="manager-pricing-check">
@@ -190,7 +228,7 @@ $transformer_types = array(
         </div>
 
         <small class="manager-pricing-autosave">آخرین هزینه‌های جانبی، درصدها و وضعیت استفاده از ترانس به‌صورت خودکار ذخیره می‌شوند.</small>
-        <div class="manager-pricing-formula"><strong>مبنای برآورد:</strong> مسیر مشکی یک‌بار و مسیر <em class="manager-pricing-double-color">قرمز</em> دوبار (برش داخلی پلکسی اصلی و برش قطعه رویی) محاسبه می‌شوند. قطعه داخلیِ هم‌رنگ پلکسی اصلی دوباره به مصرف ورق اضافه نمی‌شود. SMD بلوکی و لنزدار از سطح کامل داخل مسیر مشکی و رولوکی از مسیر میانی قابل نصب داخل حروف محاسبه می‌شود. طول رولوکی با گام برش و پرت خرید گرد می‌شود و ترانس آن براساس وات مصرفی و رزرو توان پیشنهاد می‌شود. چیدمان هر رنگ پلکسی جداگانه و همیشه با چرخش بهینه انجام می‌شود و PVC نیز محاسبه خواهد شد. برای لبه فلزی، رویه ورق فلزی ۰٫۷ و رنگ کوره‌ای براساس مترمربعِ مساحت واقعی رویه محاسبه می‌شوند.</div>
+        <div class="manager-pricing-formula"><strong>مبنای برآورد:</strong> مسیر مشکی یک‌بار و مسیر <em class="manager-pricing-double-color">قرمز</em> دوبار (برش داخلی پلکسی اصلی و برش قطعه رویی) محاسبه می‌شوند. قطعه داخلیِ هم‌رنگ پلکسی اصلی دوباره به مصرف ورق اضافه نمی‌شود. SMD بلوکی و لنزدار از سطح کامل داخل مسیر مشکی و رولوکی از مسیر میانی قابل نصب داخل حروف محاسبه می‌شود. طول رولوکی با گام برش و پرت خرید گرد می‌شود و ترانس آن براساس وات مصرفی و رزرو توان پیشنهاد می‌شود. چیدمان هر رنگ پلکسی جداگانه و همیشه با چرخش بهینه انجام می‌شود و PVC نیز محاسبه خواهد شد. برای لبه فلزی، رویه ورق فلزی ۰٫۷ و رنگ کوره‌ای محاسبه می‌شوند؛ برای حروف استیل، ورق استیل جایگزین پلکسی است و رنگ کوره‌ای محاسبه نمی‌شود. اجرت برش رویه فلزی و استیل براساس متر مسیر برش محاسبه می‌شود. پشت هر دو نوع فلزی و استیل می‌تواند PVC یا پلکسی پشت‌نور باشد؛ در حالت پلکسی، استروک به‌صورت کانتور بیرونی از هر طرف، پلکسی را بزرگ‌تر از رویه می‌کند و در مصرف و طول برش منظور می‌شود. PVC استروک ندارد. مصرف چسب برای حروف فلزی و استیل منظور نمی‌شود.</div>
         <button class="manager-pricing-calculate" type="submit" data-letter-calculate>تحلیل فایل و چیدمان ورق</button>
         <div class="manager-pricing-error" data-letter-error role="alert" hidden></div>
         <small class="manager-letter-runtime-note">طرح‌های معمولی طی چند ثانیه تحلیل می‌شوند؛ مرحله جاری و زمان سپری‌شده هنگام پردازش نمایش داده خواهد شد.</small>
@@ -226,11 +264,13 @@ $transformer_types = array(
             </div>
 
             <section class="manager-pricing-result manager-pricing-result--letters">
-                <div><span>مصرف پلکسی</span><strong data-letter-plexi-cost>۰ ریال</strong></div>
-                <div><span>برش پلکسی</span><strong data-letter-plexi-cut-cost>۰ ریال</strong></div>
+                <div><span data-letter-plexi-label>مصرف پلکسی</span><strong data-letter-plexi-cost>۰ ریال</strong></div>
+                <div><span data-letter-plexi-cut-label>برش پلکسی</span><strong data-letter-plexi-cut-cost>۰ ریال</strong></div>
                 <div><span>هزینه پی‌وی‌سی</span><strong data-letter-pvc-cost>محاسبه نشده</strong></div>
                 <div><span>برش پی‌وی‌سی</span><strong data-letter-pvc-cut-cost>محاسبه نشده</strong></div>
                 <div><span>ورق فلزی ۰٫۷</span><strong data-letter-metal-sheet-cost>محاسبه نشده</strong></div>
+                <div><span>ورق استیل</span><strong data-letter-stainless-sheet-cost>محاسبه نشده</strong></div>
+                <div><span>برش فلزات</span><strong data-letter-metal-cut-cost>محاسبه نشده</strong></div>
                 <div><span>رنگ کوره‌ای</span><strong data-letter-powder-coating-cost>محاسبه نمی‌شود</strong></div>
                 <div><span data-letter-edge-label>هزینه لبه</span><strong data-letter-edge-cost>۰ ریال</strong></div>
                 <div><span data-letter-edge-labor-label>هزینه اجرت لبه</span><strong data-letter-build-cost>۰ ریال</strong></div>

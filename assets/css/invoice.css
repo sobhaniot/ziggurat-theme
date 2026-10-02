@@ -39,6 +39,11 @@ body.invoice-action-dialog-open { overflow: hidden; }
 .invoice-action-dialog__actions button:hover { filter: brightness(.95); transform: translateY(-1px); }
 .invoice-action-dialog__actions [data-action-cancel] { background: #edf0f3; color: #343c48; }
 .invoice-action-dialog__actions [data-action-confirm] { background: #202020; color: #fff; }
+.invoice-action-dialog.is-low-tax { width: min(100%,430px); padding: 31px 28px 27px; border-color: rgba(200,72,48,.38); }
+.invoice-action-dialog.is-low-tax .invoice-action-dialog__icon { background: #fff0eb; color: #bd3f2d; }
+.invoice-action-dialog.is-low-tax h2 { margin: 4px 0 2px; font-size: clamp(26px,4vw,32px); line-height: 1.55; }
+.invoice-action-dialog.is-low-tax .invoice-action-dialog__actions { margin-top: 22px; }
+.invoice-action-dialog.is-low-tax [data-action-confirm] { background: #bd3f2d; }
 .invoice-admin-page > .container { width: 96%; max-width: 1500px; }
 .invoice-admin-top { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
 .invoice-admin-top a { padding: 9px 14px; border-radius: 8px; background: #222; color: #fff; }

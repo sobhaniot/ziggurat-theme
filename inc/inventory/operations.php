@@ -9,6 +9,28 @@ function zigurat_inventory_clean_text($value, $limit = 191)
     return function_exists('mb_substr') ? mb_substr($value, 0, $limit) : substr($value, 0, $limit);
 }
 
+/** Normalize an inventory quantity and allow at most one decimal digit. */
+function zigurat_inventory_parse_quantity($value)
+{
+    $value = trim(wp_unslash((string) $value));
+    $value = strtr($value, array(
+        '۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4','۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9',
+        '٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9',
+        '٫'=>'.', ','=>'.', '،'=>'.',
+    ));
+    if (!preg_match('/^\d+(?:\.\d)?$/', $value)) {
+        return 0.0;
+    }
+    return round((float) $value, 1);
+}
+
+function zigurat_inventory_format_quantity($value)
+{
+    $value = round((float) $value, 1);
+    $decimals = abs($value - round($value)) < 0.00001 ? 0 : 1;
+    return number_format_i18n($value, $decimals);
+}
+
 function zigurat_inventory_gregorian_to_jalali($gy, $gm, $gd)
 {
     $g_day_no = 365 * ($gy - 1600) + (int) floor(($gy - 1600 + 3) / 4)
@@ -137,7 +159,7 @@ function zigurat_inventory_get_catalog($available_only = false)
                 'id' => (int) $row->product_id,
                 'name' => $row->product_name,
                 'inventory_id' => (int) $row->inventory_id,
-                'quantity' => (int) $row->item_quantity,
+                'quantity' => (float) $row->item_quantity,
             );
         }
     }
@@ -165,9 +187,9 @@ function zigurat_inventory_adjust_stock($action, $data)
     if (!in_array($action, array('add', 'subtract'), true)) {
         return new WP_Error('invalid_action', 'نوع عملیات معتبر نیست.');
     }
-    $quantity = isset($data['quantity']) && is_numeric($data['quantity']) ? (int) $data['quantity'] : 0;
+    $quantity = zigurat_inventory_parse_quantity($data['quantity'] ?? 0);
     if ($quantity <= 0) {
-        return new WP_Error('invalid_quantity', 'تعداد باید بیشتر از صفر باشد.');
+        return new WP_Error('invalid_quantity', 'مقدار باید بیشتر از صفر و دارای حداکثر یک رقم اعشار باشد.');
     }
     $notes = isset($data['notes']) ? sanitize_textarea_field(wp_unslash((string) $data['notes'])) : '';
     $project_id = isset($data['project_id']) ? absint($data['project_id']) : 0;
@@ -207,8 +229,8 @@ function zigurat_inventory_adjust_stock($action, $data)
         $inventory_id = (int) $item->id;
         $item_name = $product->item_name;
         $item_category = $product->item_category;
-        $before = (int) $item->item_quantity;
-        $after = $before + $quantity;
+        $before = round((float) $item->item_quantity, 1);
+        $after = round($before + $quantity, 1);
     } else {
         $inventory_id = isset($data['inventory_id']) ? absint($data['inventory_id']) : 0;
         $item = $inventory_id ? $wpdb->get_row($wpdb->prepare("SELECT * FROM {$inventory_table} WHERE id = %d LIMIT 1 FOR UPDATE", $inventory_id)) : null;
@@ -218,14 +240,14 @@ function zigurat_inventory_adjust_stock($action, $data)
         }
         $item_name = $item->item_name;
         $item_category = $item->item_category;
-        $before = (int) $item->item_quantity;
+        $before = round((float) $item->item_quantity, 1);
         if ($before < $quantity) {
             $wpdb->query('ROLLBACK');
             return new WP_Error('insufficient', 'موجودی کالا برای این کسر کافی نیست.');
         }
-        $after = $before - $quantity;
+        $after = round($before - $quantity, 1);
     }
-    $updated = $wpdb->update($inventory_table, array('item_quantity' => $after, 'updated_at' => $now), array('id' => $inventory_id), array('%d', '%s'), array('%d'));
+    $updated = $wpdb->update($inventory_table, array('item_quantity' => $after, 'updated_at' => $now), array('id' => $inventory_id), array('%f', '%s'), array('%d'));
     if ($updated === false) {
         $wpdb->query('ROLLBACK');
         return new WP_Error('database', 'به‌روزرسانی موجودی انجام نشد.');
@@ -239,7 +261,7 @@ function zigurat_inventory_adjust_stock($action, $data)
         'project_name' => $project_name, 'user_id' => $current_user->ID,
         'user_name' => $current_user->display_name ?: $current_user->user_login,
         'notes' => $notes, 'created_at' => $now,
-    ), array('%d', '%s', '%d', '%d', '%d', '%s', '%s', '%d', '%s', '%d', '%s', '%s', '%s'));
+    ), array('%d', '%s', '%f', '%f', '%f', '%s', '%s', '%d', '%s', '%d', '%s', '%s', '%s'));
     if (!$inserted) {
         $wpdb->query('ROLLBACK');
         return new WP_Error('database', 'گردش انبار ثبت نشد و موجودی تغییر نکرد.');
@@ -300,19 +322,19 @@ function zigurat_inventory_reverse_transaction($transaction_id, $reason)
         return new WP_Error('invalid_item', 'ردیف موجودی مربوط به این تراکنش پیدا نشد.');
     }
 
-    $before = (int) $inventory->item_quantity;
-    $quantity = (int) $transaction->quantity;
+    $before = round((float) $inventory->item_quantity, 1);
+    $quantity = round((float) $transaction->quantity, 1);
     $reverse_action = $transaction->action === 'add' ? 'subtract' : 'add';
     if ($reverse_action === 'subtract' && $before < $quantity) {
         $wpdb->query('ROLLBACK');
         return new WP_Error('insufficient_reversal', 'موجودی فعلی برای ابطال این ورود کافی نیست؛ بخشی از کالا قبلاً مصرف شده است.');
     }
-    $after = $reverse_action === 'subtract' ? $before - $quantity : $before + $quantity;
+    $after = round($reverse_action === 'subtract' ? $before - $quantity : $before + $quantity, 1);
     $stock_updated = $wpdb->update(
         $inventory_table,
         array('item_quantity' => $after, 'updated_at' => $now),
         array('id' => (int) $inventory->id),
-        array('%d', '%s'),
+        array('%f', '%s'),
         array('%d')
     );
     if ($stock_updated === false) {
@@ -337,7 +359,7 @@ function zigurat_inventory_reverse_transaction($transaction_id, $reason)
         'notes' => $notes,
         'created_at' => $now,
         'reverses_transaction_id' => $transaction_id,
-    ), array('%d', '%s', '%d', '%d', '%d', '%s', '%s', '%d', '%s', '%d', '%s', '%s', '%s', '%d'));
+    ), array('%d', '%s', '%f', '%f', '%f', '%s', '%s', '%d', '%s', '%d', '%s', '%s', '%s', '%d'));
     if (!$inserted) {
         $wpdb->query('ROLLBACK');
         return new WP_Error('database', 'سند ابطال ثبت نشد و موجودی تغییر نکرد.');
@@ -384,7 +406,7 @@ function zigurat_get_inventory_summary()
     global $wpdb;
     $table = zigurat_inventory_table_name();
     $row = $wpdb->get_row("SELECT COUNT(*) AS item_count, COALESCE(SUM(item_quantity), 0) AS total_quantity, SUM(item_quantity > 0) AS available_count FROM {$table}");
-    return array('item_count' => (int) ($row->item_count ?? 0), 'total_quantity' => (int) ($row->total_quantity ?? 0), 'available_count' => (int) ($row->available_count ?? 0));
+    return array('item_count' => (int) ($row->item_count ?? 0), 'total_quantity' => (float) ($row->total_quantity ?? 0), 'available_count' => (int) ($row->available_count ?? 0));
 }
 
 function zigurat_get_inventory_items($args = array())

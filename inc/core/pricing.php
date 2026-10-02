@@ -565,6 +565,8 @@ function zigurat_get_letter_pricing_settings()
         'sheet_height_mm' => 1830,
         'plexi_sqm_rate' => 0,
         'metal_sheet_07_sqm_rate' => 0,
+        'stainless_sheet_sqm_rate' => 0,
+        'metal_cut_rate' => 0,
         'active_edge_type' => 'swedish',
         'edge_swedish_material_rate' => 0,
         'edge_swedish_labor_rate' => 0,
@@ -574,6 +576,8 @@ function zigurat_get_letter_pricing_settings()
         'edge_channelium_labor_rate' => 0,
         'edge_metal_material_rate' => 0,
         'edge_metal_labor_rate' => 0,
+        'edge_stainless_material_rate' => 0,
+        'edge_stainless_labor_rate' => 0,
         'metal_powder_coating_rate' => 0,
         'double_layer_labor_rate' => 0,
         'pvc_rate' => 0,
@@ -676,7 +680,7 @@ function zigurat_save_letter_pricing_settings($data)
     }
     $sheet_width = min(5000, max(100, zigurat_pricing_decimal($data['sheet_width_mm'] ?? 1220)));
     $sheet_height = min(5000, max(100, zigurat_pricing_decimal($data['sheet_height_mm'] ?? 1830)));
-    $edge_types = array('swedish', 'plastic', 'channelium', 'metal');
+    $edge_types = array('swedish', 'plastic', 'channelium', 'metal', 'stainless');
     $smd_types = array('block', 'lens', 'roll');
     $active_edge_type = sanitize_key($data['active_edge_type'] ?? 'swedish');
     $active_smd_type = sanitize_key($data['active_smd_type'] ?? 'block');
@@ -687,6 +691,8 @@ function zigurat_save_letter_pricing_settings($data)
         'sheet_height_mm' => $sheet_height,
         'plexi_sqm_rate' => zigurat_pricing_money($data['plexi_sqm_rate'] ?? 0),
         'metal_sheet_07_sqm_rate' => zigurat_pricing_money($data['metal_sheet_07_sqm_rate'] ?? 0),
+        'stainless_sheet_sqm_rate' => zigurat_pricing_money($data['stainless_sheet_sqm_rate'] ?? 0),
+        'metal_cut_rate' => zigurat_pricing_money($data['metal_cut_rate'] ?? 0),
         'active_edge_type' => in_array($active_edge_type, $edge_types, true) ? $active_edge_type : 'swedish',
         'edge_swedish_material_rate' => zigurat_pricing_money($data['edge_swedish_material_rate'] ?? 0),
         'edge_swedish_labor_rate' => zigurat_pricing_money($data['edge_swedish_labor_rate'] ?? 0),
@@ -696,6 +702,8 @@ function zigurat_save_letter_pricing_settings($data)
         'edge_channelium_labor_rate' => zigurat_pricing_money($data['edge_channelium_labor_rate'] ?? 0),
         'edge_metal_material_rate' => zigurat_pricing_money($data['edge_metal_material_rate'] ?? 0),
         'edge_metal_labor_rate' => zigurat_pricing_money($data['edge_metal_labor_rate'] ?? 0),
+        'edge_stainless_material_rate' => zigurat_pricing_money($data['edge_stainless_material_rate'] ?? 0),
+        'edge_stainless_labor_rate' => zigurat_pricing_money($data['edge_stainless_labor_rate'] ?? 0),
         'metal_powder_coating_rate' => zigurat_pricing_money($data['metal_powder_coating_rate'] ?? 0),
         'double_layer_labor_rate' => zigurat_pricing_money($data['double_layer_labor_rate'] ?? 0),
         'pvc_rate' => zigurat_pricing_money($data['pvc_rate'] ?? 0),
@@ -770,6 +778,9 @@ function zigurat_get_letter_last_values()
         'allow_rotation' => 1,
         'include_pvc' => 1,
         'include_metal_sheet_07' => 0,
+        'include_stainless_sheet' => 0,
+        'stainless_backing_material' => 'pvc',
+        'stainless_backing_stroke_mm' => 10,
         'edge_type' => 'swedish',
         'smd_type' => 'none',
     );
@@ -791,9 +802,10 @@ function zigurat_save_letter_last_values($data)
     if (!zigurat_is_manager()) {
         return new WP_Error('forbidden', 'دسترسی به ذخیره مقادیر محاسبه مجاز نیست.');
     }
-    $edge_types = array('swedish', 'plastic', 'channelium', 'metal');
+    $edge_types = array('swedish', 'plastic', 'channelium', 'metal', 'stainless');
     $smd_types = array('none', 'block', 'lens', 'roll');
     $edge_type = sanitize_key($data['edge_type'] ?? 'swedish');
+    $stainless_backing_material = sanitize_key($data['stainless_backing_material'] ?? 'pvc');
     $smd_type = sanitize_key($data['smd_type'] ?? 'none');
     $installation_mode = sanitize_key($data['installation_mode'] ?? 'fixed');
     $layout_trials = absint($data['layout_trials'] ?? 10);
@@ -807,8 +819,11 @@ function zigurat_save_letter_last_values($data)
         'insurance_tax_percent' => zigurat_pricing_insurance_tax_percent($data),
         'use_transformer' => !empty($data['use_transformer']) ? 1 : 0,
         'allow_rotation' => 1,
-        'include_pvc' => 1,
+        'include_pvc' => !(in_array($edge_type, array('metal', 'stainless'), true) && $stainless_backing_material === 'plexi') ? 1 : 0,
         'include_metal_sheet_07' => $edge_type === 'metal' ? 1 : 0,
+        'include_stainless_sheet' => $edge_type === 'stainless' ? 1 : 0,
+        'stainless_backing_material' => in_array($stainless_backing_material, array('pvc', 'plexi'), true) ? $stainless_backing_material : 'pvc',
+        'stainless_backing_stroke_mm' => min(100, max(0, zigurat_pricing_decimal($data['stainless_backing_stroke_mm'] ?? 10))),
         'edge_type' => in_array($edge_type, $edge_types, true) ? $edge_type : 'swedish',
         'smd_type' => in_array($smd_type, $smd_types, true) ? $smd_type : 'none',
     );

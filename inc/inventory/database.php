@@ -41,7 +41,7 @@ function zigurat_install_inventory_tables()
     $transactions_table = zigurat_inventory_transactions_table_name();
     $categories_table = zigurat_inventory_categories_table_name();
     $products_table = zigurat_inventory_products_table_name();
-    $schema_version = '5';
+    $schema_version = '6';
 
     // نسخه جدول‌ها فقط هنگام تغییر ساختار بررسی می‌شود؛ اجرای چهار SHOW TABLES
     // در تمام بازدیدهای سایت، حتی صفحات عمومی، زمان پاسخ را بی‌دلیل افزایش می‌داد.
@@ -57,7 +57,7 @@ function zigurat_install_inventory_tables()
         product_id bigint(20) unsigned DEFAULT NULL,
         item_name varchar(191) NOT NULL,
         item_category varchar(191) NOT NULL,
-        item_quantity bigint(20) unsigned NOT NULL DEFAULT 0,
+        item_quantity decimal(20,1) unsigned NOT NULL DEFAULT 0.0,
         created_at datetime NOT NULL,
         updated_at datetime NOT NULL,
         PRIMARY KEY  (id),
@@ -89,9 +89,9 @@ function zigurat_install_inventory_tables()
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
         inventory_id bigint(20) unsigned DEFAULT NULL,
         action varchar(20) NOT NULL,
-        quantity bigint(20) unsigned NOT NULL,
-        quantity_before bigint(20) unsigned DEFAULT NULL,
-        quantity_after bigint(20) unsigned DEFAULT NULL,
+        quantity decimal(20,1) unsigned NOT NULL,
+        quantity_before decimal(20,1) unsigned DEFAULT NULL,
+        quantity_after decimal(20,1) unsigned DEFAULT NULL,
         item_name varchar(191) NOT NULL,
         item_category varchar(191) NOT NULL,
         project_id bigint(20) unsigned DEFAULT NULL,

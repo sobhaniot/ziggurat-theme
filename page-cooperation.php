@@ -105,7 +105,7 @@ $provinces = zigurat_application_provinces();
                         <label>شهر محل سکونت/فعالیت *<input type="text" name="city" required></label>
                     </div>
                     <label>شهرهای قابل همکاری<textarea name="work_cities" rows="3" placeholder="نام شهرها را با ویرگول جدا کنید؛ مثلاً تهران، کرج، قم"></textarea></label>
-                    <label class="application-checkbox"><input type="checkbox" name="nationwide" value="1"> امکان اعزام و همکاری در سراسر ایران را دارم</label>
+                    <label class="application-checkbox application-switch-row"><input class="application-switch-control" type="checkbox" name="nationwide" value="1"><span>امکان اعزام و همکاری در سراسر ایران را دارم</span></label>
                     <label>توضیحات تکمیلی<textarea name="description" rows="4" placeholder="ابزار، تجهیزات، ظرفیت تولید، خودرو یا شرایط همکاری خود را بنویسید."></textarea></label>
 
                     <div class="application-files">
@@ -124,7 +124,7 @@ $provinces = zigurat_application_provinces();
                             <div class="application-upload-preview" data-upload-preview></div>
                         </div>
                     </div>
-                    <label class="application-checkbox privacy-consent"><input type="checkbox" name="privacy_consent" value="1" required> با ذخیره و بررسی محرمانه اطلاعات برای ارزیابی همکاری موافقم. *</label>
+                    <label class="application-checkbox application-switch-row privacy-consent"><input class="application-switch-control" type="checkbox" name="privacy_consent" value="1" required><span>با ذخیره و بررسی محرمانه اطلاعات برای ارزیابی همکاری موافقم. *</span></label>
                     <button type="submit">ثبت امن درخواست همکاری</button>
                 </form>
             </div>

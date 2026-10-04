@@ -56,6 +56,57 @@
 }
 .application-type-selector input,
 .application-checkbox input { width: auto; flex: 0 0 auto; }
+.application-switch-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 11px !important;
+  cursor: pointer;
+}
+.application-switch-row > span { min-width: 0; line-height: 1.8; }
+.application-switch-row .application-switch-control {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 64px !important;
+  height: 34px;
+  min-width: 64px;
+  flex: 0 0 64px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #777;
+  border-radius: 999px;
+  background: linear-gradient(180deg,#777 0%,#4c4c4c 54%,#626262 100%);
+  box-shadow: inset 0 3px 6px rgba(0,0,0,.35), inset 0 -2px 2px rgba(255,255,255,.26), 0 3px 6px rgba(0,0,0,.18);
+  cursor: pointer;
+  direction: ltr;
+  transition: border-color .24s ease, background .24s ease, box-shadow .24s ease;
+}
+.application-switch-row .application-switch-control::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 3px 5px rgba(0,0,0,.38), inset 0 2px 2px rgba(255,255,255,.95), inset 0 -2px 2px rgba(0,0,0,.12);
+  transition: transform .24s cubic-bezier(.2,.8,.2,1);
+}
+.application-switch-row .application-switch-control:checked {
+  border-color: #1e7040;
+  background: linear-gradient(180deg,#48b875 0%,#247d4a 54%,#30975b 100%);
+  box-shadow: inset 0 3px 6px rgba(0,55,25,.4), inset 0 -2px 2px rgba(255,255,255,.28), 0 0 0 2px rgba(47,155,89,.14), 0 3px 6px rgba(0,0,0,.2);
+}
+.application-switch-row .application-switch-control:checked::before { transform: translateX(29px); }
+.application-switch-row .application-switch-control:hover { border-color: #4c4c4c; }
+.application-switch-row .application-switch-control:focus-visible { outline: 3px solid rgba(200,155,60,.38); outline-offset: 3px; }
+.application-switch-row--danger .application-switch-control:checked {
+  border-color: #8f2626;
+  background: linear-gradient(180deg,#dc6565 0%,#a52f2f 54%,#bd4141 100%);
+  box-shadow: inset 0 3px 6px rgba(80,0,0,.4), inset 0 -2px 2px rgba(255,255,255,.24), 0 0 0 2px rgba(181,45,45,.13), 0 3px 6px rgba(0,0,0,.18);
+}
 .application-files { display: grid; gap: 14px; padding: 18px; border-radius: 12px; background: #f8f8f8; }
 .application-files small { color: #777; font-weight: 400; }
 .application-dropzone { padding: 15px; border: 2px dashed #d8c9a4; border-radius: 12px; background: #fff; transition: border-color .2s, background .2s, transform .2s; }

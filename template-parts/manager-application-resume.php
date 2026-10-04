@@ -92,7 +92,7 @@ $edit_status = isset($_GET['application-edit']) && is_string($_GET['application-
                     <label>شهر *<input type="text" name="city" value="<?php echo esc_attr($meta['city']); ?>" required></label>
                     <label class="manager-application-edit__wide">شهرهای قابل همکاری<textarea name="work_cities" rows="2"><?php echo esc_textarea($meta['work_cities']); ?></textarea></label>
                     <label class="manager-application-edit__wide">توضیحات<textarea name="description" rows="5"><?php echo esc_textarea($meta['description']); ?></textarea></label>
-                    <label class="manager-application-edit__check"><input type="checkbox" name="nationwide" value="1" <?php checked($meta['nationwide'], '1'); ?>> امکان همکاری سراسر ایران</label>
+                    <label class="manager-application-edit__check application-switch-row"><input class="application-switch-control" type="checkbox" name="nationwide" value="1" <?php checked($meta['nationwide'], '1'); ?>><span>امکان همکاری سراسر ایران</span></label>
                 </div>
 
                 <div class="manager-application-existing-files">
@@ -105,7 +105,7 @@ $edit_status = isset($_GET['application-edit']) && is_string($_GET['application-
                             <label class="manager-application-existing-file">
                                 <?php if ($is_image): ?><img src="<?php echo esc_url($file_url); ?>" alt=""><?php else: ?><span>PDF</span><?php endif; ?>
                                 <small><?php echo esc_html($label . ' — ' . ($file['name'] ?? 'فایل')); ?></small>
-                                <b><input type="checkbox" name="remove_application_files[]" value="<?php echo esc_attr($group . ':' . $index); ?>"> حذف این فایل</b>
+                                <b class="application-switch-row application-switch-row--danger"><input class="application-switch-control" type="checkbox" name="remove_application_files[]" value="<?php echo esc_attr($group . ':' . $index); ?>"><span>حذف این فایل</span></b>
                             </label>
                         <?php endforeach; ?>
                     <?php endforeach; ?>

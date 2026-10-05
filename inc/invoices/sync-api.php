@@ -2,8 +2,9 @@
 /**
  * REST bridge used by the local Ziggurat Accounting desktop application.
  *
- * The bridge deliberately exposes only issued invoices. Invoice totals are
- * read-only; the only writable field is the subject of an unlocked invoice.
+ * The bridge deliberately exposes only issued invoices. Invoice totals remain
+ * read-only; the desktop application may only synchronize internal settlement
+ * data (deductions and paid amount).
  */
 
 if (!defined('ABSPATH')) {
@@ -56,9 +57,21 @@ function zigurat_invoice_sync_register_routes()
                     return absint($value) > 0;
                 },
             ),
-            'subject' => array(
+            'net_after_deductions' => array(
                 'required' => true,
-                'sanitize_callback' => 'sanitize_text_field',
+                'validate_callback' => static function ($value) {
+                    return is_numeric(zigurat_invoice_normalize_digits($value)) && (float) zigurat_invoice_normalize_digits($value) >= 0;
+                },
+            ),
+            'paid_amount' => array(
+                'required' => true,
+                'validate_callback' => static function ($value) {
+                    return is_numeric(zigurat_invoice_normalize_digits($value)) && (float) zigurat_invoice_normalize_digits($value) >= 0;
+                },
+            ),
+            'deduction_note' => array(
+                'required' => false,
+                'sanitize_callback' => 'sanitize_textarea_field',
             ),
         ),
     ));
@@ -72,21 +85,43 @@ function zigurat_invoice_sync_get_invoices()
     $table = zigurat_invoices_table_name();
     $rows = $wpdb->get_results(
         "SELECT id, brand, document_type, document_number, number_suffix,
-                subject, grand_total, payment_status, paid_amount, status,
-                locked_at, locked_reason
+                subject, customer_name, issue_date, grand_total, deduction_amount,
+                deduction_note, payment_status, paid_amount, balance, status,
+                tax_status, locked_at, locked_reason
          FROM {$table}
          WHERE document_type = 'invoice' AND status = 'issued'
          ORDER BY document_number ASC, number_suffix ASC, id ASC"
     );
 
     $invoices = array_map(static function ($invoice) {
+        $accounting = zigurat_invoice_accounting_totals(
+            $invoice->grand_total,
+            $invoice->deduction_amount,
+            $invoice->paid_amount,
+            'invoice'
+        );
         return array(
             'id' => (int) $invoice->id,
             'brand' => (string) $invoice->brand,
             'document_type' => 'invoice',
             'number' => zigurat_invoice_object_number($invoice),
             'project' => (string) $invoice->subject,
+            'subject' => (string) $invoice->subject,
+            'customer_name' => (string) $invoice->customer_name,
+            'issue_date' => (string) $invoice->issue_date,
             'amount' => (int) $invoice->grand_total,
+            'net_after_deductions' => (int) $accounting['net_payable'],
+            'deduction_amount' => (int) $accounting['deduction_amount'],
+            'deduction_note' => (string) $invoice->deduction_note,
+            'paid_amount' => (int) $invoice->paid_amount,
+            'balance' => (int) $accounting['balance'],
+            'payment_status' => (string) $accounting['payment_status'],
+            'tax_status' => (string) $invoice->tax_status,
+            'tax_registered' => in_array(
+                (string) $invoice->tax_status,
+                array('submitted', 'confirmed', 'corrected', 'voided'),
+                true
+            ),
             'locked' => zigurat_invoice_is_locked($invoice),
         );
     }, is_array($rows) ? $rows : array());
@@ -112,39 +147,48 @@ function zigurat_invoice_sync_update_invoice(WP_REST_Request $request)
         );
     }
 
-    if (zigurat_invoice_is_locked($invoice)) {
+    $grand_total = (int) $invoice->grand_total;
+    $net_after_deductions = zigurat_invoice_money($request->get_param('net_after_deductions'));
+    $paid_amount = zigurat_invoice_money($request->get_param('paid_amount'));
+    if ($net_after_deductions > $grand_total) {
         return new WP_Error(
-            'zigurat_sync_invoice_locked',
-            'فاکتور تسویه یا قفل شده است و از برنامه قابل تغییر نیست.',
-            array('status' => 409)
-        );
-    }
-
-    $subject = sanitize_text_field((string) $request->get_param('subject'));
-    if ($subject === '') {
-        return new WP_Error(
-            'zigurat_sync_invalid_subject',
-            'نام پروژه نمی‌تواند خالی باشد.',
+            'zigurat_sync_invalid_net_amount',
+            'مبلغ پس از کسورات نمی‌تواند بیشتر از مبلغ کل فاکتور باشد.',
             array('status' => 400)
         );
     }
-
+    $deduction_amount = $grand_total - $net_after_deductions;
+    $deduction_note = sanitize_textarea_field((string) $request->get_param('deduction_note'));
+    $accounting = zigurat_invoice_accounting_totals($grand_total, $deduction_amount, $paid_amount, 'invoice');
+    $now = current_time('mysql', true);
+    $settled = $accounting['payment_status'] === 'settled';
+    $update = array(
+        'deduction_amount' => $accounting['deduction_amount'],
+        'deduction_note' => $deduction_note,
+        'paid_amount' => $accounting['paid_amount'],
+        'balance' => $accounting['balance'],
+        'payment_status' => $accounting['payment_status'],
+        'settled_at' => $settled ? ($invoice->settled_at ?: $now) : null,
+        'updated_by' => get_current_user_id(),
+        'updated_at' => $now,
+    );
+    if ($settled) {
+        $update['locked_at'] = $invoice->locked_at ?: $now;
+        $update['locked_reason'] = 'settled';
+    } elseif (($invoice->locked_reason ?? '') === 'settled') {
+        $update['locked_at'] = null;
+        $update['locked_reason'] = '';
+    }
     $updated = $wpdb->update(
         zigurat_invoices_table_name(),
-        array(
-            'subject' => $subject,
-            'updated_by' => get_current_user_id(),
-            'updated_at' => current_time('mysql', true),
-        ),
+        $update,
         array('id' => $invoice_id),
-        array('%s', '%d', '%s'),
-        array('%d')
     );
 
     if ($updated === false) {
         return new WP_Error(
             'zigurat_sync_database_error',
-            'نام پروژه در سایت ذخیره نشد.',
+            'اطلاعات کسورات و پرداخت در سایت ذخیره نشد.',
             array('status' => 500)
         );
     }
@@ -152,6 +196,10 @@ function zigurat_invoice_sync_update_invoice(WP_REST_Request $request)
     return rest_ensure_response(array(
         'updated' => true,
         'id' => $invoice_id,
-        'subject' => $subject,
+        'net_after_deductions' => $accounting['net_payable'],
+        'deduction_amount' => $accounting['deduction_amount'],
+        'paid_amount' => $accounting['paid_amount'],
+        'balance' => $accounting['balance'],
+        'payment_status' => $accounting['payment_status'],
     ));
 }

@@ -240,6 +240,7 @@
 
     var countOutput = summary.querySelector('[data-selection-count]');
     var grandOutput = summary.querySelector('[data-selection-grand]');
+    var netOutput = summary.querySelector('[data-selection-net]');
     var taxOutput = summary.querySelector('[data-selection-tax]');
     var paidOutput = summary.querySelector('[data-selection-paid]');
     var balanceOutput = summary.querySelector('[data-selection-balance]');
@@ -256,15 +257,17 @@
       var selected = Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-invoice-selectable].is-selected'));
       var totals = selected.reduce(function (result, row) {
         result.grand += numberFrom(row, 'grandTotal');
+        result.net += Math.max(0, numberFrom(row, 'grandTotal') - numberFrom(row, 'deductionAmount'));
         result.tax += numberFrom(row, 'taxAmount');
         result.paid += numberFrom(row, 'paidAmount');
         result.balance += numberFrom(row, 'balance');
         return result;
-      }, { grand: 0, tax: 0, paid: 0, balance: 0 });
+      }, { grand: 0, net: 0, tax: 0, paid: 0, balance: 0 });
       summary.classList.toggle('is-visible', selected.length > 0);
       summary.setAttribute('aria-hidden', selected.length > 0 ? 'false' : 'true');
       if (countOutput) countOutput.textContent = selected.length.toLocaleString('fa-IR');
       if (grandOutput) grandOutput.textContent = money(totals.grand);
+      if (netOutput) netOutput.textContent = money(totals.net);
       if (taxOutput) taxOutput.textContent = money(totals.tax);
       if (paidOutput) paidOutput.textContent = money(totals.paid);
       if (balanceOutput) balanceOutput.textContent = money(totals.balance);
@@ -603,14 +606,17 @@
   }
   if (editor.dataset.invoiceReady === '1') return;
   editor.dataset.invoiceReady = '1';
-  invoiceHasUnsavedChanges = editor.dataset.invoiceUnsaved === '1';
+  var isReadonlyInvoice = editor.dataset.invoiceReadonly === '1';
+  invoiceHasUnsavedChanges = !isReadonlyInvoice && editor.dataset.invoiceUnsaved === '1';
   var savedNotice = editor.querySelector('#invoice-save-result.invoice-save-result.is-success');
   function markInvoiceChanged() {
     invoiceHasUnsavedChanges = true;
     if (savedNotice && savedNotice.isConnected) savedNotice.remove();
   }
-  editor.addEventListener('input', markInvoiceChanged);
-  editor.addEventListener('change', markInvoiceChanged);
+  if (!isReadonlyInvoice) {
+    editor.addEventListener('input', markInvoiceChanged);
+    editor.addEventListener('change', markInvoiceChanged);
+  }
   var submitWasClicked = false;
   var lowTaxConfirmed = false;
   function lowTaxWarningTitle(rate) {
@@ -896,26 +902,40 @@
       var output = row.querySelector('[data-line-total]');
       if (output) output.textContent = format(total);
     });
-    var discount = Math.min(subtotal, money(editor.querySelector('[name="discount"]')));
-    var shipping = money(editor.querySelector('[name="shipping"]'));
+    var requestedDiscount = money(editor.querySelector('[name="discount"]'));
+    var shippingModeInput = editor.querySelector('[name="shipping_mode"]');
+    var shippingMode = shippingModeInput && shippingModeInput.value === 'percent' ? 'percent' : 'fixed';
+    var shippingBase = subtotal;
+    var shippingValueInput = editor.querySelector('[name="shipping_value"]');
+    var shippingRate = Math.max(0, Math.min(100, parseFloat(normalize(shippingValueInput && shippingValueInput.value)) || 0));
+    var shipping = shippingMode === 'percent'
+      ? Math.round(shippingBase * shippingRate / 100)
+      : money(shippingValueInput);
     var overheadInput = editor.querySelector('[name="overhead_rate"]');
     var insuranceInput = editor.querySelector('[name="insurance_rate"]');
     var taxInput = editor.querySelector('[name="tax_rate"]');
     var overheadRate = Math.max(0, Math.min(100, parseFloat(normalize(overheadInput && overheadInput.value)) || 0));
     var insuranceRate = Math.max(0, Math.min(100, parseFloat(normalize(insuranceInput && insuranceInput.value)) || 0));
     var taxRate = Math.max(0, Math.min(100, parseFloat(normalize(taxInput && taxInput.value)) || 0));
-    var baseAmount = Math.max(0, subtotal - discount + shipping);
+    var baseAmount = subtotal + shipping;
     var overhead = Math.round(baseAmount * overheadRate / 100);
     var amountWithOverhead = baseAmount + overhead;
     var insurance = Math.round(amountWithOverhead * insuranceRate / 100);
     var taxable = amountWithOverhead + insurance;
     var tax = Math.round(taxable * taxRate / 100);
-    var grand = taxable + tax;
-    var balance = Math.max(0, grand - money(editor.querySelector('[name="paid_amount"]')));
-    editor.querySelector('[data-subtotal]').textContent = format(baseAmount);
+    var grossTotal = taxable + tax;
+    var discount = Math.min(grossTotal, requestedDiscount);
+    var grand = Math.max(0, grossTotal - discount);
+    var deduction = Math.min(grand, money(editor.querySelector('[name="deduction_amount"]')));
+    var balance = Math.max(0, grand - deduction - money(editor.querySelector('[name="paid_amount"]')));
+    editor.querySelector('[data-subtotal]').textContent = format(subtotal);
+    var shippingOutput = editor.querySelector('[data-shipping]');
+    var discountOutput = editor.querySelector('[data-discount]');
     var overheadOutput = editor.querySelector('[data-overhead]');
     var insuranceOutput = editor.querySelector('[data-insurance]');
     if (overheadOutput) overheadOutput.textContent = format(overhead);
+    if (shippingOutput) shippingOutput.textContent = format(shipping);
+    if (discountOutput) discountOutput.textContent = format(discount);
     if (insuranceOutput) insuranceOutput.textContent = format(insurance);
     editor.querySelector('[data-tax]').textContent = format(tax);
     editor.querySelector('[data-grand-total]').textContent = format(grand);
@@ -1073,10 +1093,59 @@
   body.querySelectorAll('tr').forEach(bindRow);
   updateRowNumbers();
   editor.querySelectorAll('[data-money]').forEach(bindMoneyInput);
-  editor.querySelectorAll('input[name="discount"],input[name="shipping"],input[name="overhead_rate"],input[name="insurance_rate"],input[name="tax_rate"],input[name="paid_amount"]').forEach(function (input) { input.addEventListener('input', calculate); });
+  editor.querySelectorAll('input[name="discount"],input[name="overhead_rate"],input[name="insurance_rate"],input[name="tax_rate"],input[name="deduction_amount"],input[name="paid_amount"]').forEach(function (input) { input.addEventListener('input', calculate); });
+  var shippingModeField = editor.querySelector('input[name="shipping_mode"]');
+  var shippingModeToggle = editor.querySelector('[data-shipping-mode-toggle]');
+  var shippingValueField = editor.querySelector('input[name="shipping_value"]');
+  var shippingLabel = editor.querySelector('[data-shipping-label]');
+  var shippingFixedValue = shippingValueField ? normalize(shippingValueField.dataset.fixedValue || '0').replace(/[^0-9]/g, '') : '0';
+  var shippingPercentValue = shippingValueField ? normalizeQuantity(shippingValueField.dataset.percentValue || '0') : '0';
+  function applyShippingMode(mode, isSwitch) {
+    if (!shippingModeField || !shippingValueField) return;
+    var previousMode = shippingModeField.value === 'percent' ? 'percent' : 'fixed';
+    if (isSwitch) {
+      if (previousMode === 'percent') shippingPercentValue = normalizeQuantity(shippingValueField.value) || '0';
+      else shippingFixedValue = normalize(shippingValueField.value).replace(/[^0-9]/g, '') || '0';
+    }
+    mode = mode === 'percent' ? 'percent' : 'fixed';
+    shippingModeField.value = mode;
+    if (shippingModeToggle) shippingModeToggle.checked = mode === 'percent';
+    if (shippingLabel) shippingLabel.textContent = mode === 'percent' ? 'درصد حمل و بسته‌بندی' : 'مبلغ حمل و بسته‌بندی';
+    shippingValueField.setAttribute('aria-label', mode === 'percent' ? 'درصد حمل و بسته‌بندی' : 'مبلغ حمل و بسته‌بندی');
+    shippingValueField.inputMode = mode === 'percent' ? 'decimal' : 'numeric';
+    shippingValueField.value = mode === 'percent' ? shippingPercentValue : shippingFixedValue;
+    if (mode === 'fixed') formatMoneyInput(shippingValueField);
+  }
+  if (shippingModeToggle) shippingModeToggle.addEventListener('change', function () {
+    applyShippingMode(shippingModeToggle.checked ? 'percent' : 'fixed', true);
+    calculate();
+  });
+  if (shippingValueField) {
+    shippingValueField.addEventListener('focus', function () {
+      if ((shippingModeField.value === 'percent' ? parseFloat(normalize(shippingValueField.value)) : money(shippingValueField)) === 0) shippingValueField.value = '';
+    });
+    shippingValueField.addEventListener('input', function () {
+      if (shippingModeField.value === 'percent') {
+        shippingValueField.value = normalizeQuantity(shippingValueField.value);
+        shippingPercentValue = shippingValueField.value || '0';
+      } else {
+        formatMoneyInput(shippingValueField);
+        shippingFixedValue = normalize(shippingValueField.value).replace(/[^0-9]/g, '') || '0';
+      }
+      calculate();
+    });
+    shippingValueField.addEventListener('blur', function () {
+      if (shippingValueField.value === '') shippingValueField.value = shippingModeField.value === 'percent' ? '0' : Number(0).toLocaleString('fa-IR');
+    });
+  }
+  applyShippingMode(shippingModeField && shippingModeField.value, false);
   setupCustomerLookup();
   setupBranchNumberPreview();
   calculate();
+  if (isReadonlyInvoice) {
+    editor.querySelectorAll('input,select,textarea,button').forEach(function (control) { control.disabled = true; });
+    editor.addEventListener('submit', function (event) { event.preventDefault(); });
+  }
   }
   document.addEventListener('DOMContentLoaded', function () { initializeInvoice(document); });
   document.addEventListener('zigurat:panel-updated', function (event) { initializeInvoice(event.detail && event.detail.root ? event.detail.root : document); });

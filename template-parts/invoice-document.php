@@ -99,11 +99,11 @@ $show_grand_total = $show_paid;
         <div class="invoice-notes"><h2>توضیحات</h2><p><?php echo esc_html($invoice->notes ?: '—'); ?></p><?php if ($invoice->payment_info): ?><h2>اطلاعات پرداخت</h2><p><?php echo esc_html($invoice->payment_info); ?></p><?php endif; ?></div>
         <dl class="invoice-totals">
             <div><dt>جمع اقلام:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->subtotal)); ?></dd></div>
-            <?php if ($show_discount): ?><div><dt>تخفیف:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->discount)); ?></dd></div><?php endif; ?>
             <?php if ($show_shipping): ?><div><dt>هزینه حمل و بسته‌بندی:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->shipping)); ?></dd></div><?php endif; ?>
             <?php if ($show_overhead): ?><div><dt>بالاسری/سود پیمانکار <?php echo esc_html($rate_label($invoice->overhead_rate ?? 0)); ?>٪:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->overhead_amount ?? 0)); ?></dd></div><?php endif; ?>
             <?php if ($show_insurance): ?><div><dt>بیمه <?php echo esc_html($rate_label($invoice->insurance_rate ?? 0)); ?>٪:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->insurance_amount ?? 0)); ?></dd></div><?php endif; ?>
             <?php if ($show_tax): ?><div><dt>مالیات ارزش افزوده <?php echo esc_html($rate_label($invoice->tax_rate)); ?>٪:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->tax_amount)); ?></dd></div><?php endif; ?>
+            <?php if ($show_discount): ?><div><dt>تخفیف کلی:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->discount)); ?></dd></div><?php endif; ?>
             <?php if ($show_grand_total): ?><div><dt>جمع کل:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->grand_total)); ?></dd></div><?php endif; ?>
             <?php if ($show_paid): ?><div><dt>پرداختی:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->paid_amount)); ?></dd></div><?php endif; ?>
             <div class="is-payable"><dt>قابل پرداخت:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->balance)); ?></dd></div>

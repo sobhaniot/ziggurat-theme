@@ -36,7 +36,7 @@ function zigurat_invoice_trash_table_name()
 function zigurat_install_invoice_tables()
 {
     global $wpdb;
-    $version = '9';
+    $version = '12';
     $invoices = zigurat_invoices_table_name();
     $items = zigurat_invoice_items_table_name();
     $sequences = zigurat_invoice_sequences_table_name();
@@ -77,6 +77,8 @@ function zigurat_install_invoice_tables()
         subtotal bigint(20) unsigned NOT NULL DEFAULT 0,
         discount bigint(20) unsigned NOT NULL DEFAULT 0,
         shipping bigint(20) unsigned NOT NULL DEFAULT 0,
+        shipping_mode varchar(10) NOT NULL DEFAULT 'fixed',
+        shipping_rate decimal(5,2) NOT NULL DEFAULT 0,
         overhead_rate decimal(5,2) NOT NULL DEFAULT 0,
         overhead_amount bigint(20) unsigned NOT NULL DEFAULT 0,
         insurance_rate decimal(5,2) NOT NULL DEFAULT 0,
@@ -84,6 +86,8 @@ function zigurat_install_invoice_tables()
         tax_rate decimal(5,2) NOT NULL DEFAULT 0,
         tax_amount bigint(20) unsigned NOT NULL DEFAULT 0,
         grand_total bigint(20) unsigned NOT NULL DEFAULT 0,
+        deduction_amount bigint(20) unsigned NOT NULL DEFAULT 0,
+        deduction_note text NULL,
         paid_amount bigint(20) unsigned NOT NULL DEFAULT 0,
         balance bigint(20) unsigned NOT NULL DEFAULT 0,
         payment_status varchar(20) NOT NULL DEFAULT 'unpaid',
@@ -194,14 +198,15 @@ function zigurat_install_invoice_tables()
                         WHEN CAST(SUBSTRING(issue_date,6,2) AS UNSIGNED) BETWEEN 7 AND 9 THEN 3
                         WHEN CAST(SUBSTRING(issue_date,6,2) AS UNSIGNED) BETWEEN 10 AND 12 THEN 4
                         ELSE 0 END
-                WHERE brand = 'official' AND document_type = 'invoice'
+                WHERE brand IN ('official','unofficial') AND document_type = 'invoice'
                   AND issue_date REGEXP '^[0-9]{4}/[0-9]{2}/[0-9]{2}$'");
         }
         if ($wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'payment_status'")) {
             $wpdb->query("UPDATE {$invoices}
                 SET payment_status = CASE
                     WHEN document_type <> 'invoice' THEN 'not_applicable'
-                    WHEN grand_total > 0 AND paid_amount >= grand_total THEN 'settled'
+                    WHEN (grand_total - LEAST(deduction_amount, grand_total)) > 0
+                         AND paid_amount >= (grand_total - LEAST(deduction_amount, grand_total)) THEN 'settled'
                     WHEN paid_amount > 0 THEN 'partial'
                     ELSE 'unpaid' END");
             $wpdb->query("UPDATE {$invoices}
@@ -209,7 +214,8 @@ function zigurat_install_invoice_tables()
                     locked_at = COALESCE(locked_at, updated_at),
                     locked_reason = IF(locked_reason = '', 'settled', locked_reason)
                 WHERE document_type = 'invoice' AND status = 'issued'
-                  AND grand_total > 0 AND paid_amount >= grand_total");
+                  AND (grand_total - LEAST(deduction_amount, grand_total)) > 0
+                  AND paid_amount >= (grand_total - LEAST(deduction_amount, grand_total))");
         }
     }
     if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $payments)) === $payments) {
@@ -232,6 +238,10 @@ function zigurat_install_invoice_tables()
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'tax_year'")
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'tax_quarter'")
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'payment_status'")
+        && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'deduction_amount'")
+        && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'deduction_note'")
+        && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'shipping_mode'")
+        && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'shipping_rate'")
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'tax_status'")
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'copied_from_invoice_id'")) {
         update_option('zigurat_invoice_schema_version', $version, false);

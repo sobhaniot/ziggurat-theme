@@ -29,6 +29,20 @@ function zigurat_invoice_payment_status_label($status)
     return $labels[$status] ?? $labels['unpaid'];
 }
 
+function zigurat_invoice_accounting_totals($grand_total, $deduction_amount, $paid_amount, $document_type = 'invoice')
+{
+    $grand_total = max(0, (int) $grand_total);
+    $deduction_amount = max(0, min((int) $deduction_amount, $grand_total));
+    $paid_amount = max(0, (int) $paid_amount);
+    $net_payable = max(0, $grand_total - $deduction_amount);
+    $balance = max(0, $net_payable - $paid_amount);
+    $payment_status = $document_type !== 'invoice'
+        ? 'not_applicable'
+        : ($net_payable > 0 && $paid_amount >= $net_payable ? 'settled' : ($paid_amount > 0 ? 'partial' : 'unpaid'));
+
+    return compact('deduction_amount', 'paid_amount', 'net_payable', 'balance', 'payment_status');
+}
+
 function zigurat_invoice_tax_status_label($status)
 {
     $labels = array(
@@ -53,8 +67,13 @@ function zigurat_invoice_is_locked($invoice)
     if (!$invoice || ($invoice->document_type ?? '') !== 'invoice' || ($invoice->status ?? '') !== 'issued') {
         return false;
     }
-    return ($invoice->payment_status ?? '') === 'settled'
-        || ((int) ($invoice->grand_total ?? 0) > 0 && (int) ($invoice->paid_amount ?? 0) >= (int) $invoice->grand_total);
+    $totals = zigurat_invoice_accounting_totals(
+        $invoice->grand_total ?? 0,
+        $invoice->deduction_amount ?? 0,
+        $invoice->paid_amount ?? 0,
+        $invoice->document_type ?? 'invoice'
+    );
+    return ($invoice->payment_status ?? '') === 'settled' || $totals['payment_status'] === 'settled';
 }
 
 function zigurat_invoice_lock_reason_label($invoice)
@@ -174,7 +193,7 @@ function zigurat_invoice_today_jalali()
 
 function zigurat_invoice_tax_period($brand, $type, $issue_date)
 {
-    if ($brand !== 'official' || $type !== 'invoice') {
+    if (!in_array($brand, array('official', 'unofficial'), true) || $type !== 'invoice') {
         return array('year'=>0, 'quarter'=>0);
     }
     $issue_date = zigurat_invoice_normalize_digits($issue_date);
@@ -197,14 +216,16 @@ function zigurat_invoice_tax_quarter_label($quarter)
     return $labels[absint($quarter)] ?? 'نامشخص';
 }
 
-function zigurat_invoice_tax_years()
+function zigurat_invoice_tax_years($brand = 'official')
 {
     global $wpdb;
-    $years = array_map('absint', $wpdb->get_col(
+    $brand = in_array($brand, array('official', 'unofficial'), true) ? $brand : 'official';
+    $years = array_map('absint', $wpdb->get_col($wpdb->prepare(
         "SELECT DISTINCT tax_year FROM " . zigurat_invoices_table_name() . "
-         WHERE brand='official' AND document_type='invoice' AND tax_year > 0
-         ORDER BY tax_year DESC"
-    ));
+         WHERE brand=%s AND document_type='invoice' AND tax_year > 0
+         ORDER BY tax_year DESC",
+        $brand
+    )));
     $current_year = (int) substr(zigurat_invoice_today_jalali(), 0, 4);
     if ($current_year > 0 && !in_array($current_year, $years, true)) {
         array_unshift($years, $current_year);
@@ -213,15 +234,17 @@ function zigurat_invoice_tax_years()
     return $years;
 }
 
-function zigurat_invoice_tax_summary($year)
+function zigurat_invoice_tax_summary($year, $brand = 'official')
 {
     global $wpdb;
+    $brand = in_array($brand, array('official', 'unofficial'), true) ? $brand : 'official';
     $summary = array();
     for ($quarter = 1; $quarter <= 4; $quarter++) {
         $summary[$quarter] = (object) array(
             'tax_quarter'=>$quarter,
             'invoice_count'=>0,
             'grand_total'=>0,
+            'net_total'=>0,
             'tax_amount'=>0,
             'paid_amount'=>0,
             'balance'=>0,
@@ -231,20 +254,24 @@ function zigurat_invoice_tax_summary($year)
     if (!$year) {
         return $summary;
     }
-    $rows = $wpdb->get_results($wpdb->prepare(
-        "SELECT tax_quarter, COUNT(*) invoice_count,
-                SUM(grand_total) grand_total, SUM(tax_amount) tax_amount,
-                SUM(paid_amount) paid_amount, SUM(balance) balance
-         FROM " . zigurat_invoices_table_name() . " i
-         WHERE i.brand='official' AND i.document_type='invoice' AND i.status='issued'
+    $official_conditions = $brand === 'official' ? "
            AND i.tax_status <> 'voided'
            AND NOT EXISTS (
                SELECT 1 FROM " . zigurat_invoices_table_name() . " child
                WHERE child.reference_invoice_id = i.id AND child.tax_subject = 'correction'
                  AND child.status = 'issued' AND child.tax_status IN ('submitted','confirmed','corrected')
-           )
+           )" : '';
+    $rows = $wpdb->get_results($wpdb->prepare(
+        "SELECT tax_quarter, COUNT(*) invoice_count,
+                SUM(grand_total) grand_total,
+                SUM(grand_total - LEAST(deduction_amount, grand_total)) net_total,
+                SUM(tax_amount) tax_amount,
+                SUM(paid_amount) paid_amount, SUM(balance) balance
+         FROM " . zigurat_invoices_table_name() . " i
+         WHERE i.brand=%s AND i.document_type='invoice' AND i.status='issued'" . $official_conditions . "
            AND i.tax_year=%d AND i.tax_quarter BETWEEN 1 AND 4
          GROUP BY tax_quarter",
+        $brand,
         $year
     ));
     foreach ($rows as $row) {
@@ -659,53 +686,7 @@ function zigurat_invoice_get_latest_correction($invoice_id)
 
 function zigurat_invoice_set_payment_status($invoice_id, $status)
 {
-    if (!current_user_can('manage_options')) {
-        return new WP_Error('forbidden', 'فقط مدیر کل می‌تواند وضعیت پرداخت را تغییر دهد.');
-    }
-    $status = sanitize_key($status);
-    if (!in_array($status, array('unpaid','settled'), true)) {
-        return new WP_Error('invalid_status', 'وضعیت پرداخت معتبر نیست.');
-    }
-    $invoice = zigurat_invoice_get($invoice_id);
-    if (!$invoice || $invoice->document_type !== 'invoice') {
-        return new WP_Error('invalid_invoice', 'این سند، فاکتور معتبر نیست.');
-    }
-    if ($invoice->status !== 'issued') {
-        return new WP_Error('draft_invoice', 'ابتدا فاکتور را از حالت پیش‌نویس خارج کنید.');
-    }
-    $now = current_time('mysql', true);
-    global $wpdb;
-    $wpdb->query('START TRANSACTION');
-    $locked_invoice = $wpdb->get_row($wpdb->prepare(
-        'SELECT * FROM ' . zigurat_invoices_table_name() . ' WHERE id = %d FOR UPDATE',
-        absint($invoice_id)
-    ));
-    if (!$locked_invoice) {
-        $wpdb->query('ROLLBACK');
-        return new WP_Error('not_found', 'فاکتور پیدا نشد.');
-    }
-    $update = array(
-        'paid_amount'=>$status === 'settled' ? (int) $locked_invoice->grand_total : 0,
-        'balance'=>$status === 'settled' ? 0 : (int) $locked_invoice->grand_total,
-        'payment_status'=>$status,
-        'settled_at'=>$status === 'settled' ? $now : null,
-        'updated_by'=>get_current_user_id(),
-        'updated_at'=>$now,
-    );
-    if ($status === 'settled') {
-        $update['locked_at'] = $locked_invoice->locked_at ?: $now;
-        $update['locked_reason'] = 'settled';
-    } else {
-        $update['locked_at'] = null;
-        $update['locked_reason'] = '';
-    }
-    $saved = $wpdb->update(zigurat_invoices_table_name(), $update, array('id'=>absint($invoice_id)));
-    if ($saved === false) {
-        $wpdb->query('ROLLBACK');
-        return new WP_Error('database', 'وضعیت پرداخت ذخیره نشد.');
-    }
-    $wpdb->query('COMMIT');
-    return zigurat_invoice_get($invoice_id);
+    return new WP_Error('automatic_payment_status', 'وضعیت پرداخت از مبلغ خالص پس از کسورات و مبلغ پرداختی به‌صورت خودکار تعیین می‌شود.');
 }
 
 function zigurat_invoice_set_tax_status($invoice_id, $status)
@@ -962,33 +943,50 @@ function zigurat_invoice_save($data)
     $status = ($data['status'] ?? '') === 'draft' ? 'draft' : 'issued';
     $tax_period = zigurat_invoice_tax_period($brand, $type, $issue_date);
     $subtotal = array_sum(wp_list_pluck($items, 'line_total'));
-    $discount = min(zigurat_invoice_money($data['discount'] ?? 0), $subtotal);
-    $shipping = zigurat_invoice_money($data['shipping'] ?? 0);
+    $requested_discount = zigurat_invoice_money($data['discount'] ?? 0);
+    $shipping_mode = ($data['shipping_mode'] ?? '') === 'percent' ? 'percent' : 'fixed';
+    $shipping_value = $data['shipping_value'] ?? ($shipping_mode === 'percent' ? ($data['shipping_rate'] ?? 0) : ($data['shipping'] ?? 0));
+    $shipping_rate = $shipping_mode === 'percent'
+        ? max(0, min(100, (float) zigurat_invoice_normalize_digits($shipping_value)))
+        : 0;
+    $shipping_base = $subtotal;
+    $shipping = $shipping_mode === 'percent'
+        ? (int) round($shipping_base * $shipping_rate / 100)
+        : zigurat_invoice_money($shipping_value);
     $overhead_rate = max(0, min(100, (float) zigurat_invoice_normalize_digits($data['overhead_rate'] ?? 0)));
     $insurance_rate = $brand === 'official'
         ? max(0, min(100, (float) zigurat_invoice_normalize_digits($data['insurance_rate'] ?? 0)))
         : 0;
-    $base_amount = max(0, $subtotal - $discount + $shipping);
+    $base_amount = $subtotal + $shipping;
     $overhead_amount = (int) round($base_amount * $overhead_rate / 100);
     $amount_with_overhead = $base_amount + $overhead_amount;
     $insurance_amount = (int) round($amount_with_overhead * $insurance_rate / 100);
     $tax_rate = max(0, min(100, (float) zigurat_invoice_normalize_digits($data['tax_rate'] ?? 0)));
     $taxable = $amount_with_overhead + $insurance_amount;
     $tax_amount = (int) round($taxable * $tax_rate / 100);
-    $grand_total = $taxable + $tax_amount;
+    $gross_total = $taxable + $tax_amount;
+    $discount = min($requested_discount, $gross_total);
+    $grand_total = max(0, $gross_total - $discount);
+    $deduction_amount = 0;
+    $deduction_note = '';
     $paid_amount = 0;
     if ($type === 'invoice') {
+        $deduction_amount = current_user_can('manage_options')
+            ? zigurat_invoice_money($data['deduction_amount'] ?? 0)
+            : (int) ($existing->deduction_amount ?? 0);
+        $deduction_note = current_user_can('manage_options')
+            ? sanitize_textarea_field(wp_unslash((string) ($data['deduction_note'] ?? '')))
+            : (string) ($existing->deduction_note ?? '');
         $paid_amount = current_user_can('manage_options')
             ? zigurat_invoice_money($data['paid_amount'] ?? 0)
             : (int) ($existing->paid_amount ?? 0);
     }
-    if ($paid_amount > $grand_total) {
-        return new WP_Error('invalid_paid_amount', 'مبلغ پرداخت‌شده نمی‌تواند بیشتر از جمع کل فاکتور باشد.');
+    if ($deduction_amount > $grand_total) {
+        return new WP_Error('invalid_deduction_amount', 'مبلغ کسورات نمی‌تواند بیشتر از جمع کل فاکتور باشد.');
     }
-    $balance = max(0, $grand_total - $paid_amount);
-    $payment_status = $type !== 'invoice'
-        ? 'not_applicable'
-        : ($grand_total > 0 && $paid_amount >= $grand_total ? 'settled' : ($paid_amount > 0 ? 'partial' : 'unpaid'));
+    $accounting = zigurat_invoice_accounting_totals($grand_total, $deduction_amount, $paid_amount, $type);
+    $balance = $accounting['balance'];
+    $payment_status = $accounting['payment_status'];
     $seller = zigurat_invoice_clean_seller($data, $brand);
     $now = current_time('mysql', true);
     $user_id = get_current_user_id();
@@ -1161,9 +1159,11 @@ function zigurat_invoice_save($data)
         'customer_address'=>sanitize_textarea_field(wp_unslash((string) ($data['customer_address'] ?? ''))),
         'customer_phone'=>sanitize_text_field(wp_unslash((string) ($data['customer_phone'] ?? ''))),
         'subtotal'=>$subtotal, 'discount'=>$discount, 'shipping'=>$shipping,
+        'shipping_mode'=>$shipping_mode, 'shipping_rate'=>$shipping_rate,
         'overhead_rate'=>$overhead_rate, 'overhead_amount'=>$overhead_amount,
         'insurance_rate'=>$insurance_rate, 'insurance_amount'=>$insurance_amount,
         'tax_rate'=>$tax_rate, 'tax_amount'=>$tax_amount, 'grand_total'=>$grand_total,
+        'deduction_amount'=>$deduction_amount, 'deduction_note'=>$deduction_note,
         'paid_amount'=>$paid_amount, 'balance'=>$balance,
         'payment_status'=>$payment_status,
         'notes'=>sanitize_textarea_field(wp_unslash((string) ($data['notes'] ?? ''))),

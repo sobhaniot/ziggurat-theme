@@ -287,6 +287,14 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
 .invoice-live-totals { margin-top: 14px; border-top: 1px solid #ddd; }
 .invoice-live-totals div { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
 .invoice-live-totals div:nth-last-child(2) { font-size: 20px; font-weight: 800; }
+.invoice-field-hint { margin: 0 0 12px; color: #6b6254; font-size: 13px; }
+.invoice-accounting-fields { background: #fffaf0; }
+.invoice-shipping-field { display: grid; gap: 5px; font-weight: 700; }
+.invoice-shipping-field > input[type="hidden"] { display: none !important; }
+.invoice-shipping-field__title { display: flex; align-items: center; gap: 8px; min-height: 34px; }
+.invoice-shipping-field__switch { flex: 0 0 auto; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.invoice-shipping-field__switch:has(input:checked) { border: 0; background: transparent; box-shadow: none; }
+.invoice-shipping-field > input[name="shipping_value"] { width: 100%; }
 .invoice-editor-actions { display: flex; gap: 10px; }
 .invoice-editor-actions button,
 .invoice-editor-actions a,
@@ -320,6 +328,8 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
 .invoice-tax-card { display: block; overflow: hidden; border: 1px solid #e0d3b2; border-radius: 11px; background: rgba(255,255,255,.9); color: #30270f; box-shadow: 0 5px 15px rgba(92,67,14,.05); transition: transform .18s ease,border-color .18s ease,box-shadow .18s ease; }
 .invoice-tax-card:hover { transform: translateY(-2px); border-color: #b58b2f; box-shadow: 0 9px 20px rgba(92,67,14,.11); }
 .invoice-tax-card.is-active { border: 2px solid #a77b1b; background: #fffaf0; box-shadow: 0 8px 23px rgba(116,82,13,.16); }
+.invoice-tax-card--year { grid-column: 1/-1; }
+.invoice-tax-card--year dl { display: grid; grid-template-columns: repeat(auto-fit,minmax(145px,1fr)); gap: 0 22px; }
 .invoice-tax-card header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 11px 12px; background: #f5ead0; }
 .invoice-tax-card.is-active header { background: #d8ad4d; color: #1e180a; }
 .invoice-tax-card header strong { font-size: 16px; }
@@ -364,7 +374,7 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
 .invoice-selection-summary__title { display: grid; gap: 3px; }
 .invoice-selection-summary__title strong { color: #5f440d; font-size: 17px; }
 .invoice-selection-summary__title small { color: #83724e; font-size: 11px; }
-.invoice-selection-summary dl { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; margin: 0; }
+.invoice-selection-summary dl { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 8px; margin: 0; }
 .invoice-selection-summary dl > div { padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.78); }
 .invoice-selection-summary dt { color: #786a4b; font-size: 11px; }
 .invoice-selection-summary dd { margin: 2px 0 0; color: #29200d; font-size: 13px; font-weight: 900; white-space: nowrap; }
@@ -590,6 +600,17 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
 .invoice-admin-page--unofficial .invoice-pagination .page-numbers { border-color: #bed3e4; color: #245d89; }
 .invoice-admin-page--unofficial .invoice-pagination .page-numbers.current { border-color: #2d7bb7; background: #2d7bb7; color: #fff; }
 .invoice-admin-page--unofficial .invoice-branch-toggle { border-color: #9dc0db; background: #f0f7fc; }
+.invoice-admin-page--unofficial .invoice-shipping-field__switch,
+.invoice-admin-page--unofficial .invoice-shipping-field__switch:hover,
+.invoice-admin-page--unofficial .invoice-shipping-field__switch:has(input:checked) { padding: 0; border: 0; background: transparent; box-shadow: none; }
+.invoice-admin-page--unofficial .invoice-tax-period { border-color: #b9d3e7; background: linear-gradient(145deg,#f8fcff,#e8f5ff); }
+.invoice-admin-page--unofficial .invoice-tax-period__heading span { color: #2d719f; }
+.invoice-admin-page--unofficial .invoice-tax-period__heading > a { border-color: #86b3d2; color: #245d89; }
+.invoice-admin-page--unofficial .invoice-tax-period__heading > a.is-active { border-color: #2d7bb7; background: #2d7bb7; color: #fff; }
+.invoice-admin-page--unofficial .invoice-tax-card { border-color: #bdd5e7; box-shadow: 0 5px 15px rgba(30,93,142,.06); }
+.invoice-admin-page--unofficial .invoice-tax-card header { background: #dceffc; }
+.invoice-admin-page--unofficial .invoice-tax-card.is-active { border-color: #2d7bb7; background: #f5fbff; box-shadow: 0 8px 23px rgba(30,93,142,.15); }
+.invoice-admin-page--unofficial .invoice-tax-card.is-active header { background: #72a8cf; color: #102f47; }
 
 @media (max-width: 900px) {
   .invoice-brand-cards,
@@ -657,6 +678,7 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
   .invoice-tax-period__heading { align-items: stretch; flex-direction: column; }
   .invoice-tax-period__heading > a { justify-content: center; }
   .invoice-tax-cards { grid-template-columns: 1fr; }
+  .invoice-tax-card--year dl { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .invoice-leave-dialog { padding: 23px 18px; border-radius: 16px; }
   .invoice-leave-dialog h2 { font-size: 22px; }
   .invoice-leave-dialog__actions { grid-template-columns: 1fr; }
@@ -698,6 +720,11 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
 .invoice-status-quick__menu button:hover:not(:disabled) { background: #d6e2ff; }
 .invoice-status-quick__menu button:disabled { background: #f2f3f5; color: #9198a4; cursor: default; }
 .invoice-editor--payment-readonly label:has(> input[name="paid_amount"]) { display: none; }
+.invoice-editor--payment-readonly:not(.invoice-editor--readonly) .invoice-accounting-fields { display: none; }
+.invoice-editor--readonly input:disabled,
+.invoice-editor--readonly select:disabled,
+.invoice-editor--readonly textarea:disabled { opacity: 1; color: #302a21; background: #f4f1eb; cursor: default; }
+.invoice-editor--readonly button:disabled { cursor: default; }
 .invoice-lock-notice { display: flex; align-items: center; gap: 13px; padding: 15px 17px; border: 1px solid #edc867; border-radius: 12px; background: #fff8e5; }
 .invoice-lock-notice > span { display: grid; place-items: center; width: 39px; height: 39px; border-radius: 50%; background: #f0cf73; }
 .invoice-lock-notice strong,

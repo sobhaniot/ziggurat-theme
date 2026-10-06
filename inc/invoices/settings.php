@@ -379,7 +379,7 @@ function zigurat_invoice_build_xlsx($args)
     }
 
     $rows = zigurat_invoice_export_rows($args);
-    $headers = array('نوع مجموعه', 'نوع سند', 'شماره', 'تاریخ', 'سال مالیاتی', 'فصل مالیاتی', 'وضعیت سند', 'وضعیت پرداخت', 'وضعیت مؤدیان', 'موضوع', 'خریدار', 'شناسه/ثبت', 'شماره اقتصادی', 'استان', 'شهر', 'تلفن', 'جمع اقلام', 'تخفیف', 'حمل', 'ضریب بالاسری/سود (%)', 'مبلغ بالاسری/سود', 'ضریب بیمه (%)', 'مبلغ بیمه', 'مالیات', 'جمع کل', 'پرداختی', 'مانده');
+    $headers = array('نوع مجموعه', 'نوع سند', 'شماره', 'تاریخ', 'شماره قرارداد', 'تاریخ قرارداد', 'سال مالیاتی', 'فصل مالیاتی', 'وضعیت سند', 'وضعیت پرداخت', 'وضعیت مؤدیان', 'موضوع', 'خریدار', 'شناسه/ثبت', 'شماره اقتصادی', 'استان', 'شهر', 'تلفن', 'جمع اقلام', 'تخفیف', 'حمل', 'ضریب بالاسری/سود (%)', 'مبلغ بالاسری/سود', 'ضریب بیمه (%)', 'مبلغ بیمه', 'مالیات', 'جمع کل', 'پرداختی', 'مانده');
     $sheet_rows = array($headers);
     foreach ($rows as $row) {
         $sheet_rows[] = array(
@@ -387,6 +387,8 @@ function zigurat_invoice_build_xlsx($args)
             zigurat_invoice_document_label($row->document_type),
             zigurat_invoice_object_number($row),
             $row->issue_date,
+            $row->contract_number ?? '',
+            $row->contract_date ?? '',
             !empty($row->tax_year) ? (int) $row->tax_year : '',
             !empty($row->tax_quarter) ? zigurat_invoice_tax_quarter_label($row->tax_quarter) : '',
             zigurat_invoice_status_label($row->status),
@@ -413,7 +415,7 @@ function zigurat_invoice_build_xlsx($args)
         );
     }
 
-    $numeric_columns = range(16, 26);
+    $numeric_columns = range(18, 28);
     $sheet_data = '';
     foreach ($sheet_rows as $row_index => $cells) {
         $excel_row = $row_index + 1;

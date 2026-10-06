@@ -36,7 +36,7 @@ function zigurat_invoice_trash_table_name()
 function zigurat_install_invoice_tables()
 {
     global $wpdb;
-    $version = '12';
+    $version = '13';
     $invoices = zigurat_invoices_table_name();
     $items = zigurat_invoice_items_table_name();
     $sequences = zigurat_invoice_sequences_table_name();
@@ -58,6 +58,8 @@ function zigurat_install_invoice_tables()
         parent_invoice_id bigint(20) unsigned NOT NULL DEFAULT 0,
         allow_branches tinyint(1) unsigned NOT NULL DEFAULT 0,
         issue_date varchar(10) NOT NULL,
+        contract_number varchar(100) NOT NULL DEFAULT '',
+        contract_date varchar(10) NOT NULL DEFAULT '',
         tax_year smallint(5) unsigned NOT NULL DEFAULT 0,
         tax_quarter tinyint(1) unsigned NOT NULL DEFAULT 0,
         status varchar(20) NOT NULL DEFAULT 'issued',
@@ -242,6 +244,8 @@ function zigurat_install_invoice_tables()
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'deduction_note'")
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'shipping_mode'")
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'shipping_rate'")
+        && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'contract_number'")
+        && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'contract_date'")
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'tax_status'")
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'copied_from_invoice_id'")) {
         update_option('zigurat_invoice_schema_version', $version, false);

@@ -940,6 +940,11 @@ function zigurat_invoice_save($data)
     if (!preg_match('/^\d{4}\/\d{2}\/\d{2}$/', $issue_date)) {
         return new WP_Error('invalid_date', 'تاریخ را به‌شکل ۱۴۰۵/۰۵/۱۲ وارد کنید.');
     }
+    $contract_number = sanitize_text_field(wp_unslash((string) ($data['contract_number'] ?? '')));
+    $contract_date = zigurat_invoice_normalize_digits($data['contract_date'] ?? '');
+    if ($contract_date !== '' && !preg_match('/^\d{4}\/\d{2}\/\d{2}$/', $contract_date)) {
+        return new WP_Error('invalid_contract_date', 'تاریخ قرارداد را به‌شکل ۱۴۰۵/۰۵/۱۲ وارد کنید.');
+    }
     $status = ($data['status'] ?? '') === 'draft' ? 'draft' : 'issued';
     $tax_period = zigurat_invoice_tax_period($brand, $type, $issue_date);
     $subtotal = array_sum(wp_list_pluck($items, 'line_total'));
@@ -1141,7 +1146,8 @@ function zigurat_invoice_save($data)
         'brand'=>$brand, 'document_type'=>$type, 'document_number'=>$document_number,
         'number_suffix'=>$number_suffix, 'parent_invoice_id'=>$parent_invoice_id,
         'allow_branches'=>$allow_branches,
-        'issue_date'=>$issue_date, 'tax_year'=>$tax_period['year'],
+        'issue_date'=>$issue_date, 'contract_number'=>$contract_number,
+        'contract_date'=>$contract_date, 'tax_year'=>$tax_period['year'],
         'tax_quarter'=>$tax_period['quarter'], 'status'=>$status,
         'subject'=>sanitize_text_field(wp_unslash((string) ($data['subject'] ?? ''))),
         'source_proforma_id'=>$source_proforma_id,

@@ -1067,9 +1067,42 @@
     handle.addEventListener('pointerup', finishSorting);
     handle.addEventListener('pointercancel', finishSorting);
   }
+  function inferInvoiceUnit(description) {
+    var text = normalize(description).toLowerCase().replace(/[\u200c\u200f]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!text) return '';
+    if (/(متر\s*مربع|مترمربع|m2|㎡)/i.test(text)) return 'مترمربع';
+    if (/(متر\s*طول|مترطول)/i.test(text)) return 'متر';
+    if (/کیلو/.test(text)) return 'کیلوگرم';
+    if (/(ورق|برگ)/.test(text)) return 'برگ';
+    if (/ساعت/.test(text)) return 'ساعت';
+    if (/روز/.test(text)) return 'روز';
+    if (/دستگاه/.test(text)) return 'دستگاه';
+    if (/سرویس/.test(text)) return 'سرویس';
+    if (/حلقه/.test(text)) return 'حلقه';
+    if (/بسته/.test(text)) return 'بسته';
+    if (/متر/.test(text)) return 'متر';
+    if (/(عدد|قطعه|حروف|لوگو|تابلو|ترانس)/.test(text)) return 'عدد';
+    return '';
+  }
   function bindRow(row) {
     row.querySelectorAll('[data-money]').forEach(bindMoneyInput);
     row.querySelectorAll('[data-quantity]').forEach(bindQuantityInput);
+    row.querySelectorAll('[name="item_quantity[]"],[name="item_unit_price[]"],[name="item_discount[]"]').forEach(function (input) {
+      input.setAttribute('autocomplete', 'off');
+    });
+    var descriptionInput = row.querySelector('[name="item_description[]"]');
+    var unitInput = row.querySelector('[name="item_unit[]"]');
+    if (descriptionInput && unitInput) {
+      unitInput.dataset.unitManual = unitInput.value && unitInput.value !== 'عدد' ? '1' : '0';
+      unitInput.addEventListener('input', function () { unitInput.dataset.unitManual = '1'; });
+      descriptionInput.addEventListener('input', function () {
+        if (unitInput.dataset.unitManual === '1') return;
+        var inferredUnit = inferInvoiceUnit(descriptionInput.value);
+        if (!inferredUnit) return;
+        unitInput.value = inferredUnit;
+        unitInput.dataset.unitAuto = '1';
+      });
+    }
     row.querySelectorAll('input,textarea').forEach(function (input) { input.addEventListener('input', calculate); });
     bindRowSorting(row);
     row.querySelector('[data-remove-item]').addEventListener('click', function () {
@@ -1093,6 +1126,9 @@
   body.querySelectorAll('tr').forEach(bindRow);
   updateRowNumbers();
   editor.querySelectorAll('[data-money]').forEach(bindMoneyInput);
+  editor.querySelectorAll('input[name="discount"],input[name="shipping_value"],input[name="overhead_rate"],input[name="insurance_rate"],input[name="tax_rate"],input[name="deduction_amount"],input[name="paid_amount"]').forEach(function (input) {
+    input.setAttribute('autocomplete', 'off');
+  });
   editor.querySelectorAll('input[name="discount"],input[name="overhead_rate"],input[name="insurance_rate"],input[name="tax_rate"],input[name="deduction_amount"],input[name="paid_amount"]').forEach(function (input) { input.addEventListener('input', calculate); });
   var shippingModeField = editor.querySelector('input[name="shipping_mode"]');
   var shippingModeToggle = editor.querySelector('[data-shipping-mode-toggle]');
@@ -1100,6 +1136,7 @@
   var shippingLabel = editor.querySelector('[data-shipping-label]');
   var shippingFixedValue = shippingValueField ? normalize(shippingValueField.dataset.fixedValue || '0').replace(/[^0-9]/g, '') : '0';
   var shippingPercentValue = shippingValueField ? normalizeQuantity(shippingValueField.dataset.percentValue || '0') : '0';
+  if (shippingValueField) shippingValueField.setAttribute('data-clear-on-focus', '');
   function applyShippingMode(mode, isSwitch) {
     if (!shippingModeField || !shippingValueField) return;
     var previousMode = shippingModeField.value === 'percent' ? 'percent' : 'fixed';

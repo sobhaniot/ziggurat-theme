@@ -8,7 +8,9 @@ if (!defined('ABSPATH') || empty($invoice)) {
 $brand_title = $invoice->brand === 'official' ? 'زیگورات' : 'فروشگاه دیاموند';
 $seller = (array) $invoice->seller;
 $logo_id = $invoice->brand === 'official' ? absint(get_theme_mod('custom_logo')) : 0;
-$logo_url = $logo_id ? wp_get_attachment_image_url($logo_id, 'medium') : '';
+$logo_url = $invoice->brand === 'unofficial'
+    ? get_template_directory_uri() . '/assets/images/diamond-cyberpunk.png'
+    : ($logo_id ? wp_get_attachment_image_url($logo_id, 'medium') : '');
 $stamp_id = !empty($seller['include_stamp']) ? absint($seller['stamp_id'] ?? 0) : 0;
 $stamp_url = $stamp_id ? wp_get_attachment_image_url($stamp_id, 'full') : '';
 $stamp_layout = function_exists('zigurat_invoice_stamp_layout')
@@ -67,11 +69,11 @@ $show_grand_total = $show_paid;
     <?php if ($stamp_url): ?><div class="invoice-first-page-stamp" style="<?php echo esc_attr($stamp_style); ?>" aria-hidden="true"><img src="<?php echo esc_url($stamp_url); ?>" alt="" loading="eager" decoding="sync"></div><?php endif; ?>
     <header class="invoice-document__header">
         <div class="invoice-brand">
-            <?php if ($logo_url): ?><img src="<?php echo esc_url($logo_url); ?>" alt="<?php echo esc_attr($brand_title); ?>"><?php endif; ?>
+            <?php if ($logo_url): ?><img class="<?php echo $invoice->brand === 'unofficial' ? 'invoice-brand__diamond-logo' : ''; ?>" src="<?php echo esc_url($logo_url); ?>" alt="<?php echo esc_attr($brand_title); ?>"><?php endif; ?>
             <strong><?php echo esc_html($brand_title); ?></strong>
         </div>
         <h1><?php echo esc_html(zigurat_invoice_document_label($invoice->document_type)); ?></h1>
-        <dl><div><dt>شماره سریال:</dt><dd><bdi class="invoice-number" dir="ltr"><?php echo esc_html(zigurat_invoice_object_number($invoice)); ?></bdi></dd></div><div><dt>تاریخ:</dt><dd><?php echo esc_html($invoice->issue_date); ?></dd></div></dl>
+        <dl><div><dt>شماره سریال:</dt><dd><bdi class="invoice-number" dir="ltr"><?php echo esc_html(zigurat_invoice_object_number($invoice)); ?></bdi></dd></div><div><dt>تاریخ:</dt><dd><?php echo esc_html($invoice->issue_date); ?></dd></div><?php if (!empty($invoice->contract_number)): ?><div><dt>شماره قرارداد:</dt><dd><bdi dir="ltr"><?php echo esc_html($invoice->contract_number); ?></bdi></dd></div><?php endif; ?><?php if (!empty($invoice->contract_date)): ?><div><dt>تاریخ قرارداد:</dt><dd><?php echo esc_html($invoice->contract_date); ?></dd></div><?php endif; ?></dl>
     </header>
     <?php if ($invoice->document_type === 'invoice' && ($invoice->tax_subject ?? 'original') === 'correction'): ?><div class="invoice-document-status"><span>اصلاحیه فاکتور شماره <?php $reference = zigurat_invoice_get($invoice->reference_invoice_id ?? 0); ?><bdi dir="ltr"><?php echo esc_html($reference ? zigurat_invoice_object_number($reference) : '—'); ?></bdi></span></div><?php endif; ?>
 

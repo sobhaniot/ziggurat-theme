@@ -138,9 +138,13 @@ function zigurat_application_seen_ids($user_id = 0)
 /** شناسه درخواست‌های جدید فقط برای مدیر جاری؛ خواندن یک مدیر روی دیگری اثر ندارد. */
 function zigurat_application_unread_ids($user_id = 0)
 {
+    static $request_cache = array();
     $user_id = $user_id ? absint($user_id) : get_current_user_id();
     if (!$user_id) {
         return array();
+    }
+    if (isset($request_cache[$user_id])) {
+        return $request_cache[$user_id];
     }
     $notifiable_ids = get_posts(array(
         'post_type' => 'partner_application',
@@ -153,13 +157,56 @@ function zigurat_application_unread_ids($user_id = 0)
         'meta_key' => '_application_notify_managers',
         'meta_value' => '1',
     ));
-    return array_values(array_diff(array_map('absint', $notifiable_ids), zigurat_application_seen_ids($user_id)));
+    $request_cache[$user_id] = array_values(array_diff(array_map('absint', $notifiable_ids), zigurat_application_seen_ids($user_id)));
+    return $request_cache[$user_id];
 }
 
 function zigurat_application_unread_count($user_id = 0)
 {
-    return count(zigurat_application_unread_ids($user_id));
+    static $request_counts = array();
+    global $wpdb;
+    $user_id = $user_id ? absint($user_id) : get_current_user_id();
+    if (!$user_id) {
+        return 0;
+    }
+    if (isset($request_counts[$user_id])) {
+        return $request_counts[$user_id];
+    }
+    $seen = zigurat_application_seen_ids($user_id);
+    $sql = "SELECT COUNT(DISTINCT p.ID)
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
+            WHERE p.post_type = 'partner_application' AND p.post_status = 'private'
+              AND pm.meta_key = '_application_notify_managers' AND pm.meta_value = '1'";
+    $values = array();
+    if ($seen) {
+        $sql .= ' AND p.ID NOT IN (' . implode(',', array_fill(0, count($seen), '%d')) . ')';
+        $values = $seen;
+    }
+    $request_counts[$user_id] = (int) ($values ? $wpdb->get_var($wpdb->prepare($sql, $values)) : $wpdb->get_var($sql));
+    return $request_counts[$user_id];
 }
+
+/** نقشه سنگین همکاران فقط با درخواست صریح مدیر ساخته می‌شود. */
+function zigurat_ajax_load_partner_map()
+{
+    check_ajax_referer('zigurat_partner_map', 'nonce');
+    if (!zigurat_is_manager()) {
+        wp_send_json_error(array('message' => 'دسترسی مجاز نیست.'), 403);
+    }
+    $application_ids = get_posts(array(
+        'post_type' => 'partner_application',
+        'post_status' => 'private',
+        'posts_per_page' => -1,
+        'fields' => 'ids',
+        'no_found_rows' => true,
+    ));
+    ob_start();
+    get_template_part('template-parts/manager-partner-map', null, array('application_ids' => $application_ids));
+    $html = ob_get_clean();
+    wp_send_json_success(array('html' => $html));
+}
+add_action('wp_ajax_zigurat_load_partner_map', 'zigurat_ajax_load_partner_map');
 
 function zigurat_application_is_unread($application_id, $user_id = 0)
 {

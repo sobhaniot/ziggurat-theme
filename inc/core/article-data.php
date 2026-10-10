@@ -73,6 +73,8 @@ function zigurat_record_article_view()
         '_article_views'
     ));
     clean_post_cache($post_id);
+    delete_transient('zigurat_live_views_total');
+    delete_transient('zigurat_live_views_payload');
     zigurat_record_daily_view('article');
 
     setcookie($cookie_name, '1', array(

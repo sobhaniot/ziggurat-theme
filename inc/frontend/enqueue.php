@@ -83,14 +83,23 @@ function zigurat_enqueue_assets()
     }
     if (is_page('login') || is_page_template('page-login.php')) {
         zigurat_enqueue_theme_style('manager');
-        zigurat_enqueue_theme_style('invoice');
         zigurat_enqueue_theme_script('manager-login');
-        zigurat_enqueue_theme_script('pricing-calculator');
-        zigurat_enqueue_theme_script('invoice-calculator');
-        zigurat_enqueue_theme_script('letter-calculator', array('zigurat-pricing-calculator'));
         $manager_section = isset($_GET['manager-section']) ? sanitize_key(wp_unslash($_GET['manager-section'])) : '';
+        if ($manager_section === 'pricing') {
+            zigurat_enqueue_theme_style('invoice');
+            zigurat_enqueue_theme_script('pricing-calculator');
+            zigurat_enqueue_theme_script('invoice-calculator');
+        }
+        if ($manager_section === 'letters') {
+            zigurat_enqueue_theme_script('pricing-calculator');
+            zigurat_enqueue_theme_script('letter-calculator', array('zigurat-pricing-calculator'));
+        }
         if ($manager_section === 'applications' && zigurat_is_manager()) {
             zigurat_enqueue_theme_script('manager-partner-map');
+            wp_localize_script('zigurat-manager-partner-map', 'ziguratPartnerMapConfig', array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('zigurat_partner_map'),
+            ));
         }
         if ($manager_section === 'application-detail' && zigurat_is_manager()) {
             zigurat_enqueue_theme_style('cooperation');
@@ -103,6 +112,14 @@ function zigurat_enqueue_assets()
             wp_localize_script('zigurat-letters', 'ziguratLettersConfig', array(
                 'ajaxUrl' => admin_url('admin-ajax.php'),
                 'stampLayoutNonce' => wp_create_nonce('zigurat_letter_stamp_layout'),
+            ));
+        }
+        if ($manager_section === 'projects' && zigurat_is_manager()) {
+            zigurat_enqueue_theme_style('manager-projects');
+            zigurat_enqueue_theme_script('manager-projects');
+            wp_localize_script('zigurat-manager-projects', 'ziguratWorkflowProjects', array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('zigurat_workflow_projects'),
             ));
         }
     }
@@ -175,14 +192,18 @@ function zigurat_enqueue_assets()
 
     if (function_exists('zigurat_should_show_live_views_counter') && zigurat_should_show_live_views_counter()) {
         zigurat_enqueue_theme_style('manager-live', array());
-        zigurat_enqueue_theme_script('manager-views');
+        $is_manager_views_page = (is_page('login') || is_page_template('page-login.php'))
+            && isset($_GET['manager-section'])
+            && sanitize_key(wp_unslash($_GET['manager-section'])) === 'views';
+        $views_script = $is_manager_views_page ? 'manager-views' : 'manager-live-counter';
+        zigurat_enqueue_theme_script($views_script);
         $views_websocket_url = defined('ZIGURAT_VIEWS_WEBSOCKET_URL')
             ? (string) ZIGURAT_VIEWS_WEBSOCKET_URL
             : (string) apply_filters('zigurat_views_websocket_url', '');
         if ($views_websocket_url !== '' && !preg_match('#^wss?://#i', $views_websocket_url)) {
             $views_websocket_url = '';
         }
-        wp_localize_script('zigurat-manager-views', 'ziguratManagerViewsConfig', array(
+        wp_localize_script('zigurat-' . $views_script, 'ziguratManagerViewsConfig', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('zigurat_live_views'),
             'pollInterval' => 30000,

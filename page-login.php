@@ -125,6 +125,8 @@ get_header();
                     get_template_part('template-parts/manager-pricing');
                 } elseif ($manager_section === 'letters') {
                     get_template_part('template-parts/manager-letters');
+                } elseif ($manager_section === 'projects') {
+                    get_template_part('template-parts/manager-projects');
                 } else {
                     get_template_part('page-main');
                 }

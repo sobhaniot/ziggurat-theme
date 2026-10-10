@@ -23,24 +23,23 @@ $current_list_url = add_query_arg(array_filter(array(
     'application_page'       => $application_page > 1 ? $application_page : null,
 )), zigurat_manager_login_url());
 
-$all_application_ids = get_posts(array(
-    'post_type'      => 'partner_application',
-    'post_status'    => 'private',
-    'posts_per_page' => -1,
-    'fields'         => 'ids',
-));
-$provinces = array();
-$professions = array();
-foreach ($all_application_ids as $application_id) {
-    $province = trim((string) get_post_meta($application_id, '_application_province', true));
-    $profession = trim((string) get_post_meta($application_id, '_application_profession', true));
-    if ($province !== '') {
-        $provinces[$province] = $province;
-    }
-    if ($profession !== '') {
-        $professions[$profession] = $profession;
-    }
-}
+$all_application_ids = array();
+global $wpdb;
+$application_filter_values = static function ($meta_key) use ($wpdb) {
+    return $wpdb->get_col($wpdb->prepare(
+        "SELECT DISTINCT pm.meta_value
+         FROM {$wpdb->postmeta} pm
+         INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+         WHERE p.post_type = 'partner_application' AND p.post_status = 'private'
+           AND pm.meta_key = %s AND pm.meta_value <> ''
+         ORDER BY pm.meta_value ASC",
+        $meta_key
+    ));
+};
+$province_values = $application_filter_values('_application_province');
+$profession_values = $application_filter_values('_application_profession');
+$provinces = $province_values ? array_combine($province_values, $province_values) : array();
+$professions = $profession_values ? array_combine($profession_values, $profession_values) : array();
 natcasesort($provinces);
 natcasesort($professions);
 
@@ -98,7 +97,11 @@ $unread_application_ids = function_exists('zigurat_application_unread_ids')
         <div class="manager-applications__notice is-error" role="alert">آخرین اعلان ایمیلی درخواست همکاری ارسال نشد. تنظیمات ایمیل را آزمایش کنید.</div>
     <?php endif; ?>
 
-    <?php get_template_part('template-parts/manager-partner-map', null, array('application_ids' => $all_application_ids)); ?>
+    <section class="manager-partner-map-loader no-print" data-partner-map-loader>
+        <div><strong>نقشه همکاران</strong><span>اطلاعات نقشه فقط هنگام درخواست شما بارگذاری می‌شود.</span></div>
+        <button type="button" data-partner-map-load>نمایش نقشه</button>
+        <p data-partner-map-load-status hidden></p>
+    </section>
 
     <form class="manager-application-filters no-print" method="get" action="<?php echo esc_url(home_url('/login/')); ?>">
         <input type="hidden" name="manager-section" value="applications">

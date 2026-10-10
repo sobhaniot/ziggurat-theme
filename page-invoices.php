@@ -124,6 +124,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_invoice'])) {
         } else {
             $saved_view = zigurat_invoice_is_locked($saved) ? 'list' : 'form';
             $saved_args = array('brand'=>$saved->brand,'view'=>$saved_view,'invoice-status'=>zigurat_invoice_is_locked($saved) ? 'saved-locked' : 'saved');
+            // Notify already-open project and invoice-list tabs about every saved
+            // document. This also covers newly-created proformas and payment changes.
+            $saved_args['workflow_event'] = 'invoice-saved';
+            $saved_args['workflow_invoice_id'] = (int) $saved->id;
+            $saved_args['workflow_source_proforma_id'] = absint($saved->source_proforma_id ?? 0);
+            $saved_args['workflow_payment_status'] = sanitize_key((string) ($saved->payment_status ?? ''));
+            $saved_args['workflow_document_type'] = sanitize_key((string) $saved->document_type);
+            $saved_args['workflow_invoice_url'] = $saved->document_type === 'invoice'
+                ? zigurat_invoice_page_url(array('brand'=>$saved->brand,'view'=>'form','type'=>'invoice','edit'=>$saved->id))
+                : '';
             if ($saved_view === 'form') {
                 $saved_args['type'] = $saved->document_type;
                 $saved_args['edit'] = $saved->id;
@@ -274,6 +284,25 @@ if ($brand && $view === '') { $view = 'list'; }
 
 get_header();
 ?>
+<?php if (isset($_GET['workflow_event'], $_GET['workflow_invoice_id'])
+    && sanitize_key(wp_unslash($_GET['workflow_event'])) === 'invoice-saved'
+    && ($workflow_invoice_id = absint($_GET['workflow_invoice_id'])) > 0): ?>
+<script>
+(function () {
+  try {
+    window.localStorage.setItem('zigurat_workflow_event', JSON.stringify({
+      type: 'invoice-saved',
+      invoiceId: <?php echo (int) $workflow_invoice_id; ?>,
+      sourceProformaId: <?php echo absint($_GET['workflow_source_proforma_id'] ?? 0); ?>,
+      paymentStatus: <?php echo wp_json_encode(sanitize_key(wp_unslash($_GET['workflow_payment_status'] ?? ''))); ?>,
+      documentType: <?php echo wp_json_encode(sanitize_key(wp_unslash($_GET['workflow_document_type'] ?? ''))); ?>,
+      invoiceUrl: <?php echo wp_json_encode(esc_url_raw(wp_unslash($_GET['workflow_invoice_url'] ?? ''))); ?>,
+      at: Date.now()
+    }));
+  } catch (error) {}
+}());
+</script>
+<?php endif; ?>
 <main class="invoice-admin-page <?php echo $brand === 'unofficial' ? 'invoice-admin-page--unofficial' : ''; ?>"><div class="container">
     <div class="invoice-admin-top no-print"><a href="<?php echo esc_url(zigurat_manager_login_url()); ?>">بازگشت به پنل مدیران</a><?php if ($brand || $view === 'settings'): ?><a href="<?php echo esc_url(zigurat_invoice_page_url()); ?>">انتخاب نوع فاکتور</a><?php endif; ?><?php if (current_user_can('manage_options')): ?><a class="<?php echo $view === 'settings' ? 'is-active' : ''; ?>" href="<?php echo esc_url(zigurat_invoice_page_url(array('view'=>'settings'))); ?>">تنظیمات اولیه فاکتورها</a><?php endif; ?></div>
 
@@ -542,7 +571,7 @@ get_header();
                                 <td><?php echo esc_html($row->customer_name); ?></td>
                                 <td><?php echo esc_html($row->subject ?: '—'); ?></td>
                                 <td><?php echo esc_html(zigurat_invoice_format_money($row->grand_total)); ?></td>
-                                <td><?php if ($row->document_type === 'invoice'): ?><?php $payment_state = in_array(($row->payment_status ?? ''), array('unpaid','partial','settled'), true) ? $row->payment_status : 'unpaid'; ?><span class="invoice-payment-summary"><?php if ($payment_state === 'settled'): ?><span class="invoice-payment-badge invoice-payment-badge--settled" title="وضعیت خودکار بر اساس مبلغ خالص و پرداختی">تسویه کامل</span><?php endif; ?><span class="invoice-payment-summary__amount">پرداختی: <?php echo esc_html(zigurat_invoice_format_money((int) ($row->paid_amount ?? 0))); ?> ریال</span><?php if ($payment_state !== 'settled' && (int) ($row->balance ?? 0) > 0): ?><span class="invoice-payment-summary__balance">مانده: <?php echo esc_html(zigurat_invoice_format_money((int) $row->balance)); ?> ریال</span><?php endif; ?></span><?php else: ?>—<?php endif; ?></td>
+                                <td><?php if ($row->document_type === 'invoice'): ?><?php $payment_state = in_array(($row->payment_status ?? ''), array('unpaid','partial','settled'), true) ? $row->payment_status : 'unpaid'; ?><span class="invoice-payment-summary"><?php if ($payment_state === 'settled'): ?><span class="invoice-payment-badge invoice-payment-badge--settled" title="وضعیت خودکار بر اساس مبلغ خالص و پرداختی">تسویه کامل</span><?php endif; ?><span class="invoice-payment-summary__amount">پرداختی: <?php echo esc_html(zigurat_invoice_format_money((int) ($row->paid_amount ?? 0))); ?></span><?php if ($payment_state !== 'settled' && (int) ($row->balance ?? 0) > 0): ?><span class="invoice-payment-summary__balance">مانده: <?php echo esc_html(zigurat_invoice_format_money((int) $row->balance)); ?></span><?php endif; ?></span><?php else: ?>—<?php endif; ?></td>
                                 <?php if ($brand === 'official'): ?><td><?php if ($row->document_type === 'invoice' && $row->status === 'issued' && !in_array(($row->tax_status ?? 'not_submitted'), array('confirmed','corrected','voided'), true)): ?><?php $tax_state = ($row->tax_status ?? '') === 'submitted' ? 'submitted' : 'not_submitted'; ?><div class="invoice-status-quick" data-status-quick data-status-kind="tax" data-current-status="<?php echo esc_attr($tax_state); ?>" data-invoice-number="<?php echo esc_attr(zigurat_invoice_object_number($row)); ?>"><button type="button" class="invoice-tax-badge invoice-tax-badge--<?php echo esc_attr($tax_state); ?>" data-status-menu-toggle aria-expanded="false"><?php echo esc_html($tax_state === 'submitted' ? 'ثبت‌شده' : 'ثبت‌نشده'); ?></button><div class="invoice-status-quick__menu" data-status-menu hidden><button type="button" data-status-option="not_submitted" <?php disabled($tax_state,'not_submitted'); ?>>ثبت‌نشده</button><button type="button" data-status-option="submitted" <?php disabled($tax_state,'submitted'); ?>>ثبت‌شده</button></div><form method="post" data-status-quick-form><input type="hidden" name="set_invoice_tax_status" value="1"><input type="hidden" name="invoice_id" value="<?php echo (int) $row->id; ?>"><input type="hidden" name="tax_status_target" value=""><input type="hidden" name="confirm_tax_submission" value="0"><input type="hidden" name="invoice_return_url" value="<?php echo esc_url($list_return_url); ?>"><?php wp_nonce_field('zigurat_invoice_tax_quick_' . $row->id, 'invoice_tax_quick_nonce'); ?></form></div><?php elseif ($row->document_type === 'invoice'): ?><span class="invoice-tax-badge invoice-tax-badge--<?php echo esc_attr($row->tax_status ?? 'not_submitted'); ?>"><?php echo esc_html(zigurat_invoice_tax_status_label($row->tax_status ?? 'not_submitted')); ?></span><?php else: ?>—<?php endif; ?></td><?php endif; ?>
                                 <td>
                                     <a href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$row->brand,'view'=>'form','type'=>$row->document_type,'edit'=>$row->id))); ?>"><?php echo zigurat_invoice_is_locked($row) ? 'مشاهده' : 'اصلاح'; ?></a>

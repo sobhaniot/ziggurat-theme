@@ -5,8 +5,10 @@
     return Number(value || 0).toLocaleString('fa-IR');
   };
 
-  document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('[data-partner-map]').forEach(function (map) {
+  function initMaps(root) {
+    (root || document).querySelectorAll('[data-partner-map]').forEach(function (map) {
+      if (map.dataset.partnerMapReady === '1') return;
+      map.dataset.partnerMapReady = '1';
       var dataElement = map.querySelector('[data-partner-map-data]');
       var results = map.querySelector('[data-partner-map-results]');
       var title = map.querySelector('[data-partner-map-title]');
@@ -127,5 +129,48 @@
         });
       });
     });
+  }
+
+  function setupLoader() {
+    var loader = document.querySelector('[data-partner-map-loader]');
+    var button = loader && loader.querySelector('[data-partner-map-load]');
+    var status = loader && loader.querySelector('[data-partner-map-load-status]');
+    var config = window.ziguratPartnerMapConfig || {};
+    if (!loader || !button || !config.ajaxUrl || !config.nonce) return;
+    button.addEventListener('click', function () {
+      button.disabled = true;
+      button.textContent = 'در حال بارگذاری…';
+      if (status) status.hidden = true;
+      var body = new URLSearchParams();
+      body.set('action', 'zigurat_load_partner_map');
+      body.set('nonce', config.nonce);
+      window.fetch(config.ajaxUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+        body: body.toString()
+      }).then(function (response) {
+        return response.json().then(function (data) {
+          if (!response.ok || !data || !data.success) throw new Error(data && data.data && data.data.message ? data.data.message : 'بارگذاری نقشه انجام نشد.');
+          return data.data;
+        });
+      }).then(function (data) {
+        var shell = document.createElement('div');
+        shell.innerHTML = data.html || '';
+        var map = shell.querySelector('[data-partner-map]');
+        if (!map) throw new Error('اطلاعات نقشه معتبر نیست.');
+        loader.replaceWith(map);
+        initMaps(map.parentNode || document);
+      }).catch(function (error) {
+        button.disabled = false;
+        button.textContent = 'تلاش دوباره';
+        if (status) { status.textContent = error.message; status.hidden = false; }
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    initMaps(document);
+    setupLoader();
   });
 }());

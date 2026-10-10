@@ -30,6 +30,21 @@ function zigurat_site_intro_boot_script()
     (function(){
       try {
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+        var storageKey = 'zigurat_site_intro_seen_v1';
+        var introSeen = false;
+
+        try {
+          introSeen = window.sessionStorage.getItem(storageKey) === '1';
+        } catch (storageError) {}
+
+        if (introSeen) return;
+
+        /* در هر جلسه مرورگر، انیمیشن فقط در اولین ورود به صفحه اصلی اجرا می‌شود. */
+        try {
+          window.sessionStorage.setItem(storageKey, '1');
+        } catch (storageError) {}
+
         document.documentElement.classList.add('zigurat-intro-pending');
         /* فقط زمانی اجرا می‌شود که فایل اصلی انیمیشن اصلاً بارگذاری نشود. */
         window.ziguratIntroFailsafe = window.setTimeout(function(){

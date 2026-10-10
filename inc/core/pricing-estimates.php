@@ -420,7 +420,7 @@ function zigurat_sanitize_composite_estimate_snapshot($snapshot)
             if (!is_array($placement)) continue;
             $type = in_array(($placement['type'] ?? ''), array('face','drip','bottom','side'), true) ? $placement['type'] : '';
             if ($type === '') continue;
-            $placements[] = array(
+            $clean_placement = array(
                 'type'=>$type,
                 'label'=>sanitize_text_field((string) ($placement['label'] ?? '')),
                 'x'=>zigurat_pricing_estimate_number($placement['x'] ?? 0, 3200),
@@ -428,6 +428,10 @@ function zigurat_sanitize_composite_estimate_snapshot($snapshot)
                 'width'=>zigurat_pricing_estimate_number($placement['width'] ?? 0, 3200),
                 'height'=>zigurat_pricing_estimate_number($placement['height'] ?? 0, 1250),
             );
+            if (array_key_exists('rotated', $placement)) {
+                $clean_placement['rotated'] = !empty($placement['rotated']);
+            }
+            $placements[] = $clean_placement;
         }
         $clean['sheets'][] = array('placements'=>$placements);
     }

@@ -193,6 +193,11 @@ function zigurat_invoice_sync_update_invoice(WP_REST_Request $request)
         );
     }
 
+    $updated_invoice = zigurat_invoice_get($invoice_id);
+    if ($updated_invoice) {
+        do_action('zigurat_invoice_saved', $updated_invoice, $invoice);
+    }
+
     return rest_ensure_response(array(
         'updated' => true,
         'id' => $invoice_id,

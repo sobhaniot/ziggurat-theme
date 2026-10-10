@@ -274,6 +274,7 @@
       var body = new URLSearchParams();
       body.set('action', 'zigurat_get_live_views');
       body.set('nonce', config.nonce || '');
+      body.set('scope', statsRoot ? 'full' : 'counter');
       try {
         var response = await fetch(config.ajaxUrl || '/wp-admin/admin-ajax.php', {
           method: 'POST',

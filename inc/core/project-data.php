@@ -255,6 +255,8 @@ function zigurat_record_project_view()
         '_project_views'
     ));
     clean_post_cache($post_id);
+    delete_transient('zigurat_live_views_total');
+    delete_transient('zigurat_live_views_payload');
     zigurat_record_daily_view('project');
 
     setcookie($cookie_name, '1', array(

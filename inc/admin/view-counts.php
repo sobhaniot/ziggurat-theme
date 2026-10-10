@@ -68,6 +68,28 @@ function zigurat_get_total_post_type_views($post_type, $meta_key)
     ));
 }
 
+/** عدد سبک شمارنده گوشه پنل؛ بدون شمارش محتوا، نمودار و فهرست برترین‌ها. */
+function zigurat_get_live_views_total()
+{
+    $cached = get_transient('zigurat_live_views_total');
+    if ($cached !== false) {
+        return max(0, (int) $cached);
+    }
+    global $wpdb;
+    $total = (int) $wpdb->get_var(
+        "SELECT COALESCE(SUM(CAST(pm.meta_value AS UNSIGNED)), 0)
+         FROM {$wpdb->postmeta} pm
+         INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+         WHERE p.post_status = 'publish' AND (
+            (p.post_type = 'article' AND pm.meta_key = '_article_views') OR
+            (p.post_type = 'project' AND pm.meta_key = '_project_views') OR
+            (p.post_type = 'zig_download' AND pm.meta_key = '_zig_download_count')
+         )"
+    );
+    set_transient('zigurat_live_views_total', $total, 15);
+    return max(0, (int) $total);
+}
+
 /** داده‌های تجمعی بازدید برای پنل اختصاصی مدیران. */
 function zigurat_get_manager_views_statistics($limit = 10)
 {
@@ -117,6 +139,10 @@ function zigurat_get_manager_views_statistics($limit = 10)
 /** داده سبک و قابل استفاده برای به‌روزرسانی زنده صفحه آمار مدیران. */
 function zigurat_get_live_views_payload()
 {
+    $cached = get_transient('zigurat_live_views_payload');
+    if (is_array($cached)) {
+        return $cached;
+    }
     $statistics = zigurat_get_manager_views_statistics(10);
     $top_content = array();
     foreach ($statistics['top_content'] as $content_item) {
@@ -129,7 +155,7 @@ function zigurat_get_live_views_payload()
         );
     }
 
-    return array(
+    $payload = array(
         'article_views' => (int) $statistics['article_views'],
         'project_views' => (int) $statistics['project_views'],
         'download_views' => (int) $statistics['download_views'],
@@ -144,6 +170,8 @@ function zigurat_get_live_views_payload()
         'top_content' => $top_content,
         'updated_at' => current_time('c'),
     );
+    set_transient('zigurat_live_views_payload', $payload, 15);
+    return $payload;
 }
 
 function zigurat_ajax_get_live_views()
@@ -154,6 +182,13 @@ function zigurat_ajax_get_live_views()
 
     check_ajax_referer('zigurat_live_views', 'nonce');
     nocache_headers();
+    $scope = isset($_POST['scope']) ? sanitize_key(wp_unslash($_POST['scope'])) : 'counter';
+    if ($scope !== 'full') {
+        wp_send_json_success(array(
+            'total_views' => zigurat_get_live_views_total(),
+            'updated_at' => current_time('c'),
+        ));
+    }
     wp_send_json_success(zigurat_get_live_views_payload());
 }
 add_action('wp_ajax_zigurat_get_live_views', 'zigurat_ajax_get_live_views');
@@ -178,8 +213,7 @@ function zigurat_render_live_views_counter()
     if (!zigurat_should_show_live_views_counter()) {
         return;
     }
-    $statistics = zigurat_get_manager_views_statistics(1);
-    $total_views = max(0, (int) $statistics['total_views']);
+    $total_views = zigurat_get_live_views_total();
     ?>
     <aside class="manager-live-counter no-print" data-live-counter data-initial-total="<?php echo esc_attr($total_views); ?>" aria-live="polite">
         <span><i aria-hidden="true"></i> بازدید زنده</span>

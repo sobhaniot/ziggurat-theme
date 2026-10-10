@@ -1214,7 +1214,16 @@ function zigurat_invoice_save($data)
         }
     }
     $wpdb->query('COMMIT');
-    return zigurat_invoice_get($invoice_id);
+    $saved_invoice = zigurat_invoice_get($invoice_id);
+    if ($saved_invoice) {
+        /**
+         * Runs only after the invoice and all of its rows have been committed.
+         * Consumers can safely synchronize related records without creating
+         * half-saved projects when an invoice validation or insert fails.
+         */
+        do_action('zigurat_invoice_saved', $saved_invoice, $existing);
+    }
+    return $saved_invoice;
 }
 
 function zigurat_invoice_list($args = array())

@@ -549,7 +549,7 @@
         var card = document.createElement('article');
         card.className = 'manager-composite-sheet';
         var title = document.createElement('strong');
-        title.textContent = 'ورق ' + localizeDigits(index + 1);
+        title.textContent = 'ورق ' + localizeDigits(index + 1) + ' — طول ۳۲۰ × عرض ۱۲۵ سانتی‌متر';
         var board = document.createElement('div');
         board.className = 'manager-composite-sheet__board';
         sheet.placements.forEach(function (placement) {
@@ -559,13 +559,24 @@
           part.style.top = (placement.y / SHEET_HEIGHT * 100) + '%';
           part.style.width = (placement.width / SHEET_WIDTH * 100) + '%';
           part.style.height = (placement.height / SHEET_HEIGHT * 100) + '%';
-          part.title = placement.piece.label + ' — ' + formatCentimeters(placement.width) + '×' + formatCentimeters(placement.height) + ' سانتی‌متر';
+          part.title = placement.piece.label + ' — طول افقی ' + formatCentimeters(placement.width) + ' × عرض عمودی ' + formatCentimeters(placement.height) + ' سانتی‌متر';
           var label = document.createElement('b');
           label.textContent = placement.piece.label;
           var size = document.createElement('small');
-          size.textContent = formatCentimeters(placement.width) + '×' + formatCentimeters(placement.height) + ' سانتی‌متر';
+          size.textContent = 'طول ' + formatCentimeters(placement.width) + ' × عرض ' + formatCentimeters(placement.height) + ' سانتی‌متر';
+          var orientation = document.createElement('i');
+          orientation.className = 'manager-composite-piece__orientation' + (placement.rotated ? ' is-rotated' : '');
+          orientation.title = 'جهت بالای قطعه هنگام نصب روی تابلو';
+          var orientationLabel = document.createElement('span');
+          orientationLabel.textContent = 'بالای تابلو';
+          var orientationArrow = document.createElement('span');
+          orientationArrow.className = 'manager-composite-piece__arrow';
+          orientationArrow.textContent = '───➤';
+          orientation.appendChild(orientationLabel);
+          orientation.appendChild(orientationArrow);
           part.appendChild(label);
           part.appendChild(size);
+          part.appendChild(orientation);
           board.appendChild(part);
         });
         card.appendChild(title);
@@ -763,7 +774,7 @@
         }),
         sheets: sheets.map(function (sheet) {
           return {placements:sheet.placements.map(function (placement) {
-            return {type:placement.piece.type,label:placement.piece.label,x:placement.x,y:placement.y,width:placement.width,height:placement.height};
+            return {type:placement.piece.type,label:placement.piece.label,x:placement.x,y:placement.y,width:placement.width,height:placement.height,rotated:!!placement.rotated};
           })};
         }),
         results: {
@@ -942,14 +953,22 @@
       });
     }
 
-    function compositeLayoutPrintHtml(sheets) {
+    function compositeLayoutPrintHtml(sheets, parts) {
       if (!Array.isArray(sheets) || !sheets.length) return '';
-      return '<section class="layout-section"><h2>چیدمان ورق‌های کامپوزیت</h2><div class="layouts">' + sheets.map(function (sheet, index) {
+      var partsByLabel = {};
+      (Array.isArray(parts) ? parts : []).forEach(function (part) {
+        partsByLabel[String(part.label || '')] = part;
+      });
+      return '<section class="layout-section"><h2>چیدمان ورق‌های کامپوزیت</h2><p class="layout-dimensions-help">در ابعاد قطعات، عدد اول طول افقی و عدد دوم عرض عمودی است.</p><div class="layouts">' + sheets.map(function (sheet, index) {
         var pieces = (sheet.placements || []).map(function (placement) {
           var style = 'left:' + (Number(placement.x || 0) / SHEET_WIDTH * 100) + '%;top:' + (Number(placement.y || 0) / SHEET_HEIGHT * 100) + '%;width:' + (Number(placement.width || 0) / SHEET_WIDTH * 100) + '%;height:' + (Number(placement.height || 0) / SHEET_HEIGHT * 100) + '%';
-          return '<span class="piece is-' + escapeCompositeHtml(placement.type) + '" style="' + style + '"><b>' + escapeCompositeHtml(placement.label) + '</b><small>' + escapeCompositeHtml(formatCentimeters(Number(placement.width || 0)) + '×' + formatCentimeters(Number(placement.height || 0)) + ' سانتی‌متر') + '</small></span>';
+          var sourcePart = partsByLabel[String(placement.label || '')];
+          var isRotated = typeof placement.rotated === 'boolean'
+            ? placement.rotated
+            : !!(sourcePart && Math.abs(Number(placement.width || 0) - Number(sourcePart.height || 0)) < 1 && Math.abs(Number(placement.height || 0) - Number(sourcePart.width || 0)) < 1);
+          return '<span class="piece is-' + escapeCompositeHtml(placement.type) + '" style="' + style + '"><b>' + escapeCompositeHtml(placement.label) + '</b><small>' + escapeCompositeHtml('طول ' + formatCentimeters(Number(placement.width || 0)) + ' × عرض ' + formatCentimeters(Number(placement.height || 0)) + ' سانتی‌متر') + '</small><i class="piece-orientation' + (isRotated ? ' is-rotated' : '') + '"><span>بالای تابلو</span><span class="piece-arrow">───➤</span></i></span>';
         }).join('');
-        return '<figure><figcaption>ورق ' + Number(index + 1).toLocaleString('fa-IR') + '</figcaption><div class="sheet">' + pieces + '</div></figure>';
+        return '<figure><figcaption>ورق ' + Number(index + 1).toLocaleString('fa-IR') + ' — طول ۳۲۰ × عرض ۱۲۵ سانتی‌متر</figcaption><div class="sheet">' + pieces + '</div></figure>';
       }).join('') + '</div></section>';
     }
 
@@ -1016,10 +1035,10 @@
         : '';
       var reportTitle = includePrices ? 'برآورد قیمت تابلو کامپوزیت' : 'گزارش مصرف کامپوزیت';
       return '<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>' + reportTitle + ' - ' + safeTitle + '</title><style>'
-        + '@page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0}body{padding:12mm;font-family:Tahoma,Arial,sans-serif;color:#171717;direction:rtl}header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #b78a2d;padding-bottom:10px;margin-bottom:15px}h1{font-size:22px;margin:0}h2{font-size:14px;margin:0 0 8px}header span{color:#6b5a32}.meta{display:grid;grid-template-columns:repeat(2,1fr);border:1px solid #bbb;margin-bottom:14px}.meta div{padding:7px 9px;border-bottom:1px solid #ddd}.meta div:nth-child(odd){border-left:1px solid #ddd}.consumption{margin:10px 0 14px;padding:10px;border:1px solid #b9c8d2;background:#f5f9fb;break-inside:avoid}.consumption>div{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.consumption span{display:flex;flex-direction:column;padding:8px;border:1px solid #d5e0e6;background:#fff}.consumption b{font-size:14px}.consumption small{margin-top:3px;color:#526873;font-size:9px}.overview-section{margin:12px 0;padding:9px;border:1px solid #b9c8d2;background:#f7fafb;break-inside:avoid}.overview-section img{display:block;width:100%;height:auto;max-height:175mm;object-fit:contain}.customer-note{margin-top:12px;padding:10px;border:1px solid #b9c8d2;background:#f5f9fb;color:#405966;font-size:10px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #999;padding:6px 8px;text-align:right}th{background:#eee}td:last-child{text-align:left}.zero-rate td{background:#fff0ee;color:#a51f1a;font-weight:bold}.layout-section{margin:12px 0;padding:9px;border:1px solid #cfc7b7;background:#faf8f2}.layouts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.layouts figure{margin:0;break-inside:avoid}.layouts figcaption{font-size:9px;font-weight:bold;margin-bottom:3px}.sheet{position:relative;width:100%;aspect-ratio:3200/1250;border:1px solid #b78a2d;background:#fff;overflow:hidden}.piece{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;border:1px solid #476f8d;background:#e6f2f9;color:#24455b;font-size:7px}.piece small{font-size:6px}.piece.is-face{background:#dff2e5;border-color:#3d8151}.piece.is-drip{background:#fff0c9;border-color:#a97814}.piece.is-bottom{background:#e2ecfb;border-color:#4774ad}.piece.is-side{background:#f0e5f7;border-color:#815795}.final{display:flex;justify-content:space-between;margin-top:12px;padding:12px 14px;background:#222;color:#fff;font-size:18px;font-weight:bold}.final strong{display:grid;text-align:left}.final small{font-size:10px;color:#e8d8a7;margin-top:4px}.note{font-size:9px;color:#666;margin-top:9px}@media print{body{padding:12mm}}</style></head><body>'
+        + '@page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0}body{padding:12mm;font-family:Tahoma,Arial,sans-serif;color:#171717;direction:rtl}header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #b78a2d;padding-bottom:10px;margin-bottom:15px}h1{font-size:22px;margin:0}h2{font-size:14px;margin:0 0 8px}header span{color:#6b5a32}.meta{display:grid;grid-template-columns:repeat(2,1fr);border:1px solid #bbb;margin-bottom:14px}.meta div{padding:7px 9px;border-bottom:1px solid #ddd}.meta div:nth-child(odd){border-left:1px solid #ddd}.consumption{margin:10px 0 14px;padding:10px;border:1px solid #b9c8d2;background:#f5f9fb;break-inside:avoid}.consumption>div{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.consumption span{display:flex;flex-direction:column;padding:8px;border:1px solid #d5e0e6;background:#fff}.consumption b{font-size:14px}.consumption small{margin-top:3px;color:#526873;font-size:9px}.overview-section{margin:12px 0;padding:9px;border:1px solid #b9c8d2;background:#f7fafb;break-inside:avoid}.overview-section img{display:block;width:100%;height:auto;max-height:175mm;object-fit:contain}.customer-note{margin-top:12px;padding:10px;border:1px solid #b9c8d2;background:#f5f9fb;color:#405966;font-size:10px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #999;padding:6px 8px;text-align:right}th{background:#eee}td:last-child{text-align:left}.zero-rate td{background:#fff0ee;color:#a51f1a;font-weight:bold}.layout-section{margin:12px 0;padding:9px;border:1px solid #cfc7b7;background:#faf8f2}.layout-dimensions-help{margin:-3px 0 7px;color:#695f4c;font-size:8px}.layouts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.layouts figure{margin:0;break-inside:avoid}.layouts figcaption{font-size:9px;font-weight:bold;margin-bottom:3px}.sheet{position:relative;width:100%;aspect-ratio:3200/1250;border:1px solid #b78a2d;background:#fff;overflow:hidden}.piece{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;border:1px solid #476f8d;background:#e6f2f9;color:#24455b;font-size:7px}.piece small{font-size:6px}.piece-orientation{display:flex;align-items:center;justify-content:center;gap:2px;margin-top:2px;font-size:5.5px;font-style:normal;font-weight:bold;line-height:1;white-space:nowrap}.piece-arrow{display:inline-block;transform:rotate(-90deg)}.piece-orientation.is-rotated .piece-arrow{transform:none}.piece.is-face{background:#dff2e5;border-color:#3d8151}.piece.is-drip{background:#fff0c9;border-color:#a97814}.piece.is-bottom{background:#e2ecfb;border-color:#4774ad}.piece.is-side{background:#f0e5f7;border-color:#815795}.final{display:flex;justify-content:space-between;margin-top:12px;padding:12px 14px;background:#222;color:#fff;font-size:18px;font-weight:bold}.final strong{display:grid;text-align:left}.final small{font-size:10px;color:#e8d8a7;margin-top:4px}.note{font-size:9px;color:#666;margin-top:9px}@media print{body{padding:12mm}}</style></head><body>'
         + '<header><h1>' + reportTitle + '</h1><span>زیگورات</span></header>'
         + '<section class="meta"><div><b>نام پروژه:</b> ' + safeTitle + '</div><div><b>ابعاد نما:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.length || 0)) + ' × ' + formatMeasure(Number(inputs.width || 0)) + ' سانتی‌متر') + '</div><div><b>آبچکان / زیر / بغل:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.drip_depth || 0)) + ' / ' + formatMeasure(Number(inputs.bottom_depth || 0)) + ' / ' + formatMeasure(Number(inputs.side_depth || 0)) + ' سانتی‌متر') + '</div><div><b>خم نما؛ چپ / راست / بالا / پایین:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.fold_left !== undefined ? inputs.fold_left : (Number(inputs.install_allowance || 8) / 2))) + ' / ' + formatMeasure(Number(inputs.fold_right !== undefined ? inputs.fold_right : (Number(inputs.install_allowance || 8) / 2))) + ' / ' + formatMeasure(Number(inputs.fold_top !== undefined ? inputs.fold_top : (Number(inputs.install_allowance || 8) / 2))) + ' / ' + formatMeasure(Number(inputs.fold_bottom !== undefined ? inputs.fold_bottom : (Number(inputs.install_allowance || 8) / 2))) + ' سانتی‌متر') + '</div><div><b>خم ابتدا / انتهای آبچکان:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.drip_start_fold !== undefined ? inputs.drip_start_fold : 15)) + ' / ' + formatMeasure(Number(inputs.drip_end_fold !== undefined ? inputs.drip_end_fold : 15)) + ' سانتی‌متر') + '</div><div><b>خم زیر تابلو؛ چپ / راست / بالا / پایین:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.bottom_fold_left !== undefined ? inputs.bottom_fold_left : 4)) + ' / ' + formatMeasure(Number(inputs.bottom_fold_right !== undefined ? inputs.bottom_fold_right : 4)) + ' / ' + formatMeasure(Number(inputs.bottom_fold_top !== undefined ? inputs.bottom_fold_top : 4)) + ' / ' + formatMeasure(Number(inputs.bottom_fold_bottom !== undefined ? inputs.bottom_fold_bottom : 4)) + ' سانتی‌متر') + '</div><div><b>خم بغل‌ها:</b> ندارد</div><div><b>مساحت نما:</b> ' + escapeCompositeHtml(formatMeasure(Number(results.face_area || 0)) + ' مترمربع') + '</div><div><b>مساحت کل سطوح:</b> ' + escapeCompositeHtml(formatMeasure(Number(results.visible_area || 0)) + ' مترمربع') + '</div><div><b>شیار افقی نما:</b> ' + escapeCompositeHtml(Number(results.horizontal_seams || 0).toLocaleString('fa-IR') + ' شیار') + '</div><div><b>مصرف ورق:</b> ' + escapeCompositeHtml(formatMeasure(Number(results.utilization_percent || 0)) + '٪ مصرف، ' + formatMeasure(100 - Number(results.utilization_percent || 0)) + '٪ پرت') + '</div><div><b>جهت آبچکان:</b> ' + escapeCompositeHtml(dripDirection) + '</div><div><b>جهت زیر تابلو:</b> ' + escapeCompositeHtml(bottomDirection) + '</div></section>'
-        + consumptionHtml + compositeOverviewPrintHtml(snapshot) + compositeLayoutPrintHtml(snapshot.sheets) + pricingHtml + (includePrices ? '<p class="note">این گزارش براساس ابعاد و اطلاعات ذخیره‌شده همین برآورد تهیه شده است.</p>' : '')
+        + consumptionHtml + compositeOverviewPrintHtml(snapshot) + compositeLayoutPrintHtml(snapshot.sheets, snapshot.parts) + pricingHtml + (includePrices ? '<p class="note">این گزارش براساس ابعاد و اطلاعات ذخیره‌شده همین برآورد تهیه شده است.</p>' : '')
         + '<script>window.addEventListener("load",function(){setTimeout(function(){window.print()},300)})<\/script></body></html>';
     }
 

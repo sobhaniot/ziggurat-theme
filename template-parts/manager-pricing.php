@@ -211,7 +211,7 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                     <div class="manager-pricing-result__full"><span>قیمت نهایی هر مترمربع کل سطوح</span><strong data-composite-surface-unit>۰ ریال</strong></div>
                 </section>
                 <section class="manager-composite-layout" data-composite-layout hidden>
-                    <header><div><strong>چیدمان ورق کامپوزیت</strong><small>ورق ۳۲۰×۱۲۵ سانتی‌متر — چرخش ۹۰ درجه برای چیدمان قطعات فعال است</small><em data-composite-face-direction></em><em data-composite-drip-direction></em><em data-composite-bottom-direction></em></div><div class="manager-composite-legend"><span class="is-face">نما</span><span class="is-drip">آبچکان</span><span class="is-bottom">زیر</span><span class="is-side">بغل</span></div></header>
+                    <header><div><strong>چیدمان ورق کامپوزیت</strong><small>ابعاد ورق: طول ۳۲۰ × عرض ۱۲۵ سانتی‌متر — در ابعاد قطعات، عدد اول طول افقی و عدد دوم عرض عمودی است</small><em data-composite-face-direction></em><em data-composite-drip-direction></em><em data-composite-bottom-direction></em></div><div class="manager-composite-legend"><span class="is-face">نما</span><span class="is-drip">آبچکان</span><span class="is-bottom">زیر</span><span class="is-side">بغل</span></div></header>
                     <figure class="manager-composite-overview"><figcaption>نمای یکپارچه قطعات تابلو</figcaption><img data-composite-overview alt="نمای یکپارچه نما، آبچکان، زیر و بغل‌های تابلو"></figure>
                     <div class="manager-composite-sheets" data-composite-sheets></div>
                     <div class="manager-composite-parts" data-composite-parts></div>

@@ -168,6 +168,8 @@ function zigurat_handle_download_request()
         zigurat_record_daily_view('download');
     }
     clean_post_cache($post_id);
+    delete_transient('zigurat_live_views_total');
+    delete_transient('zigurat_live_views_payload');
     nocache_headers();
     wp_redirect($url, 302, 'Zigurat Download Center');
     exit;

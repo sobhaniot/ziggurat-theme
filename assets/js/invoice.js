@@ -153,6 +153,20 @@
     });
   }
 
+  // The project board can create an invoice in another tab. Refresh only an
+  // actual invoice-list view when that event arrives; invoice editor pages are
+  // intentionally left untouched so unsaved work is never lost.
+  function setupWorkflowInvoiceSync() {
+    if (!document.querySelector('.invoice-list-table')) return;
+    window.addEventListener('storage', function (event) {
+      if (!event || event.key !== 'zigurat_workflow_event' || !event.newValue) return;
+      var payload;
+      try { payload = JSON.parse(event.newValue); } catch (error) { return; }
+      if (!payload || !['invoice-created', 'invoice-saved'].includes(payload.type) || !Number(payload.invoiceId)) return;
+      window.location.reload();
+    });
+  }
+
   function closeStatusQuickMenus() {
     document.querySelectorAll('[data-status-menu]').forEach(function (menu) {
       menu.hidden = true;
@@ -1184,6 +1198,9 @@
     editor.addEventListener('submit', function (event) { event.preventDefault(); });
   }
   }
-  document.addEventListener('DOMContentLoaded', function () { initializeInvoice(document); });
+  document.addEventListener('DOMContentLoaded', function () {
+    initializeInvoice(document);
+    setupWorkflowInvoiceSync();
+  });
   document.addEventListener('zigurat:panel-updated', function (event) { initializeInvoice(event.detail && event.detail.root ? event.detail.root : document); });
 }());

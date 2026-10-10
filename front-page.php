@@ -3,20 +3,15 @@ get_header();
 ?>
 
 <main id="site-main">
-
-    <?php get_template_part('template-parts/hero'); ?>
-
-    <?php get_template_part('template-parts/about'); ?>
-
-    <?php get_template_part('template-parts/iran-project-map'); ?>
-
-    <?php get_template_part('template-parts/services'); ?>
-
-    <?php get_template_part('template-parts/projects'); ?>
-
-    <?php get_template_part('template-parts/latest-posts'); ?>
-
-    <?php get_template_part('template-parts/clients'); ?>
+    <?php foreach (zigurat_get_home_section_order() as $home_section_key) : ?>
+        <?php
+        $home_sections = zigurat_home_section_definitions();
+        if (!isset($home_sections[$home_section_key])) {
+            continue;
+        }
+        get_template_part($home_sections[$home_section_key]['template']);
+        ?>
+    <?php endforeach; ?>
 
 </main>
 

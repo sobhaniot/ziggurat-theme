@@ -1,4 +1,5 @@
 <div class="manager-actions">
+    <a class="manager-action" href="<?php echo esc_url(zigurat_workflow_project_url()); ?>"><span class="manager-action__icon" aria-hidden="true">📋</span><strong>مدیریت پروژه‌ها</strong><small>پیگیری مشتری از بازاریابی و پیش‌فاکتور تا اجرا و فاکتور نهایی</small></a>
     <a class="manager-action" href="<?php echo esc_url(zigurat_inventory_page_url('inventory-list')); ?>"><span class="manager-action__icon" aria-hidden="true">📦</span><strong>انبارداری</strong><small>ورود مستقیم به بخش کامل انبارداری</small></a>
     <a class="manager-action" href="<?php echo esc_url(zigurat_invoice_page_url()); ?>"><span class="manager-action__icon" aria-hidden="true">🧾</span><strong>بخش فاکتور</strong><small>ثبت، اصلاح، فهرست و چاپ فاکتورها</small></a>
     <a class="manager-action" href="<?php echo esc_url(add_query_arg('manager-section', 'views', zigurat_manager_login_url())); ?>"><span class="manager-action__icon" aria-hidden="true">📈</span><strong>آمار بازدید سایت</strong><small>نمایش عددی و نموداری بازدید مطالب، پروژه‌ها و دانلودها</small></a>

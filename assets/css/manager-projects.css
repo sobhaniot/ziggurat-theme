@@ -1,3 +1,5 @@
+.manager-area--projects > .container { width: 98%; max-width: 1560px; }
+.manager-panel--projects { max-width: 1560px; padding: 30px; }
 .manager-projects { --project-gold: #c89428; --project-line: #ded8cc; }
 .manager-projects__heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
 .manager-projects__heading > div > span { color: #926812; font-size: 13px; font-weight: 800; }
@@ -17,7 +19,7 @@
 .manager-projects__summary strong.is-alert { color: #b8322b; }
 .manager-projects__summary small { margin-right: 5px; color: #777; }
 .manager-project-board { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 10px; align-items: start; }
-.manager-project-column { min-width: 0; padding: 10px; border-top: 4px solid #bcb5a9; border-radius: 10px; background: #f6f4ef; transition: background-color .18s ease, box-shadow .18s ease; }
+.manager-project-column { min-width: 0; padding: 8px; border-top: 4px solid #bcb5a9; border-radius: 10px; background: #f6f4ef; transition: background-color .18s ease, box-shadow .18s ease; }
 .manager-project-column.is-lead { border-top-color: #b34a3f; }
 .manager-project-column.is-proforma { border-top-color: #8a65a7; }
 .manager-project-column.is-approval { border-top-color: #bf8519; }
@@ -29,26 +31,24 @@
 .manager-project-column h3 { width: 100%; margin: 0; padding: 0 30px; font-size: 17px; font-weight: 900; text-align: center; }
 .manager-project-column > header > span { position: absolute; top: 50%; left: 0; display: grid; min-width: 27px; height: 27px; padding: 0 5px; place-items: center; transform: translateY(-50%); border-radius: 999px; background: #fff; color: #696258; font-size: 12px; }
 .manager-project-column__cards { min-height: 110px; }
-.manager-project-card { position: relative; margin-top: 8px; padding: 11px; border: 1px solid #ddd7ca; border-radius: 9px; background: #fff; box-shadow: 0 4px 12px rgba(49,39,20,.04); transition: border-color .16s ease, box-shadow .16s ease, opacity .16s ease, transform .16s ease; touch-action: pan-y; }
+.manager-project-card { position: relative; margin-top: 6px; padding: 8px 9px; border: 1px solid #ddd7ca; border-radius: 9px; background: #fff; box-shadow: 0 4px 12px rgba(49,39,20,.04); transition: border-color .16s ease, box-shadow .16s ease, opacity .16s ease, transform .16s ease; touch-action: pan-y; }
 .manager-project-card:hover { border-color: #caa657; box-shadow: 0 7px 18px rgba(49,39,20,.08); }
 .manager-project-card.is-dragging { opacity: .35; transform: scale(.97); }
 .manager-project-card.is-saving::after { position: absolute; inset: 0; display: grid; place-items: center; content: 'در حال ذخیره…'; border-radius: inherit; background: rgba(255,255,255,.88); color: #78530d; font-size: 12px; font-weight: 800; }
 .manager-project-card__top { display: flex; align-items: flex-start; gap: 6px; }
-.manager-project-card__edit { display: flex; width: 100%; min-height: 34px; align-items: flex-start; padding: 0; border: 0; background: transparent; color: #222; font: inherit; text-align: right; cursor: pointer; }
-.manager-project-card__edit strong { line-height: 1.75; }
-.manager-project-card__grip { color: #a98a4e; font-size: 19px; line-height: 1.3; cursor: grab; }
-.manager-project-card__client { display: flex; align-items: center; gap: 7px; margin: 8px 0; color: #675f52; font-size: 12px; }
-.manager-project-card__client > span { display: grid; width: 25px; height: 25px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #f5e7c5; color: #6f4c08; font-weight: 800; }
+.manager-project-card__edit { display: flex; width: 100%; min-height: 27px; align-items: flex-start; padding: 0; border: 0; background: transparent; color: #222; font: inherit; text-align: right; cursor: pointer; }
+.manager-project-card__edit strong { line-height: 1.5; }
+.manager-project-card__grip { color: #a98a4e; font-size: 18px; line-height: 1.2; cursor: grab; }
+.manager-project-card__client { display: flex; align-items: center; gap: 7px; margin: 5px 0; color: #675f52; font-size: 12px; }
 .manager-project-card__client b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .manager-project-card__meta { display: grid; gap: 5px; color: #756f64; font-size: 11px; }
 .manager-project-card__meta span.is-due { padding: 4px 6px; border-radius: 5px; background: #ffe7e4; color: #a72d25; font-weight: 800; }
-.manager-project-card__work { display: grid; gap: 4px; margin-top: 9px; padding-top: 8px; border-top: 1px solid #eee9df; color: #655f55; font-size: 10px; line-height: 1.65; }
+.manager-project-card__work { display: grid; gap: 3px; margin-top: 6px; padding-top: 5px; border-top: 1px solid #eee9df; color: #655f55; font-size: 10px; line-height: 1.5; }
 .manager-project-card__work span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .manager-project-card__work b { color: #302b24; }
 .manager-project-card__work small { color: #936916; font-weight: 800; }
-.manager-project-card__documents { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; padding-top: 8px; border-top: 1px solid #eee9df; }
+.manager-project-card__documents { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; padding-top: 5px; border-top: 1px solid #eee9df; }
 .manager-project-card__documents a { padding: 3px 6px; border-radius: 5px; background: #e8f1f8; color: #265d86; font-size: 10px; font-weight: 800; }
-.manager-project-card__archive { margin-top: 8px; padding: 3px 7px; border: 1px solid #e0b0b0; border-radius: 5px; background: #fff7f7; color: #a03939; font: inherit; font-size: 10px; cursor: pointer; }
 .manager-project-column__empty { margin: 8px 0 0; padding: 18px 8px; border: 1px dashed #d4cfc4; border-radius: 8px; color: #8a847a; font-size: 11px; text-align: center; }
 .manager-projects__guide { display: flex; align-items: center; gap: 8px; margin: 17px 0 0; padding: 11px 13px; border-right: 3px solid #c79328; background: #faf8f3; color: #716a5d; font-size: 12px; line-height: 1.8; }
 .manager-projects__guide > span { color: #9a6b0c; font-size: 20px; }
@@ -180,6 +180,8 @@
 .manager-project-card--touch-ghost { position: fixed; z-index: 2147482000; margin: 0; pointer-events: none; opacity: .92; transform: translate(18px,-50%); box-shadow: 0 18px 45px rgba(0,0,0,.25); }
 
 @media (max-width: 1050px) {
+  .manager-area--projects > .container { width: 96%; }
+  .manager-panel--projects { padding: 24px 18px; }
   .manager-project-board { display: flex; align-items: flex-start; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x proximity; }
   .manager-project-column { width: min(300px,78vw); flex: 0 0 min(300px,78vw); scroll-snap-align: start; }
 }

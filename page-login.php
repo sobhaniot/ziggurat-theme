@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['zigurat_save_composit
 
 get_header();
 ?>
-<main class="manager-area">
+<main class="manager-area<?php echo $manager_section === 'projects' ? ' manager-area--projects' : ''; ?>">
     <div class="container">
         <?php if (zigurat_is_manager()): ?>
             <?php
@@ -94,7 +94,7 @@ get_header();
                 ? zigurat_application_unread_count($current_manager->ID)
                 : 0;
             ?>
-            <section class="manager-panel<?php echo $manager_section === 'letters' ? ' manager-panel--letters' : ''; ?>" aria-labelledby="manager-panel-title">
+            <section class="manager-panel<?php echo $manager_section === 'letters' ? ' manager-panel--letters' : ''; ?><?php echo $manager_section === 'projects' ? ' manager-panel--projects' : ''; ?>" aria-labelledby="manager-panel-title">
                 <div class="manager-panel__header">
                     <div>
                         <span>دسترسی مدیریت</span>

@@ -172,11 +172,9 @@
     if (record.client) {
       var client = document.createElement('div');
       client.className = 'manager-project-card__client';
-      var initial = document.createElement('span');
-      initial.textContent = String(record.client).trim().charAt(0);
       var clientName = document.createElement('b');
       clientName.textContent = record.client;
-      client.append(initial, clientName);
+      client.appendChild(clientName);
       card.appendChild(client);
     }
     if (record.followup) {
@@ -205,12 +203,6 @@
       }
       card.appendChild(documents);
     }
-    var archive = document.createElement('button');
-    archive.type = 'button';
-    archive.className = 'manager-project-card__archive';
-    archive.setAttribute('data-project-quick-archive', '');
-    archive.textContent = 'لغو و بایگانی';
-    card.appendChild(archive);
     list.insertBefore(card, list.querySelector('[data-project-empty]'));
     refreshColumnState();
   }
@@ -408,7 +400,6 @@
     var archiveJump = event.target.closest('[data-project-archive-jump]');
     var closeButton = event.target.closest('[data-project-close]');
     var editButton = event.target.closest('[data-project-edit]');
-    var quickArchive = event.target.closest('[data-project-quick-archive]');
     var closeAssignmentButton = event.target.closest('[data-close-active-assignment]');
     if (archiveJump) {
       var archive = board.querySelector('[data-project-archive]');
@@ -438,23 +429,6 @@
         closeAssignmentButton.textContent = 'کارکرد گرفته شد؛ حذف از فعال‌ها';
         showNotice(error.message, 'error');
       });
-      return;
-    }
-    if (quickArchive) {
-      var archiveCard = quickArchive.closest('[data-project-card]');
-      if (!archiveCard || !window.confirm('این پروژه لغو و به آرشیو منتقل شود؟')) return;
-      quickArchive.disabled = true;
-      request('zigurat_archive_workflow_project', { project_id: archiveCard.getAttribute('data-project-id') })
-        .then(function (data) {
-          archiveCard.remove();
-          removeProjectFromActiveLists(archiveCard.getAttribute('data-project-id'));
-          refreshColumnState();
-          showNotice(data.message, 'success');
-        })
-        .catch(function (error) {
-          quickArchive.disabled = false;
-          showNotice(error.message, 'error');
-        });
       return;
     }
     if (newButton) {
@@ -533,7 +507,7 @@
 
   archiveButton.addEventListener('click', function () {
     var projectId = form.elements.project_id.value;
-    if (!projectId || !window.confirm('این پروژه بایگانی شود؟')) return;
+    if (!projectId || !window.confirm('این پروژه لغو و به آرشیو منتقل شود؟')) return;
     setBusy(true);
     request('zigurat_archive_workflow_project', { project_id: projectId })
       .then(function (data) {

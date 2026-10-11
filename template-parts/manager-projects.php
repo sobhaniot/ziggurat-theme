@@ -67,9 +67,6 @@ $stage_classes = array(
                             && $record['followup'] !== ''
                             && $today !== ''
                             && strcmp($record['followup'], $today) <= 0;
-                        $initial = function_exists('mb_substr')
-                            ? mb_substr($record['client'] ?: $record['title'], 0, 1)
-                            : substr($record['client'] ?: $record['title'], 0, 1);
                         ?>
                         <article class="manager-project-card" draggable="true" data-project-card data-project-id="<?php echo (int) $record['id']; ?>" data-project-current-stage="<?php echo esc_attr($record['stage']); ?>" data-project-proforma-id="<?php echo (int) $record['proforma_id']; ?>" data-project-invoice-id="<?php echo (int) $record['invoice_id']; ?>" data-project-conversion-url="<?php echo esc_url($record['conversion_url']); ?>">
                             <div class="manager-project-card__top">
@@ -79,7 +76,7 @@ $stage_classes = array(
                                 </button>
                             </div>
                             <?php if ($record['client']): ?>
-                                <div class="manager-project-card__client"><span><?php echo esc_html($initial); ?></span><b><?php echo esc_html($record['client']); ?></b></div>
+                                <div class="manager-project-card__client"><b><?php echo esc_html($record['client']); ?></b></div>
                             <?php endif; ?>
                             <div class="manager-project-card__meta">
                                 <?php if ($record['followup']): ?><span class="<?php echo $is_due ? 'is-due' : ''; ?>">پیگیری: <bdi dir="ltr"><?php echo esc_html($record['followup']); ?></bdi></span><?php endif; ?>
@@ -98,7 +95,6 @@ $stage_classes = array(
                                     <?php if ($record['invoice_url']): ?><a href="<?php echo esc_url($record['invoice_url']); ?>" data-project-invoice-link>مشاهده فاکتور</a><?php endif; ?>
                                 </div>
                             <?php endif; ?>
-                            <button type="button" class="manager-project-card__archive" data-project-quick-archive>لغو و بایگانی</button>
                         </article>
                     <?php endforeach; ?>
                     <p class="manager-project-column__empty" data-project-empty <?php echo $grouped[$stage_key] ? 'hidden' : ''; ?>>پروژه‌ای در این مرحله نیست.</p>
@@ -193,7 +189,7 @@ $stage_classes = array(
                 <ol data-project-history-list></ol>
             </section>
             <footer>
-                <button type="button" class="manager-project-form__archive" data-project-archive hidden>بایگانی پروژه</button>
+                <button type="button" class="manager-project-form__archive" data-project-archive hidden>لغو و بایگانی پروژه</button>
                 <span></span>
                 <button type="button" class="manager-project-form__cancel" data-project-close>انصراف</button>
                 <button type="submit" class="manager-project-form__save">ذخیره پروژه</button>

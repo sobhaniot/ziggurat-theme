@@ -1,0 +1,18 @@
+.site-language-switcher { position: relative; flex: 0 0 auto; }
+.site-language-switcher summary { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid rgba(200,155,60,.6); border-radius: 50%; background: #fff; color: #222; font: 800 12px/1 sans-serif; cursor: pointer; list-style: none; }
+.site-language-switcher summary::-webkit-details-marker { display: none; }
+.site-language-switcher[open] summary { border-color: #c89b3c; background: #fff8e8; }
+.site-language-switcher ul { position: absolute; z-index: 1100; top: calc(100% + 10px); inset-inline-end: 0; width: 150px; padding: 7px; border: 1px solid #e3dccd; border-radius: 10px; background: #fff; box-shadow: 0 16px 38px rgba(0,0,0,.16); }
+.site-language-switcher li + li { margin-top: 2px; }
+.site-language-switcher a { display: block; padding: 8px 10px; border-radius: 7px; color: #302b23; text-align: start; font: 700 13px/1.5 sans-serif; }
+.site-language-switcher a:hover,.site-language-switcher a[aria-current="true"] { background: #f5ead0; color: #7c570c; }
+body.site-direction-ltr { direction: ltr; text-align: left; font-family: Arial,"Segoe UI",sans-serif; }
+body.site-direction-ltr #main-menu .menu li a::after { right: auto; left: 0; }
+body.site-direction-ltr #main-menu .sub-menu { right: auto; left: 0; }
+body.site-direction-ltr .footer-contact,body.site-direction-ltr .footer-column { text-align: left; }
+body.site-direction-ltr .hero-content,body.site-direction-ltr .about-text,body.site-direction-ltr .section-header { text-align: left; }
+body.site-direction-ltr .project-content,body.site-direction-ltr .post-content,body.site-direction-ltr .service-card { text-align: left; }
+@media (max-width:900px) {
+  .site-language-switcher { margin-inline-start: auto; }
+  .site-language-switcher ul { position: fixed; top: 78px; inset-inline: 14px; width: auto; }
+}

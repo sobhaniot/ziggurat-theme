@@ -13,7 +13,7 @@ function zigurat_site_logo($loading = 'eager')
     }
     printf(
         '<a href="%1$s" class="custom-logo-link" rel="home" aria-current="page"><img src="%2$s" class="custom-logo" width="1600" height="1600" loading="%3$s" decoding="async" alt="%4$s"></a>',
-        esc_url(home_url('/')),
+        esc_url(function_exists('zigurat_localized_url') ? zigurat_localized_url(home_url('/')) : home_url('/')),
         esc_url($logo_url),
         esc_attr($loading),
         esc_attr(get_bloginfo('name'))

@@ -17,16 +17,12 @@ $location_url = zigurat_get_contact_location_url($contact_details);
                     }
                     ?>
                 </div>
-                <p>
-                    زیگورات؛ طراحی، ساخت و اجرای
-                    تابلوهای تبلیغاتی و دکوراسیون
-                    تجاری با اجرای حرفه‌ای.
-                </p>
+                <p><?php echo esc_html(zigurat_t('footer_about')); ?></p>
             </div>
             <!-- خدمات -->
             <div class="footer-column">
                 <h3>
-                    خدمات ما
+                    <?php echo esc_html(zigurat_t('our_services')); ?>
                 </h3>
                 <ul>
                     <?php
@@ -48,27 +44,27 @@ $location_url = zigurat_get_contact_location_url($contact_details);
             <!-- لینک ها -->
             <div class="footer-column">
                 <h3>
-                    دسترسی سریع
+                    <?php echo esc_html(zigurat_t('quick_access')); ?>
                 </h3>
                 <ul>
                     <li>
-                        <a href="<?php echo esc_url(home_url('/')); ?>">
-                            خانه
+                        <a href="<?php echo esc_url(zigurat_localized_url(home_url('/'))); ?>">
+                            <?php echo esc_html(zigurat_t('home')); ?>
                         </a>
                     </li>
                     <li>
                         <a href="<?php echo esc_url(get_post_type_archive_link('project')); ?>">
-                            پروژه‌ها
+                            <?php echo esc_html(zigurat_t('projects')); ?>
                         </a>
                     </li>
                     <li>
-                        <a href="<?php echo esc_url(home_url('/about/')); ?>">
-                            درباره ما
+                        <a href="<?php echo esc_url(zigurat_localized_url(home_url('/about/'))); ?>">
+                            <?php echo esc_html(zigurat_t('about_us')); ?>
                         </a>
                     </li>
                     <li>
-                        <a href="<?php echo esc_url(home_url('/contact/')); ?>">
-                            تماس با ما
+                        <a href="<?php echo esc_url(zigurat_localized_url(home_url('/contact/'))); ?>">
+                            <?php echo esc_html(zigurat_t('contact')); ?>
                         </a>
                     </li>
                 </ul>
@@ -76,7 +72,7 @@ $location_url = zigurat_get_contact_location_url($contact_details);
             <!-- تماس -->
             <div class="footer-column">
                 <h3>
-                    ارتباط با ما
+                    <?php echo esc_html(zigurat_t('contact_us')); ?>
                 </h3>
                 <ul class="footer-contact">
                     <?php foreach ($contact_phones as $phone): ?>
@@ -88,12 +84,12 @@ $location_url = zigurat_get_contact_location_url($contact_details);
                     <?php endforeach; ?>
                     <?php if (!empty($contact_details['address'])): ?>
                         <li>
-                            <a href="<?php echo esc_url($location_url); ?>" target="_blank" rel="noopener noreferrer" title="مشاهده لوکیشن روی نقشه">
+                            <a href="<?php echo esc_url($location_url); ?>" target="_blank" rel="noopener noreferrer" title="<?php echo esc_attr(zigurat_t('view_location')); ?>">
                                 📍 <?php echo esc_html($contact_details['address']); ?>
                             </a>
                         </li>
                     <?php elseif ($location_url): ?>
-                        <li><a href="<?php echo esc_url($location_url); ?>" target="_blank" rel="noopener noreferrer">📍 مشاهده لوکیشن روی نقشه</a></li>
+                        <li><a href="<?php echo esc_url($location_url); ?>" target="_blank" rel="noopener noreferrer">📍 <?php echo esc_html(zigurat_t('view_location')); ?></a></li>
                     <?php endif; ?>
                     <?php if (!empty($contact_details['email'])): ?>
                         <li>
@@ -110,7 +106,7 @@ $location_url = zigurat_get_contact_location_url($contact_details);
     <div class="footer-bottom">
         <p>
             © <?php echo date('Y'); ?>
-            زیگورات - تمامی حقوق محفوظ است
+            <?php echo esc_html(zigurat_t('rights')); ?>
         </p>
     </div>
 </footer>

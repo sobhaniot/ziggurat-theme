@@ -31,22 +31,22 @@ $province_url = static function ($province) use ($activity, $archive_url) {
     );
 };
 ?>
-<section class="iran-project-map" aria-labelledby="iran-project-map-title" data-project-map>
+<section class="iran-project-map" aria-labelledby="iran-project-map-title" data-project-map data-map-locale="<?php echo esc_attr(zigurat_site_languages()[zigurat_current_language()]['locale']); ?>" data-map-projects-label="<?php echo esc_attr(zigurat_t('projects_registered')); ?>" data-map-empty-label="<?php echo esc_attr(zigurat_t('province_empty')); ?>">
     <div class="container">
         <div class="iran-project-map__card">
             <div class="iran-project-map__content">
-                <span class="iran-project-map__eyebrow">پروژه‌ها در سراسر ایران</span>
-                <h2 id="iran-project-map-title">گستره فعالیت زیگورات</h2>
-                <p>استان‌های طلایی محل اجرای پروژه‌های ثبت‌شده زیگورات هستند. روی هر استان فعال بزنید تا پروژه‌های همان استان را ببینید.</p>
+                <span class="iran-project-map__eyebrow"><?php echo esc_html(zigurat_t('activity_eyebrow')); ?></span>
+                <h2 id="iran-project-map-title"><?php echo esc_html(zigurat_t('activity_title')); ?></h2>
+                <p><?php echo esc_html(zigurat_t('activity_text')); ?></p>
 
                 <div class="iran-project-map__status" aria-live="polite">
-                    <strong data-map-status-title><?php echo esc_html(number_format_i18n($active_total)); ?> استان فعال</strong>
-                    <span data-map-status-description>برای مشاهده تعداد پروژه، نشانگر را روی نقشه ببرید.</span>
+                    <strong data-map-status-title><?php echo esc_html(zigurat_t('active_provinces', array(number_format_i18n($active_total)))); ?></strong>
+                    <span data-map-status-description><?php echo esc_html(zigurat_t('map_hint')); ?></span>
                 </div>
 
                 <div class="iran-project-map__legend" aria-label="راهنمای رنگ‌های نقشه">
-                    <span><i class="is-active" aria-hidden="true"></i> دارای پروژه</span>
-                    <span><i aria-hidden="true"></i> بدون پروژه ثبت‌شده</span>
+                    <span><i class="is-active" aria-hidden="true"></i> <?php echo esc_html(zigurat_t('has_projects')); ?></span>
+                    <span><i aria-hidden="true"></i> <?php echo esc_html(zigurat_t('no_registered_projects')); ?></span>
                 </div>
 
                 <?php if ($activity): ?>

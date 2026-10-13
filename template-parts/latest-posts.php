@@ -2,10 +2,10 @@
     <div class="container">
         <div class="section-header">
             <h2>
-                آخرین مطالب
+                <?php echo esc_html(zigurat_t('latest_articles')); ?>
             </h2>
             <p>
-                جدیدترین اخبار، ایده‌ها و مطالب تخصصی زیگورات
+                <?php echo esc_html(zigurat_t('latest_articles_subtitle')); ?>
             </p>
         </div>
         <div class="posts-grid">
@@ -57,7 +57,7 @@
                             </p>
                             <a class="read-more"
                                 href="<?php the_permalink(); ?>">
-                                ادامه مطلب
+                                <?php echo esc_html(zigurat_t('continue_reading')); ?>
                             </a>
                         </div>
                     </article>
@@ -67,7 +67,7 @@
             else:
                 ?>
                 <p>
-                    مطلبی برای نمایش وجود ندارد.
+                    <?php echo esc_html(zigurat_t('no_articles')); ?>
                 </p>
             <?php endif; ?>
         </div>

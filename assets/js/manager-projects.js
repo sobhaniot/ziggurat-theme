@@ -8,10 +8,75 @@
   var dialog = board.querySelector('[data-project-dialog]');
   var form = board.querySelector('[data-project-form]');
   var notice = board.querySelector('[data-project-notice]');
-  var archiveButton = board.querySelector('[data-project-archive]');
+  var destructiveActions = form.querySelector('[data-project-destructive-actions]');
+  var archiveButton = form.querySelector('[data-project-archive-action]');
+  var deleteButton = form.querySelector('[data-project-delete-action]');
   var draggedCard = null;
   var originalStage = '';
   var touchState = null;
+  var confirmDialog = null;
+  var confirmResolver = null;
+  var confirmLastFocus = null;
+
+  function ensureProjectConfirmDialog() {
+    if (confirmDialog && document.documentElement.contains(confirmDialog)) return confirmDialog;
+    var wrapper = document.createElement('dialog');
+    wrapper.className = 'manager-project-confirm-wrap';
+    wrapper.innerHTML = '<div class="manager-project-confirm__backdrop" data-project-confirm-cancel></div>' +
+      '<section class="manager-project-confirm" role="dialog" aria-modal="true" aria-labelledby="manager-project-confirm-title" aria-describedby="manager-project-confirm-message">' +
+        '<div class="manager-project-confirm__icon" data-project-confirm-icon aria-hidden="true">!</div>' +
+        '<h3 id="manager-project-confirm-title"></h3>' +
+        '<p id="manager-project-confirm-message"></p>' +
+        '<div class="manager-project-confirm__actions"><button type="button" data-project-confirm-cancel>انصراف</button><button type="button" data-project-confirm-accept></button></div>' +
+      '</section>';
+    document.body.appendChild(wrapper);
+    wrapper.addEventListener('click', function (event) {
+      if (event.target.closest('[data-project-confirm-accept]')) closeProjectConfirm(true);
+      else if (event.target.closest('[data-project-confirm-cancel]')) closeProjectConfirm(false);
+    });
+    wrapper.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeProjectConfirm(false);
+      }
+    });
+    wrapper.addEventListener('cancel', function (event) {
+      event.preventDefault();
+      closeProjectConfirm(false);
+    });
+    confirmDialog = wrapper;
+    return wrapper;
+  }
+
+  function showProjectConfirm(options) {
+    return new Promise(function (resolve) {
+      var wrapper = ensureProjectConfirmDialog();
+      confirmResolver = resolve;
+      confirmLastFocus = document.activeElement;
+      var panel = wrapper.querySelector('.manager-project-confirm');
+      panel.className = 'manager-project-confirm is-' + (options.variant || 'archive');
+      wrapper.querySelector('[data-project-confirm-icon]').textContent = options.icon || '!';
+      wrapper.querySelector('#manager-project-confirm-title').textContent = options.title || 'تأیید عملیات';
+      wrapper.querySelector('#manager-project-confirm-message').textContent = options.message || '';
+      wrapper.querySelector('[data-project-confirm-accept]').textContent = options.confirmText || 'تأیید';
+      if (typeof wrapper.showModal === 'function') wrapper.showModal();
+      else wrapper.setAttribute('open', 'open');
+      document.body.classList.add('manager-project-confirm-open');
+      wrapper.querySelector('.manager-project-confirm__actions [data-project-confirm-cancel]').focus();
+    });
+  }
+
+  function closeProjectConfirm(confirmed) {
+    if (!confirmDialog || (!confirmDialog.open && !confirmDialog.hasAttribute('open'))) return;
+    var resolver = confirmResolver;
+    confirmResolver = null;
+    if (typeof confirmDialog.close === 'function') confirmDialog.close();
+    else confirmDialog.removeAttribute('open');
+    document.body.classList.remove('manager-project-confirm-open');
+    if (confirmLastFocus && document.documentElement.contains(confirmLastFocus)) confirmLastFocus.focus({ preventScroll: true });
+    confirmLastFocus = null;
+    if (resolver) resolver(Boolean(confirmed));
+  }
 
   function showNotice(message, type) {
     notice.textContent = message || '';
@@ -62,6 +127,100 @@
     form.classList.toggle('is-busy', isBusy);
   }
 
+  function documentPicker(type) {
+    return form.querySelector('[data-document-picker="' + type + '"]');
+  }
+
+  function selectedDocumentValues(type) {
+    var selected = form.querySelector('[data-document-selected="' + type + '"]');
+    if (!selected) return [];
+    return Array.prototype.map.call(selected.querySelectorAll('input[type="hidden"]'), function (input) {
+      return { id: String(input.value), number: String(input.getAttribute('data-document-number') || input.value) };
+    });
+  }
+
+  function selectedDocumentIds(type) {
+    return selectedDocumentValues(type).map(function (documentValue) { return documentValue.id; });
+  }
+
+  function renderDocumentSelection(type, values) {
+    var picker = documentPicker(type);
+    var selected = form.querySelector('[data-document-selected="' + type + '"]');
+    if (!picker || !selected) return;
+    var numbers = {};
+    var ids = Array.from(new Set((Array.isArray(values) ? values : []).map(function (value) {
+      if (value && typeof value === 'object') {
+        numbers[String(value.id)] = String(value.number || value.id || '');
+        return String(value.id || '');
+      }
+      return String(value || '');
+    }).filter(Boolean)));
+    selected.replaceChildren();
+    Array.prototype.forEach.call(picker.options, function (option) {
+      var isSelected = ids.indexOf(String(option.value)) !== -1;
+      option.classList.toggle('is-selected', isSelected);
+      option.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+    });
+    ids.forEach(function (id) {
+      var option = Array.prototype.find.call(picker.options, function (item) { return String(item.value) === id; });
+      var chip = document.createElement('span');
+      chip.className = 'manager-project-document-chip';
+      var text = document.createElement('b');
+      text.textContent = (type === 'invoice' ? 'فاکتور ' : 'پیش‌فاکتور ') + (option ? (option.getAttribute('data-document-number') || id) : (numbers[id] || id));
+      var remove = document.createElement('button');
+      remove.type = 'button';
+      remove.setAttribute('data-document-remove', type);
+      remove.setAttribute('data-document-id', id);
+      remove.setAttribute('aria-label', 'حذف ' + text.textContent);
+      remove.textContent = '×';
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = type + '_ids[]';
+      input.value = id;
+      input.setAttribute('data-document-number', option ? (option.getAttribute('data-document-number') || id) : (numbers[id] || id));
+      chip.appendChild(text);
+      chip.appendChild(remove);
+      chip.appendChild(input);
+      selected.appendChild(chip);
+    });
+    selected.classList.toggle('is-empty', selected.children.length === 0);
+  }
+
+  function addDocumentSelection(type, documentId) {
+    var values = selectedDocumentValues(type);
+    var ids = values.map(function (documentValue) { return documentValue.id; });
+    documentId = String(documentId || '');
+    if (documentId && ids.indexOf(documentId) === -1) {
+      var picker = documentPicker(type);
+      var option = picker ? Array.prototype.find.call(picker.options, function (item) { return String(item.value) === documentId; }) : null;
+      values.push({ id: documentId, number: option ? (option.getAttribute('data-document-number') || documentId) : documentId });
+    }
+    renderDocumentSelection(type, values);
+  }
+
+  function removeDocumentSelection(type, documentId) {
+    renderDocumentSelection(type, selectedDocumentValues(type).filter(function (documentValue) {
+      return documentValue.id !== String(documentId);
+    }));
+  }
+
+  function cardDocumentIds(card, type) {
+    var value = card.getAttribute('data-project-' + type + '-ids') || '';
+    return value.split(',').map(function (id) { return Number(id); }).filter(Boolean);
+  }
+
+  function addCardDocumentId(card, type, documentId) {
+    var ids = cardDocumentIds(card, type);
+    documentId = Number(documentId);
+    if (documentId && ids.indexOf(documentId) === -1) ids.push(documentId);
+    card.setAttribute('data-project-' + type + '-ids', ids.join(','));
+    card.setAttribute('data-project-' + type + '-id', ids.length ? String(ids[ids.length - 1]) : '0');
+    var summary = card.querySelector('.manager-project-card__documents > strong');
+    if (summary) {
+      summary.textContent = cardDocumentIds(card, 'proforma').length.toLocaleString('fa-IR') + ' پیش‌فاکتور · ' + cardDocumentIds(card, 'invoice').length.toLocaleString('fa-IR') + ' فاکتور';
+    }
+  }
+
   function openDialog(project) {
     form.reset();
     showFormResult('', '');
@@ -71,13 +230,13 @@
     form.elements.phone.value = project ? project.phone : '';
     form.elements.stage.value = project ? project.stage : 'lead';
     form.elements.followup.value = project ? project.followup : '';
-    form.elements.proforma_id.value = project ? String(project.proforma_id || 0) : '0';
-    form.elements.invoice_id.value = project ? String(project.invoice_id || 0) : '0';
+    renderDocumentSelection('proforma', project && Array.isArray(project.proformas) ? project.proformas : []);
+    renderDocumentSelection('invoice', project && Array.isArray(project.invoices) ? project.invoices : []);
     form.elements.notes.value = project ? project.notes : '';
     renderWorkItems(project && Array.isArray(project.work_items) ? project.work_items : []);
     board.querySelector('[data-project-dialog-eyebrow]').textContent = project ? 'ویرایش پروژه' : 'پروژه جدید';
     board.querySelector('[data-project-dialog-title]').textContent = project ? project.title : 'ثبت پروژه';
-    archiveButton.hidden = !project;
+    destructiveActions.hidden = !project;
     var historyBox = board.querySelector('[data-project-history]');
     var historyList = board.querySelector('[data-project-history-list]');
     historyList.replaceChildren();
@@ -87,7 +246,9 @@
       var item = document.createElement('li');
       var description = entry.action === 'created'
         ? 'پروژه در مرحله «' + entry.to_label + '» ایجاد شد.'
-        : 'مرحله از «' + entry.from_label + '» به «' + entry.to_label + '» تغییر کرد.';
+        : (entry.action === 'merged'
+          ? 'کارت تکراری و اسناد آن در این پروژه ادغام شد.'
+          : 'مرحله از «' + entry.from_label + '» به «' + entry.to_label + '» تغییر کرد.');
       var text = document.createElement('span');
       var meta = document.createElement('small');
       text.textContent = description;
@@ -107,6 +268,22 @@
   }
 
   function refreshColumnState() {
+    var totalCards = board.querySelectorAll('[data-project-card]').length;
+    var activeCount = board.querySelector('[data-project-active-count]');
+    var dueCount = board.querySelector('[data-project-due-count]');
+    var readyInvoiceCount = board.querySelector('[data-project-ready-invoice-count]');
+    if (activeCount) activeCount.textContent = Number(totalCards).toLocaleString('fa-IR');
+    if (dueCount) {
+      var dueCards = board.querySelectorAll('[data-project-card] .manager-project-card__meta .is-due').length;
+      dueCount.textContent = Number(dueCards).toLocaleString('fa-IR');
+      dueCount.classList.toggle('is-alert', dueCards > 0);
+    }
+    if (readyInvoiceCount) {
+      var readyCards = Array.prototype.filter.call(board.querySelectorAll('[data-project-stage="delivery"] [data-project-card]'), function (card) {
+        return Number(card.getAttribute('data-project-invoice-id') || 0) === 0;
+      }).length;
+      readyInvoiceCount.textContent = Number(readyCards).toLocaleString('fa-IR');
+    }
     Array.prototype.forEach.call(board.querySelectorAll('[data-project-stage]'), function (column) {
       var cards = column.querySelectorAll('[data-project-card]');
       var counter = column.querySelector('[data-project-stage-count]');
@@ -152,7 +329,9 @@
     card.dataset.projectId = record.id;
     card.dataset.projectCurrentStage = record.stage || 'proforma';
     card.dataset.projectProformaId = record.proforma_id || 0;
+    card.dataset.projectProformaIds = (record.proforma_ids || []).join(',');
     card.dataset.projectInvoiceId = record.invoice_id || 0;
+    card.dataset.projectInvoiceIds = (record.invoice_ids || []).join(',');
     card.dataset.projectConversionUrl = record.conversion_url || '';
 
     var top = document.createElement('div');
@@ -185,22 +364,25 @@
       meta.appendChild(followup);
       card.appendChild(meta);
     }
-    if (record.proforma_url || record.invoice_url) {
+    if ((record.proformas && record.proformas.length) || (record.invoices && record.invoices.length)) {
       var documents = document.createElement('div');
       documents.className = 'manager-project-card__documents';
-      if (record.proforma_url) {
+      var documentSummary = document.createElement('strong');
+      documentSummary.textContent = Number((record.proformas || []).length).toLocaleString('fa-IR') + ' پیش‌فاکتور · ' + Number((record.invoices || []).length).toLocaleString('fa-IR') + ' فاکتور';
+      documents.appendChild(documentSummary);
+      (record.proformas || []).forEach(function (documentRecord, index) {
         var proforma = document.createElement('a');
-        proforma.href = record.proforma_url;
-        proforma.textContent = 'مشاهده پیش‌فاکتور';
+        proforma.href = documentRecord.url;
+        proforma.textContent = 'پیش‌فاکتور ' + Number(index + 1).toLocaleString('fa-IR');
         documents.appendChild(proforma);
-      }
-      if (record.invoice_url) {
+      });
+      (record.invoices || []).forEach(function (documentRecord, index) {
         var invoice = document.createElement('a');
-        invoice.href = record.invoice_url;
-        invoice.textContent = 'مشاهده فاکتور';
+        invoice.href = documentRecord.url;
+        invoice.textContent = 'فاکتور ' + Number(index + 1).toLocaleString('fa-IR');
         invoice.setAttribute('data-project-invoice-link', '');
         documents.appendChild(invoice);
-      }
+      });
       card.appendChild(documents);
     }
     list.insertBefore(card, list.querySelector('[data-project-empty]'));
@@ -217,32 +399,48 @@
     var invoiceId = String(Number(payload.invoiceId));
     var sourceId = String(Number(payload.sourceProformaId || 0));
     var card = Array.prototype.find.call(board.querySelectorAll('[data-project-card]'), function (item) {
-      return String(Number(item.getAttribute('data-project-invoice-id') || 0)) === invoiceId
-        || (Number(sourceId) > 0 && String(Number(item.getAttribute('data-project-proforma-id') || 0)) === sourceId)
-        || (payload.documentType === 'proforma' && String(Number(item.getAttribute('data-project-proforma-id') || 0)) === invoiceId);
+      return cardDocumentIds(item, 'invoice').indexOf(Number(invoiceId)) !== -1
+        || (Number(sourceId) > 0 && cardDocumentIds(item, 'proforma').indexOf(Number(sourceId)) !== -1)
+        || (payload.documentType === 'proforma' && cardDocumentIds(item, 'proforma').indexOf(Number(invoiceId)) !== -1);
     });
     if (payload.paymentStatus === 'settled') {
       if (card) {
         var projectId = card.getAttribute('data-project-id');
-        card.remove();
-        removeProjectFromActiveLists(projectId);
-        refreshColumnState();
-        showNotice('فاکتور تسویه شد؛ پروژه به آرشیو منتقل شد.', 'success');
+        request('zigurat_get_workflow_project', { project_id: projectId }).then(function (data) {
+          if (data.project && data.project.archived) {
+            card.remove();
+            removeProjectFromActiveLists(projectId);
+            refreshColumnState();
+            showNotice('تمام فاکتورهای پروژه تسویه شد؛ پروژه به آرشیو منتقل شد.', 'success');
+            return;
+          }
+          var paymentColumn = board.querySelector('[data-project-stage="payment"] [data-project-card-list]');
+          if (paymentColumn) paymentColumn.insertBefore(card, paymentColumn.querySelector('[data-project-empty]'));
+          card.setAttribute('data-project-current-stage', 'payment');
+          refreshColumnState();
+          showNotice('این فاکتور تسویه شد؛ کارت تا تسویه سایر فاکتورها فعال می‌ماند.', 'success');
+        }).catch(function (error) {
+          showNotice(error.message, 'error');
+        });
       }
       return;
     }
     if (payload.documentType === 'invoice' && card) {
-      card.setAttribute('data-project-invoice-id', invoiceId);
-      if (payload.invoiceUrl && !card.querySelector('[data-project-invoice-link]')) {
+      var invoiceWasLinked = cardDocumentIds(card, 'invoice').indexOf(Number(invoiceId)) !== -1;
+      addCardDocumentId(card, 'invoice', invoiceId);
+      if (payload.invoiceUrl && !invoiceWasLinked) {
         var documents = card.querySelector('.manager-project-card__documents');
         if (!documents) {
           documents = document.createElement('div');
           documents.className = 'manager-project-card__documents';
+          var eventSummary = document.createElement('strong');
+          eventSummary.textContent = cardDocumentIds(card, 'proforma').length.toLocaleString('fa-IR') + ' پیش‌فاکتور · ' + cardDocumentIds(card, 'invoice').length.toLocaleString('fa-IR') + ' فاکتور';
+          documents.appendChild(eventSummary);
           card.appendChild(documents);
         }
         var invoiceLink = document.createElement('a');
         invoiceLink.href = payload.invoiceUrl;
-        invoiceLink.textContent = 'مشاهده فاکتور';
+        invoiceLink.textContent = 'فاکتور ' + cardDocumentIds(card, 'invoice').length.toLocaleString('fa-IR');
         invoiceLink.setAttribute('data-project-invoice-link', '');
         documents.appendChild(invoiceLink);
       }
@@ -353,7 +551,7 @@
       clearDragState();
       return;
     }
-    if (stage === 'delivery' && Number(card.getAttribute('data-project-invoice-id') || 0) === 0 && previousStage === 'proforma' && Number(card.getAttribute('data-project-proforma-id') || 0) === 0) {
+    if (stage === 'delivery' && cardDocumentIds(card, 'invoice').length === 0 && previousStage === 'proforma' && cardDocumentIds(card, 'proforma').length === 0) {
         clearDragState();
         showNotice('این کارت به پیش‌فاکتوری متصل نیست؛ ابتدا پیش‌فاکتور را در ویرایش پروژه انتخاب کنید.', 'error');
         return;
@@ -368,17 +566,21 @@
     }).then(function (data) {
       card.classList.remove('is-saving');
       if (data.invoice_id) {
-        card.setAttribute('data-project-invoice-id', String(data.invoice_id));
-        if (data.invoice_url && !card.querySelector('[data-project-invoice-link]')) {
+        var createdInvoiceWasLinked = cardDocumentIds(card, 'invoice').indexOf(Number(data.invoice_id)) !== -1;
+        addCardDocumentId(card, 'invoice', data.invoice_id);
+        if (data.invoice_url && !createdInvoiceWasLinked) {
           var documents = card.querySelector('.manager-project-card__documents');
           if (!documents) {
             documents = document.createElement('div');
             documents.className = 'manager-project-card__documents';
+            var createdSummary = document.createElement('strong');
+            createdSummary.textContent = cardDocumentIds(card, 'proforma').length.toLocaleString('fa-IR') + ' پیش‌فاکتور · ' + cardDocumentIds(card, 'invoice').length.toLocaleString('fa-IR') + ' فاکتور';
+            documents.appendChild(createdSummary);
             card.appendChild(documents);
           }
           var invoiceLink = document.createElement('a');
           invoiceLink.href = data.invoice_url;
-          invoiceLink.textContent = 'مشاهده فاکتور';
+          invoiceLink.textContent = 'فاکتور ' + cardDocumentIds(card, 'invoice').length.toLocaleString('fa-IR');
           invoiceLink.setAttribute('data-project-invoice-link', '');
           documents.appendChild(invoiceLink);
         }
@@ -396,11 +598,19 @@
   }
 
   board.addEventListener('click', function (event) {
+    var removeDocumentButton = event.target.closest('[data-document-remove]');
     var newButton = event.target.closest('[data-project-new]');
     var archiveJump = event.target.closest('[data-project-archive-jump]');
     var closeButton = event.target.closest('[data-project-close]');
     var editButton = event.target.closest('[data-project-edit]');
     var closeAssignmentButton = event.target.closest('[data-close-active-assignment]');
+    if (removeDocumentButton) {
+      removeDocumentSelection(
+        removeDocumentButton.getAttribute('data-document-remove'),
+        removeDocumentButton.getAttribute('data-document-id')
+      );
+      return;
+    }
     if (archiveJump) {
       var archive = board.querySelector('[data-project-archive]');
       if (archive) {
@@ -413,21 +623,30 @@
     if (closeAssignmentButton) {
       var activeProject = closeAssignmentButton.closest('[data-active-project]');
       var collaboratorColumn = closeAssignmentButton.closest('[data-active-collaborator]');
-      if (!activeProject || !collaboratorColumn || !window.confirm('کارکرد این همکار دریافت شده و پروژه از فهرست فعال او خارج شود؟')) return;
-      closeAssignmentButton.disabled = true;
-      closeAssignmentButton.textContent = 'در حال ثبت…';
-      request('zigurat_close_workflow_partner_assignment', {
-        project_id: activeProject.getAttribute('data-project-id'),
-        assignment_key: collaboratorColumn.getAttribute('data-assignment-key')
-      }).then(function (data) {
-        activeProject.remove();
-        if (!collaboratorColumn.querySelector('[data-active-project]')) collaboratorColumn.remove();
-        refreshActiveCollaborators();
-        showNotice(data.message, 'success');
-      }).catch(function (error) {
-        closeAssignmentButton.disabled = false;
-        closeAssignmentButton.textContent = 'کارکرد گرفته شد؛ حذف از فعال‌ها';
-        showNotice(error.message, 'error');
+      if (!activeProject || !collaboratorColumn) return;
+      showProjectConfirm({
+        variant: 'archive',
+        icon: '✓',
+        title: 'کارکرد دریافت شده است؟',
+        message: 'پروژه فقط از فهرست فعال این همکار خارج می‌شود و سوابق پروژه باقی می‌ماند.',
+        confirmText: 'بله، از فعال‌ها خارج شود'
+      }).then(function (confirmed) {
+        if (!confirmed) return;
+        closeAssignmentButton.disabled = true;
+        closeAssignmentButton.textContent = 'در حال ثبت…';
+        request('zigurat_close_workflow_partner_assignment', {
+          project_id: activeProject.getAttribute('data-project-id'),
+          assignment_key: collaboratorColumn.getAttribute('data-assignment-key')
+        }).then(function (data) {
+          activeProject.remove();
+          if (!collaboratorColumn.querySelector('[data-active-project]')) collaboratorColumn.remove();
+          refreshActiveCollaborators();
+          showNotice(data.message, 'success');
+        }).catch(function (error) {
+          closeAssignmentButton.disabled = false;
+          closeAssignmentButton.textContent = 'کارکرد گرفته شد؛ حذف از فعال‌ها';
+          showNotice(error.message, 'error');
+        });
       });
       return;
     }
@@ -459,6 +678,26 @@
         .catch(function (error) { showNotice(error.message, 'error'); })
         .finally(function () { editButton.disabled = false; });
     }
+  });
+
+  form.addEventListener('dblclick', function (event) {
+    var picker = event.target.closest('[data-document-picker]');
+    if (!picker) return;
+    event.preventDefault();
+    var option = event.target.tagName === 'OPTION' ? event.target : picker.options[picker.selectedIndex];
+    if (!option || !option.value) return;
+    addDocumentSelection(picker.getAttribute('data-document-picker'), option.value);
+    picker.selectedIndex = -1;
+  });
+
+  form.addEventListener('keydown', function (event) {
+    var picker = event.target.closest('[data-document-picker]');
+    if (!picker || event.key !== 'Enter') return;
+    event.preventDefault();
+    var option = picker.options[picker.selectedIndex];
+    if (!option || !option.value) return;
+    addDocumentSelection(picker.getAttribute('data-document-picker'), option.value);
+    picker.selectedIndex = -1;
   });
 
   board.addEventListener('change', function (event) {
@@ -505,19 +744,64 @@
       });
   });
 
+  function removeProjectFromBoard(projectId) {
+    var card = board.querySelector('[data-project-card][data-project-id="' + projectId + '"]');
+    if (card) card.remove();
+    removeProjectFromActiveLists(projectId);
+    refreshColumnState();
+    setBusy(false);
+    closeDialog();
+  }
+
   archiveButton.addEventListener('click', function () {
     var projectId = form.elements.project_id.value;
-    if (!projectId || !window.confirm('این پروژه لغو و به آرشیو منتقل شود؟')) return;
-    setBusy(true);
-    request('zigurat_archive_workflow_project', { project_id: projectId })
-      .then(function (data) {
-        showFormResult(data.message, 'success');
-        window.setTimeout(function () { window.location.reload(); }, 400);
-      })
-      .catch(function (error) {
-        showFormResult(error.message, 'error');
-        setBusy(false);
-      });
+    if (!projectId) return;
+    showProjectConfirm({
+      variant: 'archive',
+      icon: '↙',
+      title: 'انتقال پروژه به بایگانی',
+      message: 'کارت از ستون‌های فعال حذف می‌شود اما سابقه و تایم‌لاین پروژه در بایگانی باقی می‌ماند.',
+      confirmText: 'انتقال به بایگانی'
+    }).then(function (confirmed) {
+      if (!confirmed) return;
+      setBusy(true);
+      request('zigurat_archive_workflow_project', { project_id: projectId })
+        .then(function (data) {
+          removeProjectFromBoard(projectId);
+          archiveLoaded = false;
+          var archive = board.querySelector('section[data-project-archive]');
+          if (archive && !archive.hidden) loadArchiveRecords();
+          showNotice(data.message, 'success');
+        })
+        .catch(function (error) {
+          showFormResult(error.message, 'error');
+          setBusy(false);
+        });
+    });
+  });
+
+  deleteButton.addEventListener('click', function () {
+    var projectId = form.elements.project_id.value;
+    if (!projectId) return;
+    showProjectConfirm({
+      variant: 'delete',
+      icon: '×',
+      title: 'حذف دائمی کارت پروژه',
+      message: 'این کارت و تمام اطلاعات مدیریتی آن برای همیشه حذف می‌شود و امکان بازگردانی وجود ندارد.',
+      confirmText: 'حذف دائمی'
+    }).then(function (confirmed) {
+      if (!confirmed) return;
+      setBusy(true);
+      request('zigurat_delete_workflow_project', { project_id: projectId })
+        .then(function (data) {
+          removeProjectFromBoard(projectId);
+          showNotice(data.message, 'success');
+        })
+        .catch(function (error) {
+          showFormResult(error.message, 'error');
+          setBusy(false);
+        });
+    });
   });
 
   board.addEventListener('dragstart', function (event) {

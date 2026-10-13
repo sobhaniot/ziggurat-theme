@@ -17,10 +17,19 @@ if (have_posts()) :
             '_project_gallery',
             true
         );
-        $images = array();
-        if ($gallery) {
-            $images = explode(',', $gallery);
-        }
+        $images = array_values(array_filter(array_map('absint', explode(',', (string) $gallery))));
+        usort($images, static function ($first_id, $second_id) {
+            $first_name = wp_basename((string) get_attached_file($first_id));
+            $second_name = wp_basename((string) get_attached_file($second_id));
+            if ($first_name === '') {
+                $first_name = (string) get_the_title($first_id);
+            }
+            if ($second_name === '') {
+                $second_name = (string) get_the_title($second_id);
+            }
+            $comparison = strnatcasecmp(remove_accents($first_name), remove_accents($second_name));
+            return $comparison !== 0 ? $comparison : ($first_id <=> $second_id);
+        });
 ?>
         <section class="project-single">
             <div class="container">
@@ -74,13 +83,7 @@ if (have_posts()) :
                     <?php the_content(); ?>
                 </div>
                 <?php
-                $gallery = get_post_meta(
-                    get_the_ID(),
-                    '_project_gallery',
-                    true
-                );
-                if ($gallery):
-                    $images = explode(',', $gallery);
+                if ($images):
                 ?>
                     <div class="project-gallery">
                         <h2>

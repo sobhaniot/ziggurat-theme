@@ -10,10 +10,8 @@ $query = new WP_Query(array(
 <section class="clients">
     <div class="container">
         <div class="section-title">
-            <h2>برخی از مشتریان ما</h2>
-            <p>
-                اعتماد برندهای معتبر، بزرگ‌ترین سرمایه ماست.
-            </p>
+            <h2><?php echo esc_html(zigurat_t('clients_title')); ?></h2>
+            <p><?php echo esc_html(zigurat_t('clients_subtitle')); ?></p>
         </div>
         <?php if ($query->have_posts()) : ?>
             <div class="clients-grid">

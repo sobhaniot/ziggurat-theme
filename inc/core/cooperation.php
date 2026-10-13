@@ -731,12 +731,18 @@ function zigurat_handle_partner_application()
         $status_redirect('invalid');
     }
 
-    $photo_files = isset($_FILES['applicant_photo']) ? zigurat_normalize_uploads($_FILES['applicant_photo']) : array();
+    $is_manager_entry = function_exists('zigurat_is_manager') && zigurat_is_manager();
+    $valid_uploads = static function ($uploads) {
+        return array_values(array_filter($uploads, static function ($upload) {
+            return ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+        }));
+    };
+    $photo_files = isset($_FILES['applicant_photo']) ? $valid_uploads(zigurat_normalize_uploads($_FILES['applicant_photo'])) : array();
     $card_files = $type !== 'supplier' && isset($_FILES['national_card'])
-        ? zigurat_normalize_uploads($_FILES['national_card'])
+        ? $valid_uploads(zigurat_normalize_uploads($_FILES['national_card']))
         : array();
-    $portfolio_files = isset($_FILES['portfolio']) ? array_slice(zigurat_normalize_uploads($_FILES['portfolio']), 0, 5) : array();
-    if (!$photo_files || !$portfolio_files || ($type !== 'supplier' && !$card_files)) {
+    $portfolio_files = isset($_FILES['portfolio']) ? array_slice($valid_uploads(zigurat_normalize_uploads($_FILES['portfolio'])), 0, 5) : array();
+    if (!$is_manager_entry && (!$photo_files || !$portfolio_files || ($type !== 'supplier' && !$card_files))) {
         $status_redirect('upload-error');
     }
 

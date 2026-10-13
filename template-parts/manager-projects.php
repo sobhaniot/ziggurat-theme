@@ -18,12 +18,12 @@ foreach ($records as $record) {
     if ($record['stage'] !== 'delivery' && $record['followup'] !== '' && $today !== '' && strcmp($record['followup'], $today) <= 0) {
         $due_count++;
     }
-    if ($record['stage'] === 'delivery' && !$record['invoice_id']) {
+    if ($record['stage'] === 'delivery' && !$record['invoice_ids']) {
         $ready_invoice_count++;
     }
 }
-$proformas = zigurat_workflow_project_recent_documents('proforma');
-$invoices = zigurat_workflow_project_recent_documents('invoice');
+$proformas = zigurat_workflow_project_recent_documents('proforma', 500);
+$invoices = zigurat_workflow_project_recent_documents('invoice', 500);
 $partners = zigurat_workflow_project_partners();
 $stage_classes = array(
     'lead' => 'is-lead',
@@ -41,16 +41,16 @@ $stage_classes = array(
             <h2>مدیریت پروژه‌ها</h2>
             <p>مسیر هر مشتری را از اولین پیگیری تا تحویل و صدور فاکتور نهایی مدیریت کنید.</p>
         </div>
-        <div class="manager-projects__heading-actions"><button type="button" class="manager-projects__archive-jump" data-project-archive-jump>دیدن آرشیو</button><button type="button" class="manager-projects__new" data-project-new><span aria-hidden="true">＋</span> پروژه جدید</button></div>
+        <div class="manager-projects__heading-actions"><button type="button" class="manager-projects__new" data-project-new><span aria-hidden="true">＋</span> پروژه جدید</button><button type="button" class="manager-projects__archive-jump" data-project-archive-jump>دیدن آرشیو</button></div>
     </header>
 
     <div class="manager-projects__notice" data-project-notice role="status" aria-live="polite" hidden></div>
 
     <div class="manager-projects__summary">
-        <div><span>پروژه‌های فعال</span><strong><?php echo esc_html(number_format_i18n(count($records))); ?></strong><small>پروژه</small></div>
-        <div><span>نیازمند پیگیری</span><strong class="<?php echo $due_count ? 'is-alert' : ''; ?>"><?php echo esc_html(number_format_i18n($due_count)); ?></strong><small>مورد</small></div>
+        <div><span>پروژه‌های فعال</span><strong data-project-active-count><?php echo esc_html(number_format_i18n(count($records))); ?></strong><small>پروژه</small></div>
+        <div><span>نیازمند پیگیری</span><strong data-project-due-count class="<?php echo $due_count ? 'is-alert' : ''; ?>"><?php echo esc_html(number_format_i18n($due_count)); ?></strong><small>مورد</small></div>
         <div><span>در مرحله پیش‌فاکتور</span><strong data-project-proforma-count><?php echo esc_html(number_format_i18n(count($grouped['proforma']))); ?></strong><small>پروژه</small></div>
-        <div><span>آماده صدور فاکتور</span><strong><?php echo esc_html(number_format_i18n($ready_invoice_count)); ?></strong><small>پروژه</small></div>
+        <div><span>آماده صدور فاکتور</span><strong data-project-ready-invoice-count><?php echo esc_html(number_format_i18n($ready_invoice_count)); ?></strong><small>پروژه</small></div>
     </div>
 
     <div class="manager-project-board" data-project-columns aria-label="مراحل پروژه‌ها">
@@ -68,7 +68,7 @@ $stage_classes = array(
                             && $today !== ''
                             && strcmp($record['followup'], $today) <= 0;
                         ?>
-                        <article class="manager-project-card" draggable="true" data-project-card data-project-id="<?php echo (int) $record['id']; ?>" data-project-current-stage="<?php echo esc_attr($record['stage']); ?>" data-project-proforma-id="<?php echo (int) $record['proforma_id']; ?>" data-project-invoice-id="<?php echo (int) $record['invoice_id']; ?>" data-project-conversion-url="<?php echo esc_url($record['conversion_url']); ?>">
+                        <article class="manager-project-card" draggable="true" data-project-card data-project-id="<?php echo (int) $record['id']; ?>" data-project-current-stage="<?php echo esc_attr($record['stage']); ?>" data-project-proforma-id="<?php echo (int) $record['proforma_id']; ?>" data-project-proforma-ids="<?php echo esc_attr(implode(',', $record['proforma_ids'])); ?>" data-project-invoice-id="<?php echo (int) $record['invoice_id']; ?>" data-project-invoice-ids="<?php echo esc_attr(implode(',', $record['invoice_ids'])); ?>" data-project-conversion-url="<?php echo esc_url($record['conversion_url']); ?>">
                             <div class="manager-project-card__top">
                                 <span class="manager-project-card__grip" aria-label="دستگیره جابه‌جایی" title="برای جابه‌جایی بکشید">⠿</span>
                                 <button type="button" class="manager-project-card__edit" data-project-edit aria-label="ویرایش <?php echo esc_attr($record['title']); ?>">
@@ -89,10 +89,11 @@ $stage_classes = array(
                                     <?php if (count($record['work_items']) > 3): ?><small>+ <?php echo esc_html(number_format_i18n(count($record['work_items']) - 3)); ?> بخش دیگر</small><?php endif; ?>
                                 </div>
                             <?php endif; ?>
-                            <?php if ($record['proforma_url'] || $record['invoice_url']): ?>
+                            <?php if ($record['proformas'] || $record['invoices']): ?>
                                 <div class="manager-project-card__documents">
-                                    <?php if ($record['proforma_url']): ?><a href="<?php echo esc_url($record['proforma_url']); ?>">مشاهده پیش‌فاکتور</a><?php endif; ?>
-                                    <?php if ($record['invoice_url']): ?><a href="<?php echo esc_url($record['invoice_url']); ?>" data-project-invoice-link>مشاهده فاکتور</a><?php endif; ?>
+                                    <strong><?php echo esc_html(number_format_i18n(count($record['proformas']))); ?> پیش‌فاکتور · <?php echo esc_html(number_format_i18n(count($record['invoices']))); ?> فاکتور</strong>
+                                    <?php foreach ($record['proformas'] as $index => $document): ?><a href="<?php echo esc_url($document['url']); ?>">پیش‌فاکتور <?php echo esc_html(number_format_i18n($index + 1)); ?></a><?php endforeach; ?>
+                                    <?php foreach ($record['invoices'] as $index => $document): ?><a href="<?php echo esc_url($document['url']); ?>" data-project-invoice-link>فاکتور <?php echo esc_html(number_format_i18n($index + 1)); ?></a><?php endforeach; ?>
                                 </div>
                             <?php endif; ?>
                         </article>
@@ -167,12 +168,12 @@ $stage_classes = array(
             <input type="hidden" name="project_id" value="">
             <div class="manager-project-form__grid">
                 <label class="is-wide">نام پروژه *<input type="text" name="title" required maxlength="180" placeholder="مثلاً تابلو چلنیوم شعبه ولیعصر"></label>
-                <label>نام مشتری<input type="text" name="client" maxlength="180"></label>
+                <label>نام مشتری (شرکت / سرکارخانم / جناب آقای)<input type="text" name="client" maxlength="180" placeholder="مثلاً شرکت زیگورات یا جناب آقای احمدی"></label>
                 <label>شماره تماس<input type="tel" name="phone" maxlength="50" dir="ltr"></label>
                 <label>مرحله پروژه<select name="stage"><?php foreach ($stages as $key => $label): ?><option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option><?php endforeach; ?></select></label>
                 <label>تاریخ پیگیری بعدی<input type="text" name="followup" inputmode="numeric" dir="ltr" placeholder="1405/07/20" pattern="[0-9۰-۹]{4}/[0-9۰-۹]{1,2}/[0-9۰-۹]{1,2}"></label>
-                <label class="is-wide">اتصال به پیش‌فاکتور<select name="proforma_id"><option value="0">بدون پیش‌فاکتور</option><?php foreach ($proformas as $document): ?><option value="<?php echo (int) $document->id; ?>"><?php echo esc_html(zigurat_workflow_project_document_label($document)); ?></option><?php endforeach; ?></select></label>
-                <label class="is-wide">اتصال به فاکتور نهایی<select name="invoice_id"><option value="0">بدون فاکتور نهایی</option><?php foreach ($invoices as $document): ?><option value="<?php echo (int) $document->id; ?>"><?php echo esc_html(zigurat_workflow_project_document_label($document)); ?></option><?php endforeach; ?></select></label>
+                <label class="is-wide manager-project-document-picker">اتصال به پیش‌فاکتورها<span class="manager-project-document-picker__selected" data-document-selected="proforma" aria-live="polite"></span><select size="5" data-document-picker="proforma"><?php foreach ($proformas as $document): ?><option value="<?php echo (int) $document->id; ?>" data-document-number="<?php echo esc_attr(zigurat_invoice_object_number($document)); ?>"><?php echo esc_html(zigurat_workflow_project_document_label($document)); ?></option><?php endforeach; ?></select><small>برای افزودن، روی پیش‌فاکتور دوبار کلیک کنید. کارت تکراری خودکار در همین پروژه ادغام می‌شود.</small></label>
+                <label class="is-wide manager-project-document-picker">اتصال به فاکتورهای نهایی<span class="manager-project-document-picker__selected" data-document-selected="invoice" aria-live="polite"></span><select size="5" data-document-picker="invoice"><?php foreach ($invoices as $document): ?><option value="<?php echo (int) $document->id; ?>" data-document-number="<?php echo esc_attr(zigurat_invoice_object_number($document)); ?>"><?php echo esc_html(zigurat_workflow_project_document_label($document)); ?></option><?php endforeach; ?></select><small>برای افزودن، روی فاکتور دوبار کلیک کنید؛ انتخاب‌ها از بالای کادر قابل حذف هستند.</small></label>
                 <label class="is-wide">یادداشت‌ها<textarea name="notes" rows="4" maxlength="3000" placeholder="نتیجه تماس‌ها، توافق‌ها و نکات اجرایی پروژه"></textarea></label>
             </div>
             <section class="manager-project-work-editor">
@@ -189,10 +190,14 @@ $stage_classes = array(
                 <ol data-project-history-list></ol>
             </section>
             <footer>
-                <button type="button" class="manager-project-form__archive" data-project-archive hidden>لغو و بایگانی پروژه</button>
-                <span></span>
-                <button type="button" class="manager-project-form__cancel" data-project-close>انصراف</button>
-                <button type="submit" class="manager-project-form__save">ذخیره پروژه</button>
+                <div class="manager-project-form__footer-actions">
+                    <button type="submit" class="manager-project-form__save">ذخیره پروژه</button>
+                    <button type="button" class="manager-project-form__cancel" data-project-close>انصراف</button>
+                    <div class="manager-project-form__destructive-actions" data-project-destructive-actions hidden>
+                        <button type="button" class="manager-project-form__archive" data-project-archive-action>انتقال به بایگانی</button>
+                        <button type="button" class="manager-project-form__delete" data-project-delete-action>حذف دائمی کارت</button>
+                    </div>
+                </div>
             </footer>
         </form>
         <template data-project-work-template>

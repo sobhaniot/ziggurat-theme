@@ -30,6 +30,7 @@ function zigurat_enqueue_assets()
         zigurat_enqueue_theme_style('footer');
         zigurat_enqueue_theme_style('responsive');
     }
+    zigurat_enqueue_theme_style('multilingual', array());
     zigurat_enqueue_theme_script('header');
     zigurat_enqueue_theme_script('form-inputs');
 

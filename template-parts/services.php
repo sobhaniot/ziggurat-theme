@@ -22,8 +22,8 @@ if (!$services->have_posts()) {
         <?php endif; ?>
         <?php if (is_front_page()) : ?>
             <div class="section-header">
-                <h2>خدمات زیگورات</h2>
-                <p>طراحی، ساخت و اجرای تابلوهای تبلیغاتی</p>
+                <h2><?php echo esc_html(zigurat_t('services_title')); ?></h2>
+                <p><?php echo esc_html(zigurat_t('services_subtitle')); ?></p>
             </div>
         <?php endif; ?>
         <div class="services-grid">
@@ -45,7 +45,7 @@ if (!$services->have_posts()) {
                 );
                 ?>
                 <article id="service-<?php the_ID(); ?>" class="service-card">
-                    <a class="service-card__link" href="<?php echo esc_url($service_projects_url); ?>" aria-label="<?php echo esc_attr(sprintf('مشاهده پروژه‌های %s', get_the_title())); ?>">
+                    <a class="service-card__link" href="<?php echo esc_url($service_projects_url); ?>" aria-label="<?php echo esc_attr(zigurat_t('view_service_projects', array(get_the_title()))); ?>">
                         <?php if (has_post_thumbnail()) : ?>
                             <div class="service-image">
                                 <?php the_post_thumbnail('medium_large'); ?>

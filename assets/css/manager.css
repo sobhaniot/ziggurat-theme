@@ -33,6 +33,34 @@
 .manager-applications__toolbar form { margin: 0; }
 .manager-applications__toolbar .manager-application-delete,
 .manager-application-actions .manager-application-delete { border-color: #a93232; background: #a93232; color: #fff; }
+.manager-resume-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  width: 100%;
+  gap: 10px;
+}
+.manager-resume-actions > a,
+.manager-resume-actions > button,
+.manager-resume-actions > form { min-width: 0; width: 100%; }
+.manager-resume-actions > form { display: block; }
+.manager-resume-actions > a,
+.manager-resume-actions > button,
+.manager-resume-actions > form > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border-radius: 9px;
+  color: #fff;
+  font-weight: 800;
+  text-align: center;
+}
+.manager-resume-actions .manager-resume-actions__back { border-color: #4d5662; background: #4d5662; color: #fff; }
+.manager-resume-actions .manager-resume-actions__print { border-color: #28769a; background: #28769a; color: #fff; }
+.manager-resume-actions .manager-resume-actions__edit { border-color: #b9851f; background: #c89428; color: #211a0c; }
+.manager-resume-actions > form > .manager-application-delete { min-height: 48px; border-color: #a93232; background: #a93232; color: #fff; }
 .manager-application-actions { display: flex; align-items: center; gap: 7px; }
 .manager-application-actions form { margin: 0; }
 .manager-application-actions .manager-application-delete { min-height: 39px; padding: 7px 12px; border: 1px solid #a93232; border-radius: 7px; font: inherit; font-weight: 800; cursor: pointer; }

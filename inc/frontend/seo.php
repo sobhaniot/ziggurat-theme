@@ -217,7 +217,7 @@ function zigurat_seo_canonical_url()
         return '';
     }
     if (is_front_page()) {
-        return home_url('/');
+        return function_exists('zigurat_localized_url') ? zigurat_localized_url(home_url('/')) : home_url('/');
     }
     if (is_singular()) {
         return get_permalink(get_queried_object_id());
@@ -365,7 +365,10 @@ function zigurat_output_seo_head()
     if ($canonical) {
         echo '<link rel="canonical" href="' . esc_url($canonical) . '">' . "\n";
     }
-    echo '<meta property="og:locale" content="fa_IR">' . "\n";
+    $site_language = function_exists('zigurat_current_language') ? zigurat_current_language() : 'fa';
+    $site_languages = function_exists('zigurat_site_languages') ? zigurat_site_languages() : array('fa' => array('locale' => 'fa_IR'));
+    $site_locale = $site_languages[$site_language]['locale'] ?? 'fa_IR';
+    echo '<meta property="og:locale" content="' . esc_attr(str_replace('-', '_', $site_locale)) . '">' . "\n";
     echo '<meta property="og:type" content="' . (is_singular('article') ? 'article' : 'website') . '">' . "\n";
     echo '<meta property="og:site_name" content="' . esc_attr(get_bloginfo('name')) . '">' . "\n";
     echo '<meta property="og:title" content="' . esc_attr($title) . '">' . "\n";
@@ -406,7 +409,7 @@ function zigurat_output_seo_head()
             '@id' => home_url('/#website'),
             'url' => home_url('/'),
             'name' => get_bloginfo('name'),
-            'inLanguage' => 'fa-IR',
+            'inLanguage' => str_replace('_', '-', $site_locale),
             'publisher' => array('@id' => home_url('/#organization')),
         );
     }
@@ -416,7 +419,7 @@ function zigurat_output_seo_head()
         '@id' => $canonical . '#webpage',
         'url' => $canonical,
         'name' => $title,
-        'inLanguage' => 'fa-IR',
+        'inLanguage' => str_replace('_', '-', $site_locale),
         'isPartOf' => array('@id' => home_url('/#website')),
         'about' => array('@id' => home_url('/#organization')),
     );

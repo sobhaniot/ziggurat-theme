@@ -143,20 +143,97 @@ function zigurat_workflow_project_conversion_url($proforma)
     ));
 }
 
+/**
+ * شناسه همه اسناد متصل به یک کارت. کلیدهای تکی نسخه قدیمی همچنان خوانده
+ * می‌شوند تا پروژه‌های موجود بدون مهاجرت دستی قابل استفاده باشند.
+ */
+function zigurat_workflow_project_document_ids($project_id, $document_type)
+{
+    $project_id = absint($project_id);
+    $document_type = $document_type === 'invoice' ? 'invoice' : 'proforma';
+    $plural_key = $document_type === 'invoice'
+        ? '_zigurat_work_project_invoices'
+        : '_zigurat_work_project_proformas';
+    $legacy_key = $document_type === 'invoice'
+        ? '_zigurat_work_project_invoice'
+        : '_zigurat_work_project_proforma';
+    $ids = array();
+    foreach ((array) get_post_meta($project_id, $plural_key, false) as $stored) {
+        foreach ((array) $stored as $document_id) {
+            $document_id = absint($document_id);
+            if ($document_id) {
+                $ids[] = $document_id;
+            }
+        }
+    }
+    $legacy_id = absint(get_post_meta($project_id, $legacy_key, true));
+    if ($legacy_id) {
+        $ids[] = $legacy_id;
+    }
+    return array_values(array_unique($ids));
+}
+
+function zigurat_workflow_project_set_document_ids($project_id, $document_type, $document_ids)
+{
+    $project_id = absint($project_id);
+    $document_type = $document_type === 'invoice' ? 'invoice' : 'proforma';
+    $plural_key = $document_type === 'invoice'
+        ? '_zigurat_work_project_invoices'
+        : '_zigurat_work_project_proformas';
+    $legacy_key = $document_type === 'invoice'
+        ? '_zigurat_work_project_invoice'
+        : '_zigurat_work_project_proforma';
+    $document_ids = array_values(array_unique(array_filter(array_map('absint', (array) $document_ids))));
+    delete_post_meta($project_id, $plural_key);
+    foreach ($document_ids as $document_id) {
+        add_post_meta($project_id, $plural_key, $document_id, false);
+    }
+    update_post_meta($project_id, $legacy_key, $document_ids ? (int) end($document_ids) : 0);
+    return $document_ids;
+}
+
+function zigurat_workflow_project_add_document($project_id, $document_type, $document_id)
+{
+    $ids = zigurat_workflow_project_document_ids($project_id, $document_type);
+    $document_id = absint($document_id);
+    if ($document_id && !in_array($document_id, $ids, true)) {
+        $ids[] = $document_id;
+    }
+    return zigurat_workflow_project_set_document_ids($project_id, $document_type, $ids);
+}
+
+function zigurat_workflow_project_documents($project_id, $document_type)
+{
+    $documents = array();
+    foreach (zigurat_workflow_project_document_ids($project_id, $document_type) as $document_id) {
+        $document = zigurat_workflow_project_document($document_id, $document_type);
+        if ($document) {
+            $documents[] = $document;
+        }
+    }
+    return $documents;
+}
+
 function zigurat_workflow_project_find_by_document($meta_key, $document_id)
 {
     $document_id = absint($document_id);
     if (!$document_id || !in_array($meta_key, array('_zigurat_work_project_proforma', '_zigurat_work_project_invoice'), true)) {
         return 0;
     }
+    $plural_key = $meta_key === '_zigurat_work_project_invoice'
+        ? '_zigurat_work_project_invoices'
+        : '_zigurat_work_project_proformas';
     $projects = get_posts(array(
         'post_type' => 'zig_work_project',
         'post_status' => 'private',
         'posts_per_page' => 1,
         'fields' => 'ids',
         'no_found_rows' => true,
-        'meta_key' => $meta_key,
-        'meta_value' => $document_id,
+        'meta_query' => array(
+            'relation' => 'OR',
+            array('key' => $plural_key, 'value' => $document_id, 'compare' => '='),
+            array('key' => $meta_key, 'value' => $document_id, 'compare' => '='),
+        ),
     ));
     return $projects ? (int) $projects[0] : 0;
 }
@@ -170,6 +247,12 @@ function zigurat_workflow_sync_saved_invoice($invoice)
     if ($invoice->document_type === 'proforma') {
         $project_id = zigurat_workflow_project_find_by_document('_zigurat_work_project_proforma', $invoice->id);
         if ($project_id) {
+            zigurat_workflow_project_add_document($project_id, 'proforma', $invoice->id);
+            $old_stage = sanitize_key((string) get_post_meta($project_id, '_zigurat_work_project_stage', true));
+            if ($old_stage === '' || $old_stage === 'lead') {
+                update_post_meta($project_id, '_zigurat_work_project_stage', 'proforma');
+                zigurat_workflow_project_add_history($project_id, $old_stage ?: 'lead', 'proforma', 'proforma');
+            }
             return;
         }
         $title = trim((string) ($invoice->subject ?? ''));
@@ -189,8 +272,8 @@ function zigurat_workflow_sync_saved_invoice($invoice)
         update_post_meta($project_id, '_zigurat_work_project_stage', 'proforma');
         update_post_meta($project_id, '_zigurat_work_project_client', sanitize_text_field((string) ($invoice->customer_name ?? '')));
         update_post_meta($project_id, '_zigurat_work_project_phone', sanitize_text_field((string) ($invoice->customer_phone ?? '')));
-        update_post_meta($project_id, '_zigurat_work_project_proforma', (int) $invoice->id);
-        update_post_meta($project_id, '_zigurat_work_project_invoice', 0);
+        zigurat_workflow_project_set_document_ids($project_id, 'proforma', array((int) $invoice->id));
+        zigurat_workflow_project_set_document_ids($project_id, 'invoice', array());
         zigurat_workflow_project_add_history($project_id, '', 'proforma', 'created');
         return;
     }
@@ -203,12 +286,19 @@ function zigurat_workflow_sync_saved_invoice($invoice)
         return;
     }
     $old_stage = sanitize_key((string) get_post_meta($project_id, '_zigurat_work_project_stage', true));
-    update_post_meta($project_id, '_zigurat_work_project_invoice', (int) $invoice->id);
-    if (($invoice->payment_status ?? '') === 'settled') {
+    zigurat_workflow_project_add_document($project_id, 'invoice', $invoice->id);
+    $project_invoices = zigurat_workflow_project_documents($project_id, 'invoice');
+    $all_invoices_settled = $project_invoices && !array_filter($project_invoices, static function ($project_invoice) {
+        return ($project_invoice->payment_status ?? '') !== 'settled';
+    });
+    if ($all_invoices_settled) {
         zigurat_workflow_archive_project($project_id);
         return;
     }
-    $next_stage = $old_stage === 'payment' ? 'payment' : 'delivery';
+    $has_settled_invoice = (bool) array_filter($project_invoices, static function ($project_invoice) {
+        return ($project_invoice->payment_status ?? '') === 'settled';
+    });
+    $next_stage = ($old_stage === 'payment' || $has_settled_invoice) ? 'payment' : 'delivery';
     update_post_meta($project_id, '_zigurat_work_project_stage', $next_stage);
     if ($old_stage !== $next_stage) {
         zigurat_workflow_project_add_history($project_id, $old_stage, $next_stage, 'invoice');
@@ -225,6 +315,16 @@ function zigurat_workflow_create_invoice_from_proforma($proforma)
     if (!$proforma || $proforma->document_type !== 'proforma' || !function_exists('zigurat_invoice_save')) {
         return new WP_Error('invalid_proforma', 'پیش‌فاکتور مبدأ معتبر نیست.');
     }
+    // کارت پروژه برای سرعت فقط خلاصه سند را نگه می‌دارد. برای تبدیل باید
+    // پیش‌فاکتور کامل، به‌ویژه ردیف‌های کالا/خدمت و اطلاعات فروشنده، خوانده شود.
+    $full_proforma = function_exists('zigurat_invoice_get') ? zigurat_invoice_get($proforma->id) : null;
+    if (!$full_proforma || $full_proforma->document_type !== 'proforma') {
+        return new WP_Error('invalid_proforma', 'اطلاعات کامل پیش‌فاکتور پیدا نشد.');
+    }
+    if (empty($full_proforma->items) || !is_array($full_proforma->items)) {
+        return new WP_Error('invalid_proforma_items', 'پیش‌فاکتور انتخاب‌شده ردیف کالا یا خدمت ندارد.');
+    }
+    $proforma = $full_proforma;
     if (function_exists('zigurat_invoice_get_conversion')) {
         $existing = zigurat_invoice_get_conversion($proforma->id);
         if ($existing) {
@@ -295,10 +395,11 @@ function zigurat_workflow_project_recent_documents($document_type, $limit = 40)
     }
     $document_type = $document_type === 'invoice' ? 'invoice' : 'proforma';
     $limit = max(20, min(500, absint($limit)));
+    $payment_condition = $document_type === 'invoice' ? " AND payment_status <> 'settled'" : '';
     return $wpdb->get_results($wpdb->prepare(
-        'SELECT id, brand, document_type, document_number, number_suffix, customer_name, subject, status, grand_total
+        'SELECT id, brand, document_type, document_number, number_suffix, customer_name, subject, status, payment_status, grand_total
          FROM ' . zigurat_invoices_table_name() . '
-         WHERE document_type = %s
+         WHERE document_type = %s' . $payment_condition . '
          ORDER BY id DESC LIMIT %d',
         $document_type,
         $limit
@@ -557,8 +658,10 @@ function zigurat_workflow_project_record($project)
     if (!isset($stages[$stage])) {
         $stage = 'lead';
     }
-    $proforma = zigurat_workflow_project_document(get_post_meta($project->ID, '_zigurat_work_project_proforma', true), 'proforma');
-    $invoice = zigurat_workflow_project_document(get_post_meta($project->ID, '_zigurat_work_project_invoice', true), 'invoice');
+    $proformas = zigurat_workflow_project_documents($project->ID, 'proforma');
+    $invoices = zigurat_workflow_project_documents($project->ID, 'invoice');
+    $proforma = $proformas ? end($proformas) : null;
+    $invoice = $invoices ? end($invoices) : null;
     $raw_history = get_post_meta($project->ID, '_zigurat_work_project_history', true);
     $history = array();
     foreach (array_reverse(array_slice(is_array($raw_history) ? $raw_history : array(), -12)) as $entry) {
@@ -579,6 +682,7 @@ function zigurat_workflow_project_record($project)
     }
     return array(
         'id' => (int) $project->ID,
+        'archived' => $project->post_status === 'trash',
         'title' => (string) $project->post_title,
         'stage' => $stage,
         'stage_label' => $stages[$stage],
@@ -587,10 +691,30 @@ function zigurat_workflow_project_record($project)
         'followup' => (string) get_post_meta($project->ID, '_zigurat_work_project_followup', true),
         'work_items' => zigurat_workflow_project_work_items($project->ID),
         'notes' => (string) get_post_meta($project->ID, '_zigurat_work_project_notes', true),
+        'proforma_ids' => array_values(array_map(static function ($document) { return (int) $document->id; }, $proformas)),
+        'proformas' => array_values(array_map(static function ($document) {
+            return array(
+                'id' => (int) $document->id,
+                'number' => function_exists('zigurat_invoice_object_number') ? zigurat_invoice_object_number($document) : (string) $document->document_number,
+                'label' => zigurat_workflow_project_document_label($document),
+                'url' => zigurat_workflow_project_document_url($document),
+                'conversion_url' => zigurat_workflow_project_conversion_url($document),
+            );
+        }, $proformas)),
         'proforma_id' => $proforma ? (int) $proforma->id : 0,
         'proforma_label' => zigurat_workflow_project_document_label($proforma),
         'proforma_url' => zigurat_workflow_project_document_url($proforma),
         'conversion_url' => zigurat_workflow_project_conversion_url($proforma),
+        'invoice_ids' => array_values(array_map(static function ($document) { return (int) $document->id; }, $invoices)),
+        'invoices' => array_values(array_map(static function ($document) {
+            return array(
+                'id' => (int) $document->id,
+                'number' => function_exists('zigurat_invoice_object_number') ? zigurat_invoice_object_number($document) : (string) $document->document_number,
+                'label' => zigurat_workflow_project_document_label($document),
+                'url' => zigurat_workflow_project_document_url($document),
+                'payment_status' => sanitize_key((string) ($document->payment_status ?? '')),
+            );
+        }, $invoices)),
         'invoice_id' => $invoice ? (int) $invoice->id : 0,
         'invoice_label' => zigurat_workflow_project_document_label($invoice),
         'invoice_url' => zigurat_workflow_project_document_url($invoice),
@@ -599,11 +723,51 @@ function zigurat_workflow_project_record($project)
     );
 }
 
+/** کارت‌هایی که یک سند مشترک دارند، همان پروژه‌اند و پیش از نمایش یکی می‌شوند. */
+function zigurat_workflow_merge_duplicate_document_projects()
+{
+    static $done = false;
+    if ($done || !zigurat_is_manager()) {
+        return;
+    }
+    $done = true;
+    $safety = 0;
+    do {
+        $merged = false;
+        $owners = array();
+        $projects = get_posts(array(
+            'post_type' => 'zig_work_project',
+            'post_status' => 'private',
+            'posts_per_page' => -1,
+            'orderby' => 'date',
+            'order' => 'ASC',
+            'no_found_rows' => true,
+        ));
+        foreach ($projects as $project) {
+            foreach (array('proforma', 'invoice') as $document_type) {
+                foreach (zigurat_workflow_project_document_ids($project->ID, $document_type) as $document_id) {
+                    $key = $document_type . ':' . $document_id;
+                    if (!isset($owners[$key])) {
+                        $owners[$key] = (int) $project->ID;
+                        continue;
+                    }
+                    if (zigurat_workflow_merge_projects((int) $owners[$key], (int) $project->ID)) {
+                        $merged = true;
+                        break 3;
+                    }
+                }
+            }
+        }
+        $safety++;
+    } while ($merged && $safety < 250);
+}
+
 function zigurat_workflow_project_records()
 {
     if (!zigurat_is_manager()) {
         return array();
     }
+    zigurat_workflow_merge_duplicate_document_projects();
     $query = new WP_Query(array(
         'post_type' => 'zig_work_project',
         'post_status' => 'private',
@@ -614,8 +778,11 @@ function zigurat_workflow_project_records()
     ));
     $document_ids = array();
     foreach ($query->posts as $project) {
-        $document_ids[] = get_post_meta($project->ID, '_zigurat_work_project_proforma', true);
-        $document_ids[] = get_post_meta($project->ID, '_zigurat_work_project_invoice', true);
+        $document_ids = array_merge(
+            $document_ids,
+            zigurat_workflow_project_document_ids($project->ID, 'proforma'),
+            zigurat_workflow_project_document_ids($project->ID, 'invoice')
+        );
     }
     zigurat_workflow_prime_documents($document_ids);
     return array_values(array_filter(array_map('zigurat_workflow_project_record', $query->posts)));
@@ -636,8 +803,11 @@ function zigurat_workflow_archived_records()
     ));
     $document_ids = array();
     foreach ($query->posts as $project) {
-        $document_ids[] = get_post_meta($project->ID, '_zigurat_work_project_proforma', true);
-        $document_ids[] = get_post_meta($project->ID, '_zigurat_work_project_invoice', true);
+        $document_ids = array_merge(
+            $document_ids,
+            zigurat_workflow_project_document_ids($project->ID, 'proforma'),
+            zigurat_workflow_project_document_ids($project->ID, 'invoice')
+        );
     }
     zigurat_workflow_prime_documents($document_ids);
     $records = array();
@@ -710,6 +880,96 @@ function zigurat_workflow_archive_project($project_id)
     return (bool) wp_trash_post($project_id);
 }
 
+function zigurat_workflow_project_valid_document_ids($raw_ids, $document_type)
+{
+    $ids = array_values(array_unique(array_filter(array_map('absint', (array) $raw_ids))));
+    return array_values(array_filter($ids, static function ($document_id) use ($document_type) {
+        return (bool) zigurat_workflow_project_document($document_id, $document_type);
+    }));
+}
+
+/** ادغام کارت خودکار/تکراری در کارت اصلی بدون حذف اسناد و تاریخچه. */
+function zigurat_workflow_merge_projects($target_id, $source_id)
+{
+    $target_id = absint($target_id);
+    $source_id = absint($source_id);
+    if (!$target_id || !$source_id || $target_id === $source_id) {
+        return false;
+    }
+    $target = get_post($target_id);
+    $source = get_post($source_id);
+    if (!$target || !$source || $target->post_type !== 'zig_work_project' || $source->post_type !== 'zig_work_project' || $source->post_status !== 'private') {
+        return false;
+    }
+
+    foreach (array('proforma', 'invoice') as $document_type) {
+        $ids = array_merge(
+            zigurat_workflow_project_document_ids($target_id, $document_type),
+            zigurat_workflow_project_document_ids($source_id, $document_type)
+        );
+        zigurat_workflow_project_set_document_ids($target_id, $document_type, $ids);
+    }
+
+    $stage_order = array_keys(zigurat_workflow_project_stages());
+    $target_stage = sanitize_key((string) get_post_meta($target_id, '_zigurat_work_project_stage', true));
+    $source_stage = sanitize_key((string) get_post_meta($source_id, '_zigurat_work_project_stage', true));
+    $target_rank = array_search($target_stage, $stage_order, true);
+    $source_rank = array_search($source_stage, $stage_order, true);
+    $merged_stage = ($source_rank !== false && ($target_rank === false || $source_rank > $target_rank)) ? $source_stage : $target_stage;
+    if ($merged_stage === '' || !isset(zigurat_workflow_project_stages()[$merged_stage])) {
+        $merged_stage = 'lead';
+    }
+    if (zigurat_workflow_project_document_ids($target_id, 'invoice') && !in_array($merged_stage, array('delivery', 'payment'), true)) {
+        $merged_stage = 'delivery';
+    } elseif (zigurat_workflow_project_document_ids($target_id, 'proforma') && $merged_stage === 'lead') {
+        $merged_stage = 'proforma';
+    }
+    update_post_meta($target_id, '_zigurat_work_project_stage', $merged_stage);
+
+    foreach (array('client', 'phone', 'followup', 'notes') as $field) {
+        $key = '_zigurat_work_project_' . $field;
+        if (trim((string) get_post_meta($target_id, $key, true)) === '') {
+            $source_value = get_post_meta($source_id, $key, true);
+            if ($source_value !== '') {
+                update_post_meta($target_id, $key, $source_value);
+            }
+        }
+    }
+
+    $target_items = zigurat_workflow_project_work_items($target_id);
+    $source_items = zigurat_workflow_project_work_items($source_id);
+    $known_items = array();
+    foreach ($target_items as $item) {
+        $known_items[md5(wp_json_encode(array($item['title'], $item['partner_ids'], $item['other_partner'])))] = true;
+    }
+    foreach ($source_items as $item) {
+        $key = md5(wp_json_encode(array($item['title'], $item['partner_ids'], $item['other_partner'])));
+        if (!isset($known_items[$key])) {
+            $target_items[] = $item;
+            $known_items[$key] = true;
+        }
+    }
+    update_post_meta($target_id, '_zigurat_work_project_work_items', $target_items);
+
+    $target_closed = get_post_meta($target_id, '_zigurat_work_project_closed_partners', true);
+    $source_closed = get_post_meta($source_id, '_zigurat_work_project_closed_partners', true);
+    update_post_meta($target_id, '_zigurat_work_project_closed_partners', array_merge(
+        is_array($source_closed) ? $source_closed : array(),
+        is_array($target_closed) ? $target_closed : array()
+    ));
+
+    $target_history = get_post_meta($target_id, '_zigurat_work_project_history', true);
+    $source_history = get_post_meta($source_id, '_zigurat_work_project_history', true);
+    $history = array_merge(is_array($target_history) ? $target_history : array(), is_array($source_history) ? $source_history : array());
+    usort($history, static function ($first, $second) {
+        return strcmp((string) ($first['time'] ?? ''), (string) ($second['time'] ?? ''));
+    });
+    update_post_meta($target_id, '_zigurat_work_project_history', array_slice($history, -99));
+    zigurat_workflow_project_add_history($target_id, '', '', 'merged');
+    wp_delete_post($source_id, true);
+    return true;
+}
+
 function zigurat_workflow_project_save_from_request($data)
 {
     if (!zigurat_is_manager()) {
@@ -729,11 +989,11 @@ function zigurat_workflow_project_save_from_request($data)
     if (!isset($stages[$stage])) {
         $stage = 'lead';
     }
-    $proforma = zigurat_workflow_project_document($data['proforma_id'] ?? 0, 'proforma');
-    $invoice = zigurat_workflow_project_document($data['invoice_id'] ?? 0, 'invoice');
-    if ($invoice) {
+    $proforma_ids = zigurat_workflow_project_valid_document_ids($data['proforma_ids'] ?? ($data['proforma_id'] ?? array()), 'proforma');
+    $invoice_ids = zigurat_workflow_project_valid_document_ids($data['invoice_ids'] ?? ($data['invoice_id'] ?? array()), 'invoice');
+    if ($invoice_ids && $stage !== 'payment') {
         $stage = 'delivery';
-    } elseif ($proforma && $stage === 'lead') {
+    } elseif ($proforma_ids && $stage === 'lead') {
         $stage = 'proforma';
     }
     $post_data = array(
@@ -771,8 +1031,32 @@ function zigurat_workflow_project_save_from_request($data)
     update_post_meta($result, '_zigurat_work_project_closed_partners', $closed_partners);
     delete_post_meta($result, '_zigurat_work_project_owner');
     update_post_meta($result, '_zigurat_work_project_notes', sanitize_textarea_field(wp_unslash((string) ($data['notes'] ?? ''))));
-    update_post_meta($result, '_zigurat_work_project_proforma', $proforma ? (int) $proforma->id : 0);
-    update_post_meta($result, '_zigurat_work_project_invoice', $invoice ? (int) $invoice->id : 0);
+    $duplicate_project_ids = array();
+    foreach ($proforma_ids as $document_id) {
+        $duplicate_id = zigurat_workflow_project_find_by_document('_zigurat_work_project_proforma', $document_id);
+        if ($duplicate_id && $duplicate_id !== (int) $result) {
+            $duplicate_project_ids[] = $duplicate_id;
+        }
+    }
+    foreach ($invoice_ids as $document_id) {
+        $duplicate_id = zigurat_workflow_project_find_by_document('_zigurat_work_project_invoice', $document_id);
+        if ($duplicate_id && $duplicate_id !== (int) $result) {
+            $duplicate_project_ids[] = $duplicate_id;
+        }
+    }
+    zigurat_workflow_project_set_document_ids($result, 'proforma', $proforma_ids);
+    zigurat_workflow_project_set_document_ids($result, 'invoice', $invoice_ids);
+    foreach (array_unique($duplicate_project_ids) as $duplicate_project_id) {
+        zigurat_workflow_merge_projects($result, $duplicate_project_id);
+    }
+    $effective_invoice_ids = zigurat_workflow_project_document_ids($result, 'invoice');
+    $effective_proforma_ids = zigurat_workflow_project_document_ids($result, 'proforma');
+    if ($effective_invoice_ids && $stage !== 'payment') {
+        $stage = 'delivery';
+    } elseif (!$effective_invoice_ids && $effective_proforma_ids && $stage === 'lead') {
+        $stage = 'proforma';
+    }
+    update_post_meta($result, '_zigurat_work_project_stage', $stage);
     if (!$existing || $old_stage !== $stage) {
         zigurat_workflow_project_add_history($result, $old_stage, $stage, $existing ? 'stage' : 'created');
     }
@@ -824,21 +1108,27 @@ function zigurat_ajax_move_workflow_project()
         wp_send_json_error(array('message' => 'مرحله انتخاب‌شده معتبر نیست.'), 400);
     }
     $created_invoice = null;
-    $proforma_id = absint(get_post_meta($project_id, '_zigurat_work_project_proforma', true));
-    $invoice_id = absint(get_post_meta($project_id, '_zigurat_work_project_invoice', true));
-    if ($stage === 'delivery' && $proforma_id && !$invoice_id) {
+    $proforma_ids = zigurat_workflow_project_document_ids($project_id, 'proforma');
+    $invoice_ids = zigurat_workflow_project_document_ids($project_id, 'invoice');
+    $proforma_id = $proforma_ids ? (int) end($proforma_ids) : 0;
+    $invoice_id = $invoice_ids ? (int) end($invoice_ids) : 0;
+    if ($stage === 'delivery' && $proforma_id && !$invoice_ids) {
         $proforma = zigurat_workflow_project_document($proforma_id, 'proforma');
         $created_invoice = zigurat_workflow_create_invoice_from_proforma($proforma);
         if (is_wp_error($created_invoice)) {
             wp_send_json_error(array('message' => $created_invoice->get_error_message()), 400);
         }
         $invoice_id = absint($created_invoice->id ?? 0);
+        if ($invoice_id) {
+            zigurat_workflow_project_add_document($project_id, 'invoice', $invoice_id);
+            $invoice_ids[] = $invoice_id;
+        }
     }
-    if ($stage === 'payment' && !$invoice_id) {
+    if ($stage === 'payment' && !$invoice_ids) {
         wp_send_json_error(array('message' => 'برای ورود به انتظار پرداخت، ابتدا فاکتور نهایی را بسازید.'), 400);
     }
     if ($stage === 'delivery') {
-        if ($proforma_id && !$invoice_id) {
+        if ($proforma_id && !$invoice_ids) {
             wp_send_json_error(array('message' => 'ابتدا فاکتور نهایی را از پیش‌فاکتور بسازید و ذخیره کنید.'), 409);
         }
     }
@@ -876,6 +1166,24 @@ function zigurat_ajax_archive_workflow_project()
     wp_send_json_success(array('message' => 'پروژه بایگانی شد.'));
 }
 add_action('wp_ajax_zigurat_archive_workflow_project', 'zigurat_ajax_archive_workflow_project');
+
+function zigurat_ajax_delete_workflow_project()
+{
+    check_ajax_referer('zigurat_workflow_projects', 'nonce');
+    if (!zigurat_is_manager()) {
+        wp_send_json_error(array('message' => 'دسترسی مجاز نیست.'), 403);
+    }
+    $project_id = absint($_POST['project_id'] ?? 0);
+    $project = get_post($project_id);
+    if (!$project || $project->post_type !== 'zig_work_project' || $project->post_status !== 'private') {
+        wp_send_json_error(array('message' => 'پروژه پیدا نشد.'), 404);
+    }
+    if (!wp_delete_post($project_id, true)) {
+        wp_send_json_error(array('message' => 'حذف کارت انجام نشد.'), 500);
+    }
+    wp_send_json_success(array('message' => 'کارت پروژه برای همیشه حذف شد.'));
+}
+add_action('wp_ajax_zigurat_delete_workflow_project', 'zigurat_ajax_delete_workflow_project');
 
 function zigurat_ajax_close_workflow_partner_assignment()
 {

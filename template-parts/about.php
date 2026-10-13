@@ -5,7 +5,7 @@ if (!$about) {
 }
 $title = get_the_title($about);
 $link  = get_permalink($about->ID);
-$excerpt = $about->post_excerpt;
+$excerpt = get_the_excerpt($about);
 $about_stats = zigurat_get_about_stats($about->ID);
 if (empty($excerpt)) {
     $excerpt = wp_trim_words(
@@ -49,7 +49,7 @@ if (empty($excerpt)) {
                     <a
                         href="<?php echo esc_url($link); ?>"
                         class="btn-primary">
-                        بیشتر بخوانید
+                        <?php echo esc_html(zigurat_t('read_more')); ?>
                     </a>
                 </div>
             </div>

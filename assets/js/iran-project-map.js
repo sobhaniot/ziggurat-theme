@@ -9,14 +9,17 @@
 
       var defaultTitle = title.textContent;
       var defaultDescription = description.textContent;
+      var locale = map.getAttribute('data-map-locale') || 'fa-IR';
+      var projectsLabel = map.getAttribute('data-map-projects-label') || '%s پروژه ثبت‌شده؛ برای مشاهده کلیک کنید.';
+      var emptyLabel = map.getAttribute('data-map-empty-label') || 'هنوز پروژه‌ای برای این استان ثبت نشده است.';
 
       function showProvince(path) {
         var province = path.getAttribute('data-province') || '';
         var count = parseInt(path.getAttribute('data-count') || '0', 10);
         title.textContent = province;
         description.textContent = count > 0
-          ? count.toLocaleString('fa-IR') + ' پروژه ثبت‌شده؛ برای مشاهده کلیک کنید.'
-          : 'هنوز پروژه‌ای برای این استان ثبت نشده است.';
+          ? projectsLabel.replace('%s', count.toLocaleString(locale.replace('_', '-')))
+          : emptyLabel;
       }
 
       function resetStatus() {

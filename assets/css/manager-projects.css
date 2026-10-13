@@ -5,7 +5,7 @@
 .manager-projects__heading > div > span { color: #926812; font-size: 13px; font-weight: 800; }
 .manager-projects__heading h2 { margin: 5px 0 7px; font-size: 30px; }
 .manager-projects__heading p { margin: 0; color: #6e695f; }
-.manager-projects__heading-actions { display: flex; align-items: center; gap: 8px; }
+.manager-projects__heading-actions { order: -1; display: flex; align-items: center; gap: 8px; }
 .manager-projects__archive-jump { min-height: 42px; padding: 9px 14px; border: 1px solid #c89428; border-radius: 9px; background: #fffaf0; color: #79550f; font: inherit; font-weight: 800; cursor: pointer; }
 .manager-projects__new { display: inline-flex; min-height: 46px; align-items: center; gap: 7px; padding: 10px 17px; border: 0; border-radius: 9px; background: #d4a238; color: #201a0e; font: inherit; font-weight: 800; cursor: pointer; }
 .manager-projects__new span { font-size: 21px; line-height: 1; }
@@ -48,6 +48,7 @@
 .manager-project-card__work b { color: #302b24; }
 .manager-project-card__work small { color: #936916; font-weight: 800; }
 .manager-project-card__documents { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; padding-top: 5px; border-top: 1px solid #eee9df; }
+.manager-project-card__documents > strong { flex: 0 0 100%; color: #6f6658; font-size: 10px; }
 .manager-project-card__documents a { padding: 3px 6px; border-radius: 5px; background: #e8f1f8; color: #265d86; font-size: 10px; font-weight: 800; }
 .manager-project-column__empty { margin: 8px 0 0; padding: 18px 8px; border: 1px dashed #d4cfc4; border-radius: 8px; color: #8a847a; font-size: 11px; text-align: center; }
 .manager-projects__guide { display: flex; align-items: center; gap: 8px; margin: 17px 0 0; padding: 11px 13px; border-right: 3px solid #c79328; background: #faf8f3; color: #716a5d; font-size: 12px; line-height: 1.8; }
@@ -125,7 +126,11 @@
 .manager-project-form > header { position: sticky; z-index: 2; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 18px 22px; border-bottom: 1px solid #e7e1d6; background: #1e1b16; color: #fff; }
 .manager-project-form > header span { color: #dcb55d; font-size: 12px; }
 .manager-project-form > header h3 { margin: 4px 0 0; color: #fff; font-size: 22px; }
-.manager-project-form > header button { display: grid; width: 38px; height: 38px; padding: 0; place-items: center; border: 1px solid rgba(255,255,255,.2); border-radius: 50%; background: transparent; color: #fff; font: inherit; font-size: 26px; cursor: pointer; }
+.manager-project-form > header button { position: relative; display: grid; width: 38px; height: 38px; padding: 0; place-items: center; border: 1px solid rgba(255,255,255,.2); border-radius: 50%; background: transparent; color: #fff; font: inherit; font-size: 0; line-height: 0; cursor: pointer; }
+.manager-project-form > header button::before,
+.manager-project-form > header button::after { content: ""; position: absolute; top: 50%; left: 50%; width: 15px; height: 2px; border-radius: 2px; background: currentColor; transform-origin: center; }
+.manager-project-form > header button::before { transform: translate(-50%,-50%) rotate(45deg); }
+.manager-project-form > header button::after { transform: translate(-50%,-50%) rotate(-45deg); }
 .manager-project-form__grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; padding: 22px; }
 .manager-project-form__grid label { display: grid; gap: 7px; color: #3f3a32; font-size: 13px; font-weight: 800; }
 .manager-project-form__grid label.is-wide { grid-column: 1 / -1; }
@@ -133,6 +138,14 @@
 .manager-project-form__grid select,
 .manager-project-form__grid textarea { width: 100%; min-height: 45px; padding: 9px 11px; border: 1px solid #d8d3ca; border-radius: 8px; background: #fff; color: #222; font: inherit; font-weight: 400; }
 .manager-project-form__grid textarea { min-height: 90px; resize: vertical; }
+.manager-project-form__grid select[data-document-picker] { min-height: 122px; }
+.manager-project-form__grid label > small { color: #786f61; font-size: 11px; font-weight: 500; line-height: 1.8; }
+.manager-project-document-picker__selected { display: flex; flex-wrap: wrap; gap: 7px; min-height: 34px; padding: 6px; border: 1px solid #dfd8cb; border-radius: 8px; background: #faf8f3; }
+.manager-project-document-picker__selected.is-empty { display: none; }
+.manager-project-document-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 29px; padding: 3px 5px 3px 9px; border: 1px solid #c9a557; border-radius: 999px; background: #fff5d9; color: #503a0e; }
+.manager-project-document-chip b { font-size: 11px; font-weight: 900; }
+.manager-project-document-chip button { display: grid; width: 21px; height: 21px; padding: 0; border: 0; border-radius: 50%; background: #9d2d2d; color: #fff; font: inherit; font-size: 16px; line-height: 1; cursor: pointer; place-items: center; }
+.manager-project-document-picker option.is-selected { background: #e8f4ec; color: #17613a; font-weight: 800; }
 .manager-project-form__grid input:focus,
 .manager-project-form__grid select:focus,
 .manager-project-form__grid textarea:focus { border-color: #ba851c; outline: 3px solid rgba(197,147,43,.14); }
@@ -172,11 +185,35 @@
 .manager-project-history li span,
 .manager-project-history li small { display: block; }
 .manager-project-history li small { color: #7a7469; }
-.manager-project-form > footer { display: grid; grid-template-columns: auto 1fr auto auto; gap: 9px; align-items: center; padding: 15px 22px; border-top: 1px solid #e7e1d6; background: #faf8f3; }
+.manager-project-form > footer { display: flex; align-items: center; justify-content: flex-start; padding: 15px 22px; border-top: 1px solid #e7e1d6; background: #faf8f3; direction: rtl; }
+.manager-project-form__footer-actions { display: flex; align-items: center; gap: 9px; width: 100%; }
 .manager-project-form > footer button { min-height: 42px; padding: 8px 14px; border: 1px solid #d4cec2; border-radius: 8px; background: #fff; font: inherit; font-weight: 800; cursor: pointer; }
-.manager-project-form > footer .manager-project-form__save { border-color: #c89428; background: #c89428; color: #211a0c; }
+.manager-project-form > footer .manager-project-form__save { min-width: 158px; min-height: 49px; padding-inline: 22px; border-color: #c89428; background: #c89428; color: #211a0c; font-size: 15px; }
+.manager-project-form > footer .manager-project-form__cancel { min-width: 76px; min-height: 38px; padding-inline: 10px; color: #665f54; font-size: 12px; }
 .manager-project-form > footer .manager-project-form__archive { border-color: #d8a6a6; color: #9c2e2e; }
+.manager-project-form__destructive-actions { display: flex; gap: 7px; align-items: center; margin-inline-start: auto; }
+.manager-project-form > footer .manager-project-form__delete { border-color: #b72e2e; background: #fff1f1; color: #921f1f; }
+.manager-project-form__destructive-actions[hidden] { display: none; }
 .manager-project-form.is-busy { opacity: .75; }
+.manager-project-confirm-open { overflow: hidden; }
+.manager-project-confirm-wrap { position: fixed; inset: 0; z-index: 100300; width: 100vw; max-width: none; height: 100vh; max-height: none; margin: 0; padding: 18px; border: 0; background: transparent; place-items: center; box-sizing: border-box; overflow: hidden; }
+.manager-project-confirm-wrap[open] { display: grid; }
+.manager-project-confirm-wrap:not([open]) { display: none; }
+.manager-project-confirm-wrap::backdrop { background: transparent; }
+.manager-project-confirm__backdrop { position: absolute; inset: 0; background: rgba(24,20,14,.68); backdrop-filter: blur(5px); }
+.manager-project-confirm { position: relative; z-index: 1; width: min(100%,460px); padding: 28px; border: 1px solid rgba(200,148,40,.45); border-radius: 18px; background: #fffdf8; box-shadow: 0 28px 85px rgba(0,0,0,.32); text-align: center; animation: manager-project-confirm-in .18s ease-out; }
+.manager-project-confirm__icon { display: grid; width: 60px; height: 60px; place-items: center; margin: 0 auto 12px; border-radius: 50%; background: #fff2cf; color: #8c6108; font-size: 31px; font-weight: 900; }
+.manager-project-confirm h3 { margin: 0 0 8px; color: #282116; font-size: 24px; }
+.manager-project-confirm p { margin: 0; color: #6f675a; font-size: 14px; line-height: 1.9; }
+.manager-project-confirm__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 21px; }
+.manager-project-confirm__actions button { min-height: 48px; padding: 9px 13px; border: 0; border-radius: 9px; font: inherit; font-weight: 900; cursor: pointer; transition: transform .15s ease, filter .15s ease; }
+.manager-project-confirm__actions button:hover { filter: brightness(.96); transform: translateY(-1px); }
+.manager-project-confirm__actions [data-project-confirm-cancel] { background: #eeeae2; color: #403b33; }
+.manager-project-confirm__actions [data-project-confirm-accept] { background: #c89428; color: #241a08; }
+.manager-project-confirm.is-delete { border-color: rgba(183,46,46,.42); }
+.manager-project-confirm.is-delete .manager-project-confirm__icon { background: #ffeded; color: #a62424; }
+.manager-project-confirm.is-delete [data-project-confirm-accept] { background: #b72e2e; color: #fff; }
+@keyframes manager-project-confirm-in { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
 .manager-project-card--touch-ghost { position: fixed; z-index: 2147482000; margin: 0; pointer-events: none; opacity: .92; transform: translate(18px,-50%); box-shadow: 0 18px 45px rgba(0,0,0,.25); }
 
 @media (max-width: 1050px) {
@@ -201,11 +238,13 @@
   .manager-project-work-editor header button { justify-content: center; }
   .manager-project-work-row { grid-template-columns: 1fr; }
   .manager-project-partner-picker details > div { position: static; width: 100%; margin-top: 5px; box-shadow: none; }
-  .manager-project-form > footer { grid-template-columns: 1fr 1fr; }
-  .manager-project-form > footer > span { display: none; }
-  .manager-project-form__archive { grid-column: 1 / -1; }
+  .manager-project-form__footer-actions { width: 100%; flex-wrap: wrap; }
+  .manager-project-form__destructive-actions { width: 100%; margin-inline-start: 0; display: grid; grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 430px) {
+  .manager-project-confirm { padding: 23px 17px; border-radius: 15px; }
+  .manager-project-confirm h3 { font-size: 21px; }
+  .manager-project-confirm__actions { grid-template-columns: 1fr; }
   .manager-projects__summary { grid-template-columns: 1fr 1fr; gap: 7px; }
   .manager-projects__summary > div { min-height: 78px; padding: 11px; }
   .manager-project-column { width: 84vw; flex-basis: 84vw; }

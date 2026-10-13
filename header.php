@@ -16,13 +16,13 @@
                 <?php if (has_custom_logo()) : ?>
                     <?php zigurat_site_logo('eager'); ?>
                 <?php else : ?>
-                    <a href="<?php echo esc_url(home_url('/')); ?>" rel="home" aria-label="<?php echo esc_attr(get_bloginfo('name')); ?>">
+                    <a href="<?php echo esc_url(zigurat_localized_url(home_url('/'))); ?>" rel="home" aria-label="<?php echo esc_attr(get_bloginfo('name')); ?>">
                         <span>ZIGGURAT</span>
                     </a>
                 <?php endif; ?>
             </div>
             <!-- منوی اصلی -->
-            <nav id="main-menu" class="main-navigation" aria-label="منوی اصلی">
+            <nav id="main-menu" class="main-navigation" aria-label="<?php echo esc_attr(zigurat_t('primary_menu')); ?>">
                 <?php
                 wp_nav_menu(array(
                     'theme_location' => 'main-menu',
@@ -32,14 +32,15 @@
                 ));
                 ?>
             </nav>
+            <?php zigurat_render_language_switcher(); ?>
             <!-- دکمه ورود -->
             <div class="header-buttons">
-                <a href="<?php echo esc_url(home_url('/login')); ?>" class="btn-login">
-                    پنل مدیران
+                <a href="<?php echo esc_url(zigurat_localized_url(home_url('/login'))); ?>" class="btn-login">
+                    <?php echo esc_html(zigurat_t('manager_panel')); ?>
                 </a>
             </div>
             <!-- دکمه موبایل -->
-            <button id="mobile-menu-btn" type="button" aria-label="باز کردن منو" aria-controls="main-menu" aria-expanded="false">
+            <button id="mobile-menu-btn" type="button" aria-label="<?php echo esc_attr(zigurat_t('open_menu')); ?>" aria-controls="main-menu" aria-expanded="false">
                 <span></span>
                 <span></span>
                 <span></span>

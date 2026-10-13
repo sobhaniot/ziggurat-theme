@@ -2,10 +2,10 @@
     <div class="container">
         <div class="section-header">
             <h2>
-                آخرین پروژه‌ها
+                <?php echo esc_html(zigurat_t('latest_projects')); ?>
             </h2>
             <p>
-                بخشی از پروژه‌های اجرا شده توسط زیگورات
+                <?php echo esc_html(zigurat_t('latest_projects_subtitle')); ?>
             </p>
         </div>
         <div class="projects-grid">
@@ -69,7 +69,7 @@
             else:
                 ?>
                 <p>
-                    هنوز پروژه‌ای ثبت نشده است.
+                    <?php echo esc_html(zigurat_t('no_projects')); ?>
                 </p>
             <?php endif; ?>
         </div>

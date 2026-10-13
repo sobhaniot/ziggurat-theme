@@ -43,11 +43,11 @@ $edit_status = isset($_GET['application-edit']) && is_string($_GET['application-
     : '';
 ?>
 <div class="manager-resume-page">
-    <div class="manager-applications__toolbar no-print">
-        <a href="<?php echo esc_url($list_url); ?>">بازگشت به درخواست‌ها</a>
-        <button type="button" onclick="window.print()">چاپ رزومه</button>
+    <div class="manager-applications__toolbar manager-resume-actions no-print">
+        <a class="manager-resume-actions__back" href="<?php echo esc_url($list_url); ?>">بازگشت به درخواست‌ها</a>
+        <button class="manager-resume-actions__print" type="button" onclick="window.print()">چاپ رزومه</button>
         <?php if (current_user_can('manage_options')): ?>
-            <button type="button" class="manager-application-edit-toggle" aria-expanded="false" aria-controls="manager-application-edit-form" onclick="var panel=document.getElementById('manager-application-edit-form'); var open=panel.hidden; panel.hidden=!open; this.setAttribute('aria-expanded', open ? 'true' : 'false'); if(open){panel.scrollIntoView({behavior:'smooth', block:'start'});}">ویرایش رزومه</button>
+            <button type="button" class="manager-application-edit-toggle manager-resume-actions__edit" aria-expanded="false" aria-controls="manager-application-edit-form" onclick="var panel=document.getElementById('manager-application-edit-form'); var open=panel.hidden; panel.hidden=!open; this.setAttribute('aria-expanded', open ? 'true' : 'false'); if(open){panel.scrollIntoView({behavior:'smooth', block:'start'});}">ویرایش رزومه</button>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('این رزومه به زباله‌دان منتقل شود؟');">
                 <input type="hidden" name="action" value="zigurat_delete_partner_application">
                 <input type="hidden" name="application_id" value="<?php echo esc_attr($application_id); ?>">

@@ -243,6 +243,7 @@
   font-weight: 900;
 }
 .manager-panel__notification span { color: inherit; font-size: 18px; }
+.manager-panel__notification--crm { border-color: #d99a91; background: #fff1ef; color: #812d28; }
 .manager-panel__user {
   display: grid;
   gap: 2px;
@@ -299,6 +300,7 @@
   box-shadow: 0 5px 14px rgba(187,38,52,.22);
 }
 .manager-action--applications.has-notification { border-color: #e0b54b; background: #fffaf0; }
+.manager-action--customers.has-notification { border-color: #dc9e94; background: #fff4f2; }
 .manager-application-table tr.is-unread td { background: #fff9e8; }
 .manager-application-table tr.is-unread td:first-child { border-right: 3px solid #d5a32c; }
 .manager-application-new {
@@ -734,6 +736,37 @@
 .manager-pricing-check input:focus-visible { outline: 3px solid rgba(200,155,60,.38); outline-offset: 3px; }
 .manager-pricing-check:has(input:checked) { border-color: #73b98d; background: #effaf3; box-shadow: 0 5px 16px rgba(35,116,71,.1); }
 .manager-pricing-check:has(input:checked) small { color: #356a49; }
+.manager-composite-side-field { position: relative; display: grid; gap: 6px; color: #443713; font-weight: 700; }
+.manager-composite-side-field__heading { display: block; min-height: 21px; padding-left: 122px; }
+.manager-composite-side-field__heading > label:first-child { display: block; min-width: 0; margin: 0; line-height: 1.4; }
+.manager-composite-fields label.manager-composite-side-count {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  display: inline-flex;
+  width: auto;
+  min-width: 118px;
+  min-height: 28px;
+  grid-column: auto;
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  white-space: nowrap;
+}
+.manager-composite-fields label.manager-composite-side-count:hover,
+.manager-composite-fields label.manager-composite-side-count:has(input:checked) { border: 0; background: transparent; box-shadow: none; }
+.manager-composite-fields label.manager-composite-side-count input { width: 52px !important; min-width: 52px; height: 28px; min-height: 28px !important; padding: 0; }
+.manager-composite-fields label.manager-composite-side-count input::before { top: 2px; left: 3px; width: 22px; height: 22px; }
+.manager-composite-fields label.manager-composite-side-count input:checked::before { transform: translateX(24px); }
+.manager-composite-fields label.manager-composite-side-count > span { display: block; min-width: 47px; color: #6c5a35; font-size: 11px; font-weight: 900; line-height: 1; text-align: right; }
 .manager-pricing-formula { padding: 13px 15px; border-right: 4px solid #c89b3c; border-radius: 8px; background: #fff8e9; color: #614912; line-height: 1.8; }
 .manager-pricing-error { padding: 12px 14px; border: 1px solid #e3b4b4; border-radius: 8px; background: #fff2f2; color: #8b2222; }
 .manager-pricing-error.is-warning { border-color: #e2c36f; background: #fff8df; color: #76550c; }

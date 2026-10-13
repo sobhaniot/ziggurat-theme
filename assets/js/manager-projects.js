@@ -14,6 +14,10 @@
   var draggedCard = null;
   var originalStage = '';
   var touchState = null;
+  var mobileBoardSwipe = null;
+  var mobileStageNav = null;
+  var mobileActiveColumn = null;
+  var suppressCardClickUntil = 0;
   var confirmDialog = null;
   var confirmResolver = null;
   var confirmLastFocus = null;
@@ -259,13 +263,22 @@
     });
     if (typeof dialog.showModal === 'function') dialog.showModal();
     else dialog.setAttribute('open', 'open');
+    document.documentElement.classList.add('manager-project-dialog-open');
+    document.body.classList.add('manager-project-dialog-open');
     window.setTimeout(function () { form.elements.title.focus(); }, 30);
   }
 
   function closeDialog() {
     if (typeof dialog.close === 'function') dialog.close();
     else dialog.removeAttribute('open');
+    document.documentElement.classList.remove('manager-project-dialog-open');
+    document.body.classList.remove('manager-project-dialog-open');
   }
+
+  dialog.addEventListener('close', function () {
+    document.documentElement.classList.remove('manager-project-dialog-open');
+    document.body.classList.remove('manager-project-dialog-open');
+  });
 
   function refreshColumnState() {
     var totalCards = board.querySelectorAll('[data-project-card]').length;
@@ -294,6 +307,108 @@
     var proformaCount = board.querySelector('[data-project-stage="proforma"] [data-project-stage-count]');
     var summary = board.querySelector('[data-project-proforma-count]');
     if (proformaCount && summary) summary.textContent = proformaCount.textContent;
+    syncMobileStageNav();
+  }
+
+  function isMobileProjectBoard() {
+    return window.matchMedia('(max-width: 720px)').matches;
+  }
+
+  function projectColumns() {
+    return Array.prototype.slice.call(board.querySelectorAll('[data-project-columns] > [data-project-stage]'));
+  }
+
+  function syncMobileStageNav() {
+    if (!mobileStageNav) return;
+    projectColumns().forEach(function (column) {
+      var stage = column.getAttribute('data-project-stage');
+      var button = mobileStageNav.querySelector('[data-mobile-project-stage="' + stage + '"]');
+      var sourceCount = column.querySelector('[data-project-stage-count]');
+      var targetCount = button && button.querySelector('[data-mobile-project-count]');
+      if (targetCount && sourceCount) targetCount.textContent = sourceCount.textContent;
+    });
+  }
+
+  function setActiveMobileColumn(column, options) {
+    if (!column) return;
+    mobileActiveColumn = column;
+    var stage = column.getAttribute('data-project-stage');
+    projectColumns().forEach(function (item) {
+      item.classList.toggle('is-mobile-active', item === column);
+      item.setAttribute('aria-hidden', isMobileProjectBoard() && item !== column ? 'true' : 'false');
+    });
+    if (mobileStageNav) {
+      mobileStageNav.querySelectorAll('[data-mobile-project-stage]').forEach(function (button) {
+        var active = button.getAttribute('data-mobile-project-stage') === stage;
+        button.classList.toggle('is-active', active);
+        button.classList.remove('is-swipe-target');
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+    }
+    if (!options || options.remember !== false) {
+      try { window.sessionStorage.setItem('zigurat-project-mobile-stage', stage); } catch (error) { /* Storage may be disabled. */ }
+    }
+  }
+
+  function adjacentProjectColumn(column, direction) {
+    var columns = projectColumns();
+    var index = columns.indexOf(column);
+    return index < 0 ? null : (columns[index + direction] || null);
+  }
+
+  function previewMobileStage(column) {
+    if (!mobileStageNav) return;
+    var stage = column ? column.getAttribute('data-project-stage') : '';
+    mobileStageNav.querySelectorAll('[data-mobile-project-stage]').forEach(function (button) {
+      button.classList.toggle('is-swipe-target', button.getAttribute('data-mobile-project-stage') === stage);
+    });
+  }
+
+  function initMobileProjectBoard() {
+    var columnsRoot = board.querySelector('[data-project-columns]');
+    var columns = projectColumns();
+    if (!columnsRoot || !columns.length || mobileStageNav) return;
+    mobileStageNav = document.createElement('nav');
+    mobileStageNav.className = 'manager-project-mobile-stages';
+    mobileStageNav.setAttribute('aria-label', 'مراحل پروژه');
+    columns.forEach(function (column, index) {
+      var stage = column.getAttribute('data-project-stage');
+      var heading = column.querySelector('h3');
+      var counter = column.querySelector('[data-project-stage-count]');
+      var button = document.createElement('button');
+      var columnId = 'manager-project-stage-' + stage;
+      column.id = columnId;
+      button.type = 'button';
+      button.className = 'manager-project-mobile-stage is-' + stage;
+      button.setAttribute('data-mobile-project-stage', stage);
+      button.setAttribute('aria-controls', columnId);
+      button.setAttribute('aria-label', heading ? heading.textContent.trim() : ('مرحله ' + (index + 1)));
+      button.innerHTML = '<span class="manager-project-mobile-stage__label"></span><span class="manager-project-mobile-stage__count" data-mobile-project-count></span>';
+      button.querySelector('.manager-project-mobile-stage__label').textContent = heading ? heading.textContent.trim() : '';
+      button.querySelector('[data-mobile-project-count]').textContent = counter ? counter.textContent : '۰';
+      button.addEventListener('click', function () {
+        setActiveMobileColumn(column);
+        columnsRoot.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+      mobileStageNav.appendChild(button);
+    });
+    columnsRoot.parentNode.insertBefore(mobileStageNav, columnsRoot);
+    var remembered = '';
+    try { remembered = window.sessionStorage.getItem('zigurat-project-mobile-stage') || ''; } catch (error) { /* Storage may be disabled. */ }
+    var initial = columns.filter(function (column) { return column.getAttribute('data-project-stage') === remembered; })[0] || columns[0];
+    setActiveMobileColumn(initial, { remember: false });
+    syncMobileStageNav();
+    var viewport = window.matchMedia('(max-width: 720px)');
+    var handleViewportChange = function () {
+      if (viewport.matches) {
+        setActiveMobileColumn(mobileActiveColumn || columns[0], { remember: false });
+      } else {
+        columns.forEach(function (column) { column.setAttribute('aria-hidden', 'false'); });
+        previewMobileStage(null);
+      }
+    };
+    if (typeof viewport.addEventListener === 'function') viewport.addEventListener('change', handleViewportChange);
+    else if (typeof viewport.addListener === 'function') viewport.addListener(handleViewportChange);
   }
 
   function refreshActiveCollaborators() {
@@ -559,6 +674,7 @@
     column.querySelector('[data-project-card-list]').insertBefore(card, column.querySelector('[data-project-empty]'));
     card.setAttribute('data-project-current-stage', stage);
     card.classList.add('is-saving');
+    if (isMobileProjectBoard()) setActiveMobileColumn(column);
     refreshColumnState();
     request('zigurat_move_workflow_project', {
       project_id: card.getAttribute('data-project-id'),
@@ -592,6 +708,7 @@
       card.classList.remove('is-saving');
       card.setAttribute('data-project-current-stage', previousStage);
       if (previousColumn) previousColumn.querySelector('[data-project-card-list]').insertBefore(card, previousColumn.querySelector('[data-project-empty]'));
+      if (isMobileProjectBoard() && previousColumn) setActiveMobileColumn(previousColumn);
       refreshColumnState();
       showNotice(error.message, 'error');
     }).finally(clearDragState);
@@ -835,6 +952,13 @@
 
   board.addEventListener('dragend', clearDragState);
 
+  board.addEventListener('click', function (event) {
+    if (Date.now() < suppressCardClickUntil && event.target.closest('[data-project-card]')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
+
   function touchTargetColumn(x, y) {
     var ghost = touchState && touchState.ghost;
     if (ghost) ghost.style.display = 'none';
@@ -843,9 +967,94 @@
     return element ? element.closest('[data-project-stage]') : null;
   }
 
+  function liftMobileCard(state) {
+    if (!state || touchState !== state || state.mobileNavigating) return;
+    var rect = state.card.getBoundingClientRect();
+    var ghost = state.card.cloneNode(true);
+    ghost.className = 'manager-project-card manager-project-card--touch-ghost is-mobile-lifted';
+    ghost.removeAttribute('draggable');
+    ghost.style.width = rect.width + 'px';
+    ghost.style.left = state.currentX + 'px';
+    ghost.style.top = state.currentY + 'px';
+    document.body.appendChild(ghost);
+    state.active = true;
+    state.mobileDrag = true;
+    state.ghost = ghost;
+    state.card.classList.add('is-dragging');
+    state.column.classList.add('is-drag-over');
+    suppressCardClickUntil = Date.now() + 600;
+    if (navigator.vibrate) navigator.vibrate(30);
+  }
+
+  function clearMobileEdgeMove(state) {
+    if (!state) return;
+    if (state.edgeTimer) window.clearTimeout(state.edgeTimer);
+    state.edgeTimer = null;
+  }
+
+  function queueMobileEdgeMove(state, direction) {
+    if (!state || (state.edgeDirection === direction && state.edgeTimer)) return;
+    if (state.edgeDirection !== direction) clearMobileEdgeMove(state);
+    state.edgeDirection = direction;
+    var advanceOneColumn = function () {
+      state.edgeTimer = null;
+      if (touchState !== state || !state.mobileDrag) return;
+      var nextColumn = adjacentProjectColumn(state.column, direction);
+      if (!nextColumn) return;
+      board.querySelectorAll('.is-drag-over').forEach(function (item) { item.classList.remove('is-drag-over'); });
+      state.column = nextColumn;
+      setActiveMobileColumn(nextColumn);
+      nextColumn.classList.add('is-drag-over');
+      if (navigator.vibrate) navigator.vibrate(12);
+      var edgeSize = Math.max(54, window.innerWidth * 0.18);
+      var stillAtSameEdge = direction > 0
+        ? state.currentX <= edgeSize
+        : state.currentX >= window.innerWidth - edgeSize;
+      if (stillAtSameEdge) state.edgeTimer = window.setTimeout(advanceOneColumn, 1000);
+    };
+    state.edgeTimer = window.setTimeout(advanceOneColumn, 1000);
+  }
+
   board.addEventListener('pointerdown', function (event) {
-    if (event.pointerType === 'mouse' || event.button !== 0 || event.target.closest('a,button,input,select,textarea')) return;
+    if (event.pointerType === 'mouse' || event.button !== 0) return;
     var card = event.target.closest('[data-project-card]');
+    if (isMobileProjectBoard()) {
+      var columnsRoot = event.target.closest('[data-project-columns]');
+      if (!columnsRoot) return;
+      var interactive = event.target.closest('a,button,input,select,textarea');
+      if (card && (!interactive || interactive.matches('[data-project-edit]'))) {
+        var mobileCardState = {
+          card: card,
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          currentX: event.clientX,
+          currentY: event.clientY,
+          active: false,
+          mobileCard: true,
+          mobileNavigating: false,
+          mobileDrag: false,
+          ghost: null,
+          edgeTimer: null,
+          edgeDirection: 0,
+          column: card.closest('[data-project-stage]'),
+          originalColumn: card.closest('[data-project-stage]')
+        };
+        mobileCardState.timer = window.setTimeout(function () { liftMobileCard(mobileCardState); }, 360);
+        touchState = mobileCardState;
+        card.setPointerCapture(event.pointerId);
+      } else if (!card && !interactive) {
+        mobileBoardSwipe = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          active: false
+        };
+        columnsRoot.setPointerCapture(event.pointerId);
+      }
+      return;
+    }
+    if (event.target.closest('a,button,input,select,textarea')) return;
     if (!card) return;
     var timer = window.setTimeout(function () {
       var rect = card.getBoundingClientRect();
@@ -864,7 +1073,46 @@
   });
 
   board.addEventListener('pointermove', function (event) {
+    if (mobileBoardSwipe && mobileBoardSwipe.pointerId === event.pointerId) {
+      var boardDx = event.clientX - mobileBoardSwipe.startX;
+      var boardDy = event.clientY - mobileBoardSwipe.startY;
+      if (Math.abs(boardDx) > 12 && Math.abs(boardDx) > Math.abs(boardDy) * 1.15) {
+        mobileBoardSwipe.active = true;
+        event.preventDefault();
+        previewMobileStage(adjacentProjectColumn(mobileActiveColumn, boardDx < 0 ? -1 : 1));
+      }
+      return;
+    }
     if (!touchState || touchState.pointerId !== event.pointerId) return;
+    if (touchState.mobileCard) {
+      var mobileDx = event.clientX - touchState.startX;
+      var mobileDy = event.clientY - touchState.startY;
+      touchState.currentX = event.clientX;
+      touchState.currentY = event.clientY;
+      if (!touchState.active) {
+        if (Math.abs(mobileDx) > 10 && Math.abs(mobileDx) > Math.abs(mobileDy) * 1.15) {
+          window.clearTimeout(touchState.timer);
+          touchState.mobileNavigating = true;
+          event.preventDefault();
+          previewMobileStage(adjacentProjectColumn(touchState.column, mobileDx < 0 ? -1 : 1));
+        } else if (Math.abs(mobileDy) > 10) {
+          window.clearTimeout(touchState.timer);
+          touchState = null;
+        }
+        return;
+      }
+      event.preventDefault();
+      touchState.ghost.style.left = event.clientX + 'px';
+      touchState.ghost.style.top = event.clientY + 'px';
+      var edgeSize = Math.max(54, window.innerWidth * 0.18);
+      var edgeDirection = event.clientX <= edgeSize ? 1 : (event.clientX >= window.innerWidth - edgeSize ? -1 : 0);
+      if (edgeDirection) queueMobileEdgeMove(touchState, edgeDirection);
+      else {
+        clearMobileEdgeMove(touchState);
+        touchState.edgeDirection = 0;
+      }
+      return;
+    }
     var dx = Math.abs(event.clientX - touchState.startX);
     var dy = Math.abs(event.clientY - touchState.startY);
     if (!touchState.active && (dx > 9 || dy > 9)) {
@@ -882,18 +1130,71 @@
   });
 
   function endTouch(event) {
+    if (mobileBoardSwipe && mobileBoardSwipe.pointerId === event.pointerId) {
+      var boardState = mobileBoardSwipe;
+      mobileBoardSwipe = null;
+      var boardDx = event.clientX - boardState.startX;
+      var boardDy = event.clientY - boardState.startY;
+      previewMobileStage(null);
+      if (boardState.active && Math.abs(boardDx) >= 55 && Math.abs(boardDx) > Math.abs(boardDy) * 1.15) {
+        var destination = adjacentProjectColumn(mobileActiveColumn, boardDx < 0 ? -1 : 1);
+        if (destination) setActiveMobileColumn(destination);
+      }
+      return;
+    }
     if (!touchState || touchState.pointerId !== event.pointerId) return;
+    if (touchState.mobileCard) {
+      var mobileState = touchState;
+      touchState = null;
+      window.clearTimeout(mobileState.timer);
+      var mobileDx = event.clientX - mobileState.startX;
+      var mobileDy = event.clientY - mobileState.startY;
+      clearMobileEdgeMove(mobileState);
+      if (mobileState.ghost) mobileState.ghost.remove();
+      mobileState.card.classList.remove('is-dragging');
+      board.querySelectorAll('.is-drag-over').forEach(function (item) { item.classList.remove('is-drag-over'); });
+      previewMobileStage(null);
+      if (mobileState.mobileDrag) {
+        suppressCardClickUntil = Date.now() + 500;
+        if (mobileState.column !== mobileState.originalColumn) moveCard(mobileState.card, mobileState.column);
+      } else if (mobileState.mobileNavigating && Math.abs(mobileDx) >= 55 && Math.abs(mobileDx) > Math.abs(mobileDy) * 1.15) {
+        suppressCardClickUntil = Date.now() + 500;
+        var mobileDestination = adjacentProjectColumn(mobileState.column, mobileDx < 0 ? -1 : 1);
+        if (mobileDestination) setActiveMobileColumn(mobileDestination);
+      }
+      return;
+    }
     window.clearTimeout(touchState.timer);
     var state = touchState;
     touchState = null;
+    clearMobileEdgeMove(state);
     if (state.ghost) state.ghost.remove();
     state.card.classList.remove('is-dragging');
     board.querySelectorAll('.is-drag-over').forEach(function (item) { item.classList.remove('is-drag-over'); });
     if (state.active && state.column) moveCard(state.card, state.column);
   }
 
+  function cancelTouch(event) {
+    if (mobileBoardSwipe && mobileBoardSwipe.pointerId === event.pointerId) {
+      mobileBoardSwipe = null;
+      previewMobileStage(null);
+    }
+    if (!touchState || touchState.pointerId !== event.pointerId) return;
+    window.clearTimeout(touchState.timer);
+    var state = touchState;
+    touchState = null;
+    clearMobileEdgeMove(state);
+    if (state.ghost) state.ghost.remove();
+    if (state.card) {
+      state.card.classList.remove('is-dragging');
+      state.card.style.transform = '';
+    }
+    previewMobileStage(null);
+    board.querySelectorAll('.is-drag-over').forEach(function (item) { item.classList.remove('is-drag-over'); });
+  }
+
   board.addEventListener('pointerup', endTouch);
-  board.addEventListener('pointercancel', endTouch);
+  board.addEventListener('pointercancel', cancelTouch);
   var archiveLoaded = false;
   var archiveLoading = false;
 
@@ -1037,6 +1338,7 @@
   window.addEventListener('pageshow', function (event) {
     if (event.persisted) window.location.reload();
   });
+  initMobileProjectBoard();
   refreshColumnState();
   refreshActiveCollaborators();
 }());

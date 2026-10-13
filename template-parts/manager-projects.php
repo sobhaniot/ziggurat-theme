@@ -104,7 +104,7 @@ $stage_classes = array(
         <?php endforeach; ?>
     </div>
 
-    <p class="manager-projects__guide"><span aria-hidden="true">↔</span> کارت را بکشید و در ستون جدید رها کنید؛ انتقال به «تحویل و فاکتور» فاکتور را خودکار می‌سازد و پس از تسویه، پروژه بایگانی می‌شود. در موبایل کارت را کمی نگه دارید و سپس بکشید.</p>
+    <p class="manager-projects__guide"><span aria-hidden="true">↔</span> کارت را بکشید و در ستون جدید رها کنید؛ انتقال به «تحویل و فاکتور» فاکتور را خودکار می‌سازد و پس از تسویه، پروژه بایگانی می‌شود. در موبایل با سوایپ روی صفحه یا کارت، مرحله را عوض کنید؛ برای انتقال کارت، انگشت را روی آن نگه دارید تا بلند شود و سپس به چپ یا راست ببرید.</p>
 
     <section id="manager-project-archive" class="manager-project-archive" aria-labelledby="manager-project-archive-title" data-project-archive hidden>
         <header class="manager-project-archive__heading">
@@ -166,29 +166,31 @@ $stage_classes = array(
                 <button type="button" data-project-close aria-label="بستن پنجره">×</button>
             </header>
             <input type="hidden" name="project_id" value="">
-            <div class="manager-project-form__grid">
-                <label class="is-wide">نام پروژه *<input type="text" name="title" required maxlength="180" placeholder="مثلاً تابلو چلنیوم شعبه ولیعصر"></label>
-                <label>نام مشتری (شرکت / سرکارخانم / جناب آقای)<input type="text" name="client" maxlength="180" placeholder="مثلاً شرکت زیگورات یا جناب آقای احمدی"></label>
-                <label>شماره تماس<input type="tel" name="phone" maxlength="50" dir="ltr"></label>
-                <label>مرحله پروژه<select name="stage"><?php foreach ($stages as $key => $label): ?><option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option><?php endforeach; ?></select></label>
-                <label>تاریخ پیگیری بعدی<input type="text" name="followup" inputmode="numeric" dir="ltr" placeholder="1405/07/20" pattern="[0-9۰-۹]{4}/[0-9۰-۹]{1,2}/[0-9۰-۹]{1,2}"></label>
-                <label class="is-wide manager-project-document-picker">اتصال به پیش‌فاکتورها<span class="manager-project-document-picker__selected" data-document-selected="proforma" aria-live="polite"></span><select size="5" data-document-picker="proforma"><?php foreach ($proformas as $document): ?><option value="<?php echo (int) $document->id; ?>" data-document-number="<?php echo esc_attr(zigurat_invoice_object_number($document)); ?>"><?php echo esc_html(zigurat_workflow_project_document_label($document)); ?></option><?php endforeach; ?></select><small>برای افزودن، روی پیش‌فاکتور دوبار کلیک کنید. کارت تکراری خودکار در همین پروژه ادغام می‌شود.</small></label>
-                <label class="is-wide manager-project-document-picker">اتصال به فاکتورهای نهایی<span class="manager-project-document-picker__selected" data-document-selected="invoice" aria-live="polite"></span><select size="5" data-document-picker="invoice"><?php foreach ($invoices as $document): ?><option value="<?php echo (int) $document->id; ?>" data-document-number="<?php echo esc_attr(zigurat_invoice_object_number($document)); ?>"><?php echo esc_html(zigurat_workflow_project_document_label($document)); ?></option><?php endforeach; ?></select><small>برای افزودن، روی فاکتور دوبار کلیک کنید؛ انتخاب‌ها از بالای کادر قابل حذف هستند.</small></label>
-                <label class="is-wide">یادداشت‌ها<textarea name="notes" rows="4" maxlength="3000" placeholder="نتیجه تماس‌ها، توافق‌ها و نکات اجرایی پروژه"></textarea></label>
+            <div class="manager-project-form__scroll">
+                <div class="manager-project-form__grid">
+                    <label class="is-wide">نام پروژه *<input type="text" name="title" required maxlength="180" placeholder="مثلاً تابلو چلنیوم شعبه ولیعصر"></label>
+                    <label>نام مشتری (شرکت / سرکارخانم / جناب آقای)<input type="text" name="client" maxlength="180" placeholder="مثلاً شرکت زیگورات یا جناب آقای احمدی"></label>
+                    <label>شماره تماس<input type="tel" name="phone" maxlength="50" dir="ltr"></label>
+                    <label>مرحله پروژه<select name="stage"><?php foreach ($stages as $key => $label): ?><option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option><?php endforeach; ?></select></label>
+                    <label>تاریخ پیگیری بعدی<input type="text" name="followup" inputmode="numeric" dir="ltr" placeholder="1405/07/20" pattern="[0-9۰-۹]{4}/[0-9۰-۹]{1,2}/[0-9۰-۹]{1,2}"></label>
+                    <label class="is-wide manager-project-document-picker">اتصال به پیش‌فاکتورها<span class="manager-project-document-picker__selected" data-document-selected="proforma" aria-live="polite"></span><select size="5" data-document-picker="proforma"><?php foreach ($proformas as $document): ?><option value="<?php echo (int) $document->id; ?>" data-document-number="<?php echo esc_attr(zigurat_invoice_object_number($document)); ?>"><?php echo esc_html(zigurat_workflow_project_document_label($document)); ?></option><?php endforeach; ?></select><small>برای افزودن، روی پیش‌فاکتور دوبار کلیک کنید. کارت تکراری خودکار در همین پروژه ادغام می‌شود.</small></label>
+                    <label class="is-wide manager-project-document-picker">اتصال به فاکتورهای نهایی<span class="manager-project-document-picker__selected" data-document-selected="invoice" aria-live="polite"></span><select size="5" data-document-picker="invoice"><?php foreach ($invoices as $document): ?><option value="<?php echo (int) $document->id; ?>" data-document-number="<?php echo esc_attr(zigurat_invoice_object_number($document)); ?>"><?php echo esc_html(zigurat_workflow_project_document_label($document)); ?></option><?php endforeach; ?></select><small>برای افزودن، روی فاکتور دوبار کلیک کنید؛ انتخاب‌ها از بالای کادر قابل حذف هستند.</small></label>
+                    <label class="is-wide">یادداشت‌ها<textarea name="notes" rows="4" maxlength="3000" placeholder="نتیجه تماس‌ها، توافق‌ها و نکات اجرایی پروژه"></textarea></label>
+                </div>
+                <section class="manager-project-work-editor">
+                    <header>
+                        <div><h4>بخش‌های اجرایی پروژه</h4><p>مثلاً بنایی، نقاشی، برق یا نصب را اضافه و برای هر بخش یک یا چند همکار انتخاب کنید.</p></div>
+                        <button type="button" data-project-work-add><span aria-hidden="true">＋</span> افزودن بخش</button>
+                    </header>
+                    <div class="manager-project-work-editor__list" data-project-work-list></div>
+                    <p class="manager-project-work-editor__empty" data-project-work-empty>هنوز بخش اجرایی اضافه نشده است.</p>
+                </section>
+                <div class="manager-project-form__result" data-project-form-result role="status" aria-live="polite" hidden></div>
+                <section class="manager-project-history" data-project-history hidden>
+                    <h4>سوابق تغییر مرحله</h4>
+                    <ol data-project-history-list></ol>
+                </section>
             </div>
-            <section class="manager-project-work-editor">
-                <header>
-                    <div><h4>بخش‌های اجرایی پروژه</h4><p>مثلاً بنایی، نقاشی، برق یا نصب را اضافه و برای هر بخش یک یا چند همکار انتخاب کنید.</p></div>
-                    <button type="button" data-project-work-add><span aria-hidden="true">＋</span> افزودن بخش</button>
-                </header>
-                <div class="manager-project-work-editor__list" data-project-work-list></div>
-                <p class="manager-project-work-editor__empty" data-project-work-empty>هنوز بخش اجرایی اضافه نشده است.</p>
-            </section>
-            <div class="manager-project-form__result" data-project-form-result role="status" aria-live="polite" hidden></div>
-            <section class="manager-project-history" data-project-history hidden>
-                <h4>سوابق تغییر مرحله</h4>
-                <ol data-project-history-list></ol>
-            </section>
             <footer>
                 <div class="manager-project-form__footer-actions">
                     <button type="submit" class="manager-project-form__save">ذخیره پروژه</button>

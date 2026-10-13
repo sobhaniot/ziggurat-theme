@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['zigurat_save_composit
 
 get_header();
 ?>
-<main class="manager-area<?php echo $manager_section === 'projects' ? ' manager-area--projects' : ''; ?>">
+<main class="manager-area<?php echo $manager_section === 'projects' ? ' manager-area--projects' : ''; ?><?php echo $manager_section === 'customers' ? ' manager-area--customers' : ''; ?>">
     <div class="container">
         <?php if (zigurat_is_manager()): ?>
             <?php
@@ -93,6 +93,9 @@ get_header();
             $manager_unread_applications = function_exists('zigurat_application_unread_count')
                 ? zigurat_application_unread_count($current_manager->ID)
                 : 0;
+            $manager_due_customers = function_exists('zigurat_crm_due_count')
+                ? zigurat_crm_due_count($current_manager->ID)
+                : 0;
             ?>
             <section class="manager-panel<?php echo $manager_section === 'letters' ? ' manager-panel--letters' : ''; ?><?php echo $manager_section === 'projects' ? ' manager-panel--projects' : ''; ?>" aria-labelledby="manager-panel-title">
                 <div class="manager-panel__header">
@@ -101,6 +104,12 @@ get_header();
                         <h1 id="manager-panel-title">پنل مدیران</h1>
                     </div>
                     <div class="manager-panel__account">
+                        <?php if ($manager_due_customers): ?>
+                            <a class="manager-panel__notification manager-panel__notification--crm" href="<?php echo esc_url(zigurat_crm_url()); ?>" aria-label="<?php echo esc_attr($manager_due_customers . ' پیگیری مشتری سررسیدشده'); ?>">
+                                <span aria-hidden="true">☎️</span>
+                                <strong><?php echo esc_html(number_format_i18n($manager_due_customers)); ?> پیگیری</strong>
+                            </a>
+                        <?php endif; ?>
                         <?php if ($manager_unread_applications): ?>
                             <a class="manager-panel__notification" href="<?php echo esc_url(add_query_arg('manager-section', 'applications', zigurat_manager_login_url())); ?>" aria-label="<?php echo esc_attr($manager_unread_applications . ' درخواست همکاری جدید'); ?>">
                                 <span aria-hidden="true">🔔</span>
@@ -127,6 +136,8 @@ get_header();
                     get_template_part('template-parts/manager-letters');
                 } elseif ($manager_section === 'projects') {
                     get_template_part('template-parts/manager-projects');
+                } elseif ($manager_section === 'customers') {
+                    get_template_part('template-parts/manager-customers');
                 } else {
                     get_template_part('page-main');
                 }

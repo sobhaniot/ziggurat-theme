@@ -471,6 +471,7 @@
       var svgWidth = 1000;
       var faceWidth = 650;
       var faceHeight = Math.max(190, Math.min(360, faceWidth * heightMm / lengthMm));
+      var sideCount = Number(inputs.side_count || 2) === 1 ? 1 : 2;
       var sideWidth = Number(inputs.side_depth || 0) > 0 ? Math.max(55, Math.min(130, faceWidth * Number(inputs.side_depth) * 10 / lengthMm)) : 0;
       var dripHeight = Number(inputs.drip_depth || 0) > 0 ? Math.max(55, Math.min(125, faceHeight * Number(inputs.drip_depth) * 10 / heightMm)) : 0;
       var bottomHeight = Number(inputs.bottom_depth || 0) > 0 ? Math.max(55, Math.min(125, faceHeight * Number(inputs.bottom_depth) * 10 / heightMm)) : 0;
@@ -525,8 +526,8 @@
       if (dripHeight) addGrid(faceX, topMargin, faceWidth, dripHeight, dripColumnSegments, dripRowSegments, '#fff8e8', '#c58b20', 'آبچکان', true, 0);
       if (bottomHeight) addGrid(faceX, faceY + faceHeight + gap, faceWidth, bottomHeight, bottomColumnSegments, bottomRowSegments, '#eef5ff', '#4774ad', 'زیر تابلو', true, 0);
       if (sideWidth) {
-        addGrid(faceX - gap - sideWidth, faceY, sideWidth, faceHeight, 1, 1, '#f6effb', '#815795', 'بغل چپ', true, 0);
-        addGrid(faceX + faceWidth + gap, faceY, sideWidth, faceHeight, 1, 1, '#f6effb', '#815795', 'بغل راست', true, 1);
+        if (sideCount === 2) addGrid(faceX - gap - sideWidth, faceY, sideWidth, faceHeight, 1, 1, '#f6effb', '#815795', 'بغل چپ', true, 0);
+        addGrid(faceX + faceWidth + gap, faceY, sideWidth, faceHeight, 1, 1, '#f6effb', '#815795', sideCount === 2 ? 'بغل راست' : 'بغل تابلو', true, sideCount === 2 ? 1 : 0);
       }
       return '<svg xmlns="http://www.w3.org/2000/svg" width="' + svgWidth + '" height="' + svgHeight + '" viewBox="0 0 ' + svgWidth + ' ' + svgHeight + '" direction="rtl">' + content + '</svg>';
     }
@@ -610,6 +611,7 @@
         drip_end_fold: decimal(field('drip_end_fold').value),
         bottom_depth: decimal(field('bottom_depth').value),
         side_depth: decimal(field('side_depth').value),
+        side_count: field('side_count').checked ? 2 : 1,
         fold_left: decimal(field('fold_left').value),
         fold_right: decimal(field('fold_right').value),
         fold_top: decimal(field('fold_top').value),
@@ -665,6 +667,9 @@
       var dripDepth = decimal(field('drip_depth').value) / 100;
       var bottomDepth = decimal(field('bottom_depth').value) / 100;
       var sideDepth = decimal(field('side_depth').value) / 100;
+      var sideCount = field('side_count').checked ? 2 : 1;
+      var sideCountLabel = form.querySelector('[data-composite-side-count-label]');
+      if (sideCountLabel) sideCountLabel.textContent = sideCount === 2 ? 'دو بغل' : 'یک بغل';
       var dripStartFoldMm = decimal(field('drip_start_fold').value) * 10;
       var dripEndFoldMm = decimal(field('drip_end_fold').value) * 10;
       var foldLeftMm = decimal(field('fold_left').value) * 10;
@@ -700,12 +705,12 @@
         error.classList.remove('is-warning');
       }
       var faceArea = length * width;
-      var visibleArea = faceArea + length * dripDepth + length * bottomDepth + 2 * width * sideDepth;
+      var visibleArea = faceArea + length * dripDepth + length * bottomDepth + sideCount * width * sideDepth;
       var surfaces = [
         { type: 'face', title: 'نما', width: length * 1000, height: width * 1000 },
-        { type: 'side', title: 'بغل راست', width: width * 1000, height: sideDepth * 1000 },
-        { type: 'side', title: 'بغل چپ', width: width * 1000, height: sideDepth * 1000 }
+        { type: 'side', title: sideCount === 2 ? 'بغل راست' : 'بغل تابلو', width: width * 1000, height: sideDepth * 1000 }
       ];
+      if (sideCount === 2) surfaces.push({ type: 'side', title: 'بغل چپ', width: width * 1000, height: sideDepth * 1000 });
       var baseParts = [];
       surfaces.forEach(function (surface) {
         baseParts = baseParts.concat(splitSurface(surface, surface.type === 'face' ? foldAllowances : {horizontal:0,vertical:0}));
@@ -761,7 +766,7 @@
         calculator_type: 'composite',
         inputs: {
           length: decimal(field('length').value), width: decimal(field('width').value),
-          drip_depth: decimal(field('drip_depth').value), bottom_depth: decimal(field('bottom_depth').value), side_depth: decimal(field('side_depth').value),
+          drip_depth: decimal(field('drip_depth').value), bottom_depth: decimal(field('bottom_depth').value), side_depth: decimal(field('side_depth').value), side_count: sideCount,
           drip_start_fold: decimal(field('drip_start_fold').value), drip_end_fold: decimal(field('drip_end_fold').value),
           fold_left: decimal(field('fold_left').value), fold_right: decimal(field('fold_right').value), fold_top: decimal(field('fold_top').value), fold_bottom: decimal(field('fold_bottom').value),
           bottom_fold_left: decimal(field('bottom_fold_left').value), bottom_fold_right: decimal(field('bottom_fold_right').value), bottom_fold_top: decimal(field('bottom_fold_top').value), bottom_fold_bottom: decimal(field('bottom_fold_bottom').value)
@@ -859,7 +864,7 @@
     function buildCompositeEstimateSnapshot() {
       if (!calculate(false) || !compositeState) throw new Error('ابتدا ابعاد معتبر وارد کنید تا محاسبه انجام شود.');
       return {
-        version: 4,
+        version: 5,
         calculator_type: 'composite',
         inputs: {
           length: decimal(field('length').value),
@@ -869,6 +874,7 @@
           drip_end_fold: decimal(field('drip_end_fold').value),
           bottom_depth: decimal(field('bottom_depth').value),
           side_depth: decimal(field('side_depth').value),
+          side_count: field('side_count').checked ? 2 : 1,
           fold_left: decimal(field('fold_left').value),
           fold_right: decimal(field('fold_right').value),
           fold_top: decimal(field('fold_top').value),
@@ -914,6 +920,7 @@
       ['length','width','drip_depth','drip_start_fold','drip_end_fold','bottom_depth','side_depth','profit_percent','insurance_tax_percent'].forEach(function (name) {
         setCompositeFieldValue(name, inputs[name] || 0, false);
       });
+      field('side_count').checked = Number(inputs.side_count || 2) !== 1;
       var legacyFold = Number(inputs.install_allowance || 8) / 2;
       ['fold_left','fold_right','fold_top','fold_bottom'].forEach(function (name) {
         setCompositeFieldValue(name, inputs[name] !== undefined ? inputs[name] : legacyFold, false);
@@ -1037,7 +1044,7 @@
       return '<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>' + reportTitle + ' - ' + safeTitle + '</title><style>'
         + '@page{size:A4 portrait;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0}body{padding:12mm;font-family:Tahoma,Arial,sans-serif;color:#171717;direction:rtl}header{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #b78a2d;padding-bottom:10px;margin-bottom:15px}h1{font-size:22px;margin:0}h2{font-size:14px;margin:0 0 8px}header span{color:#6b5a32}.meta{display:grid;grid-template-columns:repeat(2,1fr);border:1px solid #bbb;margin-bottom:14px}.meta div{padding:7px 9px;border-bottom:1px solid #ddd}.meta div:nth-child(odd){border-left:1px solid #ddd}.consumption{margin:10px 0 14px;padding:10px;border:1px solid #b9c8d2;background:#f5f9fb;break-inside:avoid}.consumption>div{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.consumption span{display:flex;flex-direction:column;padding:8px;border:1px solid #d5e0e6;background:#fff}.consumption b{font-size:14px}.consumption small{margin-top:3px;color:#526873;font-size:9px}.overview-section{margin:12px 0;padding:9px;border:1px solid #b9c8d2;background:#f7fafb;break-inside:avoid}.overview-section img{display:block;width:100%;height:auto;max-height:175mm;object-fit:contain}.customer-note{margin-top:12px;padding:10px;border:1px solid #b9c8d2;background:#f5f9fb;color:#405966;font-size:10px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #999;padding:6px 8px;text-align:right}th{background:#eee}td:last-child{text-align:left}.zero-rate td{background:#fff0ee;color:#a51f1a;font-weight:bold}.layout-section{margin:12px 0;padding:9px;border:1px solid #cfc7b7;background:#faf8f2}.layout-dimensions-help{margin:-3px 0 7px;color:#695f4c;font-size:8px}.layouts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.layouts figure{margin:0;break-inside:avoid}.layouts figcaption{font-size:9px;font-weight:bold;margin-bottom:3px}.sheet{position:relative;width:100%;aspect-ratio:3200/1250;border:1px solid #b78a2d;background:#fff;overflow:hidden}.piece{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;border:1px solid #476f8d;background:#e6f2f9;color:#24455b;font-size:7px}.piece small{font-size:6px}.piece-orientation{display:flex;align-items:center;justify-content:center;gap:2px;margin-top:2px;font-size:5.5px;font-style:normal;font-weight:bold;line-height:1;white-space:nowrap}.piece-arrow{display:inline-block;transform:rotate(-90deg)}.piece-orientation.is-rotated .piece-arrow{transform:none}.piece.is-face{background:#dff2e5;border-color:#3d8151}.piece.is-drip{background:#fff0c9;border-color:#a97814}.piece.is-bottom{background:#e2ecfb;border-color:#4774ad}.piece.is-side{background:#f0e5f7;border-color:#815795}.final{display:flex;justify-content:space-between;margin-top:12px;padding:12px 14px;background:#222;color:#fff;font-size:18px;font-weight:bold}.final strong{display:grid;text-align:left}.final small{font-size:10px;color:#e8d8a7;margin-top:4px}.note{font-size:9px;color:#666;margin-top:9px}@media print{body{padding:12mm}}</style></head><body>'
         + '<header><h1>' + reportTitle + '</h1><span>زیگورات</span></header>'
-        + '<section class="meta"><div><b>نام پروژه:</b> ' + safeTitle + '</div><div><b>ابعاد نما:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.length || 0)) + ' × ' + formatMeasure(Number(inputs.width || 0)) + ' سانتی‌متر') + '</div><div><b>آبچکان / زیر / بغل:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.drip_depth || 0)) + ' / ' + formatMeasure(Number(inputs.bottom_depth || 0)) + ' / ' + formatMeasure(Number(inputs.side_depth || 0)) + ' سانتی‌متر') + '</div><div><b>خم نما؛ چپ / راست / بالا / پایین:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.fold_left !== undefined ? inputs.fold_left : (Number(inputs.install_allowance || 8) / 2))) + ' / ' + formatMeasure(Number(inputs.fold_right !== undefined ? inputs.fold_right : (Number(inputs.install_allowance || 8) / 2))) + ' / ' + formatMeasure(Number(inputs.fold_top !== undefined ? inputs.fold_top : (Number(inputs.install_allowance || 8) / 2))) + ' / ' + formatMeasure(Number(inputs.fold_bottom !== undefined ? inputs.fold_bottom : (Number(inputs.install_allowance || 8) / 2))) + ' سانتی‌متر') + '</div><div><b>خم ابتدا / انتهای آبچکان:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.drip_start_fold !== undefined ? inputs.drip_start_fold : 15)) + ' / ' + formatMeasure(Number(inputs.drip_end_fold !== undefined ? inputs.drip_end_fold : 15)) + ' سانتی‌متر') + '</div><div><b>خم زیر تابلو؛ چپ / راست / بالا / پایین:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.bottom_fold_left !== undefined ? inputs.bottom_fold_left : 4)) + ' / ' + formatMeasure(Number(inputs.bottom_fold_right !== undefined ? inputs.bottom_fold_right : 4)) + ' / ' + formatMeasure(Number(inputs.bottom_fold_top !== undefined ? inputs.bottom_fold_top : 4)) + ' / ' + formatMeasure(Number(inputs.bottom_fold_bottom !== undefined ? inputs.bottom_fold_bottom : 4)) + ' سانتی‌متر') + '</div><div><b>خم بغل‌ها:</b> ندارد</div><div><b>مساحت نما:</b> ' + escapeCompositeHtml(formatMeasure(Number(results.face_area || 0)) + ' مترمربع') + '</div><div><b>مساحت کل سطوح:</b> ' + escapeCompositeHtml(formatMeasure(Number(results.visible_area || 0)) + ' مترمربع') + '</div><div><b>شیار افقی نما:</b> ' + escapeCompositeHtml(Number(results.horizontal_seams || 0).toLocaleString('fa-IR') + ' شیار') + '</div><div><b>مصرف ورق:</b> ' + escapeCompositeHtml(formatMeasure(Number(results.utilization_percent || 0)) + '٪ مصرف، ' + formatMeasure(100 - Number(results.utilization_percent || 0)) + '٪ پرت') + '</div><div><b>جهت آبچکان:</b> ' + escapeCompositeHtml(dripDirection) + '</div><div><b>جهت زیر تابلو:</b> ' + escapeCompositeHtml(bottomDirection) + '</div></section>'
+        + '<section class="meta"><div><b>نام پروژه:</b> ' + safeTitle + '</div><div><b>ابعاد نما:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.length || 0)) + ' × ' + formatMeasure(Number(inputs.width || 0)) + ' سانتی‌متر') + '</div><div><b>آبچکان / زیر / بغل:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.drip_depth || 0)) + ' / ' + formatMeasure(Number(inputs.bottom_depth || 0)) + ' / ' + formatMeasure(Number(inputs.side_depth || 0)) + ' سانتی‌متر — ' + (Number(inputs.side_count || 2) === 1 ? 'یک بغل' : 'دو بغل')) + '</div><div><b>خم نما؛ چپ / راست / بالا / پایین:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.fold_left !== undefined ? inputs.fold_left : (Number(inputs.install_allowance || 8) / 2))) + ' / ' + formatMeasure(Number(inputs.fold_right !== undefined ? inputs.fold_right : (Number(inputs.install_allowance || 8) / 2))) + ' / ' + formatMeasure(Number(inputs.fold_top !== undefined ? inputs.fold_top : (Number(inputs.install_allowance || 8) / 2))) + ' / ' + formatMeasure(Number(inputs.fold_bottom !== undefined ? inputs.fold_bottom : (Number(inputs.install_allowance || 8) / 2))) + ' سانتی‌متر') + '</div><div><b>خم ابتدا / انتهای آبچکان:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.drip_start_fold !== undefined ? inputs.drip_start_fold : 15)) + ' / ' + formatMeasure(Number(inputs.drip_end_fold !== undefined ? inputs.drip_end_fold : 15)) + ' سانتی‌متر') + '</div><div><b>خم زیر تابلو؛ چپ / راست / بالا / پایین:</b> ' + escapeCompositeHtml(formatMeasure(Number(inputs.bottom_fold_left !== undefined ? inputs.bottom_fold_left : 4)) + ' / ' + formatMeasure(Number(inputs.bottom_fold_right !== undefined ? inputs.bottom_fold_right : 4)) + ' / ' + formatMeasure(Number(inputs.bottom_fold_top !== undefined ? inputs.bottom_fold_top : 4)) + ' / ' + formatMeasure(Number(inputs.bottom_fold_bottom !== undefined ? inputs.bottom_fold_bottom : 4)) + ' سانتی‌متر') + '</div><div><b>خم بغل‌ها:</b> ندارد</div><div><b>مساحت نما:</b> ' + escapeCompositeHtml(formatMeasure(Number(results.face_area || 0)) + ' مترمربع') + '</div><div><b>مساحت کل سطوح:</b> ' + escapeCompositeHtml(formatMeasure(Number(results.visible_area || 0)) + ' مترمربع') + '</div><div><b>شیار افقی نما:</b> ' + escapeCompositeHtml(Number(results.horizontal_seams || 0).toLocaleString('fa-IR') + ' شیار') + '</div><div><b>مصرف ورق:</b> ' + escapeCompositeHtml(formatMeasure(Number(results.utilization_percent || 0)) + '٪ مصرف، ' + formatMeasure(100 - Number(results.utilization_percent || 0)) + '٪ پرت') + '</div><div><b>جهت آبچکان:</b> ' + escapeCompositeHtml(dripDirection) + '</div><div><b>جهت زیر تابلو:</b> ' + escapeCompositeHtml(bottomDirection) + '</div></section>'
         + consumptionHtml + compositeOverviewPrintHtml(snapshot) + compositeLayoutPrintHtml(snapshot.sheets, snapshot.parts) + pricingHtml + (includePrices ? '<p class="note">این گزارش براساس ابعاد و اطلاعات ذخیره‌شده همین برآورد تهیه شده است.</p>' : '')
         + '<script>window.addEventListener("load",function(){setTimeout(function(){window.print()},300)})<\/script></body></html>';
     }
@@ -1131,7 +1138,7 @@
       input.addEventListener('input', function () { calculate(false); });
       input.addEventListener('change', function () { calculate(false); });
     });
-    ['length', 'width', 'drip_depth', 'drip_start_fold', 'drip_end_fold', 'bottom_depth', 'side_depth', 'fold_left', 'fold_right', 'fold_top', 'fold_bottom', 'bottom_fold_left', 'bottom_fold_right', 'bottom_fold_top', 'bottom_fold_bottom', 'iron_basis', 'installer_basis', 'supplies_basis', 'freight', 'bracing_cost', 'profit_percent', 'insurance_tax_percent'].forEach(function (name) {
+    ['length', 'width', 'drip_depth', 'drip_start_fold', 'drip_end_fold', 'bottom_depth', 'side_depth', 'side_count', 'fold_left', 'fold_right', 'fold_top', 'fold_bottom', 'bottom_fold_left', 'bottom_fold_right', 'bottom_fold_top', 'bottom_fold_bottom', 'iron_basis', 'installer_basis', 'supplies_basis', 'freight', 'bracing_cost', 'profit_percent', 'insurance_tax_percent'].forEach(function (name) {
       var input = field(name);
       input.addEventListener('input', function () {
         if (input.value.trim() !== '') scheduleValuesSave();

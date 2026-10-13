@@ -1,4 +1,6 @@
 <div class="manager-actions">
+    <?php $due_customers = function_exists('zigurat_crm_due_count') ? zigurat_crm_due_count() : 0; ?>
+    <a class="manager-action manager-action--customers<?php echo $due_customers ? ' has-notification' : ''; ?>" href="<?php echo esc_url(zigurat_crm_url()); ?>"><?php if ($due_customers): ?><b class="manager-action__badge"><?php echo esc_html(number_format_i18n($due_customers)); ?> پیگیری</b><?php endif; ?><span class="manager-action__icon" aria-hidden="true">☎️</span><strong>پیگیری مشتریان</strong><small>ثبت تماس‌ها، زمان پیگیری بعدی و اعلان روی گوشی</small></a>
     <a class="manager-action" href="<?php echo esc_url(zigurat_workflow_project_url()); ?>"><span class="manager-action__icon" aria-hidden="true">📋</span><strong>مدیریت پروژه‌ها</strong><small>پیگیری مشتری از بازاریابی و پیش‌فاکتور تا اجرا و فاکتور نهایی</small></a>
     <a class="manager-action" href="<?php echo esc_url(zigurat_inventory_page_url('inventory-list')); ?>"><span class="manager-action__icon" aria-hidden="true">📦</span><strong>انبارداری</strong><small>ورود مستقیم به بخش کامل انبارداری</small></a>
     <a class="manager-action" href="<?php echo esc_url(zigurat_invoice_page_url()); ?>"><span class="manager-action__icon" aria-hidden="true">🧾</span><strong>بخش فاکتور</strong><small>ثبت، اصلاح، فهرست و چاپ فاکتورها</small></a>

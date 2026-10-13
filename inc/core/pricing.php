@@ -212,6 +212,7 @@ function zigurat_get_composite_last_values()
         'drip_end_fold' => 15,
         'bottom_depth' => 0,
         'side_depth' => 0,
+        'side_count' => 2,
         'fold_left' => 4,
         'fold_right' => 4,
         'fold_top' => 4,
@@ -249,6 +250,7 @@ function zigurat_save_composite_last_values($data)
         'drip_end_fold' => zigurat_pricing_decimal($data['drip_end_fold'] ?? 15),
         'bottom_depth' => zigurat_pricing_decimal($data['bottom_depth'] ?? 0),
         'side_depth' => zigurat_pricing_decimal($data['side_depth'] ?? 0),
+        'side_count' => absint($data['side_count'] ?? 2) === 2 ? 2 : 1,
         'fold_left' => zigurat_pricing_decimal($data['fold_left'] ?? 4),
         'fold_right' => zigurat_pricing_decimal($data['fold_right'] ?? 4),
         'fold_top' => zigurat_pricing_decimal($data['fold_top'] ?? 4),
@@ -299,6 +301,7 @@ function zigurat_calculate_composite_price($data, $settings = null)
     $drip_end_fold_mm = zigurat_pricing_decimal($data['drip_end_fold'] ?? 15) * 10;
     $bottom_depth = zigurat_pricing_decimal($data['bottom_depth'] ?? 0) / 100;
     $side_depth = zigurat_pricing_decimal($data['side_depth'] ?? 0) / 100;
+    $side_count = absint($data['side_count'] ?? 2) === 1 ? 1 : 2;
     $legacy_allowance = zigurat_pricing_decimal($data['install_allowance'] ?? 8);
     $fold_left = zigurat_pricing_decimal($data['fold_left'] ?? ($legacy_allowance / 2));
     $fold_right = zigurat_pricing_decimal($data['fold_right'] ?? ($legacy_allowance / 2));
@@ -311,7 +314,7 @@ function zigurat_calculate_composite_price($data, $settings = null)
     $face_horizontal_rows = max(1, (int) ceil(($width * 1000) / max(1, $sheet_width - $vertical_allowance_mm)));
     $face_horizontal_seams = max(0, $face_horizontal_rows - 1);
     $face_area = $length * $width;
-    $area = $face_area + ($length * $drip_depth) + ($length * $bottom_depth) + (2 * $width * $side_depth);
+    $area = $face_area + ($length * $drip_depth) + ($length * $bottom_depth) + ($side_count * $width * $side_depth);
 
     $split_surface = static function ($surface_width, $surface_height, $type, $forced_direction = '', $custom_horizontal_allowance_mm = null, $custom_vertical_allowance_mm = null) use ($sheet_width, $sheet_height, $horizontal_allowance_mm, $vertical_allowance_mm) {
         if ($surface_width <= 0 || $surface_height <= 0) {
@@ -390,11 +393,10 @@ function zigurat_calculate_composite_price($data, $settings = null)
         return $parts;
     };
 
-    $surfaces = array(
-        array('type'=>'face', 'width'=>$length * 1000, 'height'=>$width * 1000),
-        array('type'=>'side', 'width'=>$width * 1000, 'height'=>$side_depth * 1000),
-        array('type'=>'side', 'width'=>$width * 1000, 'height'=>$side_depth * 1000),
-    );
+    $surfaces = array(array('type'=>'face', 'width'=>$length * 1000, 'height'=>$width * 1000));
+    for ($side_index = 0; $side_index < $side_count; ++$side_index) {
+        $surfaces[] = array('type'=>'side', 'width'=>$width * 1000, 'height'=>$side_depth * 1000);
+    }
     $base_parts = array();
     foreach ($surfaces as $surface) {
         if ($surface['type'] === 'side') {
@@ -526,6 +528,7 @@ function zigurat_calculate_composite_price($data, $settings = null)
     return array(
         'length' => $length,
         'width' => $width,
+        'side_count' => $side_count,
         'face_area' => $face_area,
         'area' => $area,
         'cut_area' => $cut_area,

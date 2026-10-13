@@ -1,0 +1,668 @@
+<?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+function zigurat_crm_register_post_type()
+{
+    register_post_type('zig_crm_customer', array(
+        'labels' => array('name' => 'پیگیری مشتریان', 'singular_name' => 'مشتری'),
+        'public' => false,
+        'show_ui' => false,
+        'show_in_rest' => false,
+        'supports' => array('title', 'author'),
+        'capability_type' => 'post',
+        'map_meta_cap' => true,
+    ));
+}
+add_action('init', 'zigurat_crm_register_post_type', 12);
+
+function zigurat_crm_url($args = array())
+{
+    return add_query_arg(array_merge(array('manager-section' => 'customers'), $args), zigurat_manager_login_url());
+}
+
+function zigurat_crm_statuses()
+{
+    return array(
+        'new' => 'تماس جدید',
+        'contacting' => 'در حال مذاکره',
+        'waiting' => 'منتظر پاسخ',
+        'won' => 'تبدیل‌شده به پروژه',
+        'lost' => 'ناموفق',
+    );
+}
+
+function zigurat_crm_priorities()
+{
+    return array('normal' => 'عادی', 'important' => 'مهم', 'urgent' => 'فوری');
+}
+
+function zigurat_crm_active_statuses()
+{
+    return array('new', 'contacting', 'waiting');
+}
+
+function zigurat_crm_managers()
+{
+    $users = get_users(array(
+        'role__in' => array('administrator', 'contributor'),
+        'orderby' => 'display_name',
+        'order' => 'ASC',
+        'fields' => array('ID', 'display_name', 'user_login'),
+    ));
+    return array_map(static function ($user) {
+        $name = trim((string) $user->display_name);
+        return array('id' => (int) $user->ID, 'name' => $name !== '' ? $name : (string) $user->user_login);
+    }, $users);
+}
+
+function zigurat_crm_parse_datetime($value)
+{
+    $value = sanitize_text_field((string) $value);
+    if (function_exists('zigurat_invoice_normalize_digits')) {
+        $value = zigurat_invoice_normalize_digits($value);
+    }
+    if ($value === '') {
+        return 0;
+    }
+    $date = DateTime::createFromFormat('Y-m-d\TH:i', $value, wp_timezone());
+    if (!$date) {
+        $date = DateTime::createFromFormat('Y-m-d H:i', $value, wp_timezone());
+    }
+    return $date ? $date->getTimestamp() : 0;
+}
+
+function zigurat_crm_datetime_input($timestamp)
+{
+    return $timestamp ? wp_date('Y-m-d\TH:i', (int) $timestamp, wp_timezone()) : '';
+}
+
+function zigurat_crm_datetime_label($timestamp)
+{
+    return $timestamp ? wp_date('Y/m/d ساعت H:i', (int) $timestamp, wp_timezone()) : 'بدون زمان';
+}
+
+function zigurat_crm_history($customer_id)
+{
+    $history = get_post_meta($customer_id, '_zigurat_crm_history', true);
+    return is_array($history) ? array_values($history) : array();
+}
+
+function zigurat_crm_add_history($customer_id, $type, $note = '')
+{
+    $history = zigurat_crm_history($customer_id);
+    $user = wp_get_current_user();
+    $history[] = array(
+        'type' => sanitize_key($type),
+        'note' => sanitize_textarea_field($note),
+        'time' => current_time('mysql'),
+        'user' => $user->exists() ? ($user->display_name ?: $user->user_login) : 'سیستم',
+    );
+    update_post_meta($customer_id, '_zigurat_crm_history', array_slice($history, -100));
+}
+
+function zigurat_crm_record($post)
+{
+    $post = is_numeric($post) ? get_post((int) $post) : $post;
+    if (!$post || $post->post_type !== 'zig_crm_customer' || $post->post_status !== 'private') {
+        return null;
+    }
+    $status = sanitize_key((string) get_post_meta($post->ID, '_zigurat_crm_status', true));
+    $priority = sanitize_key((string) get_post_meta($post->ID, '_zigurat_crm_priority', true));
+    $next_at = (int) get_post_meta($post->ID, '_zigurat_crm_next_at', true);
+    $owner_id = absint(get_post_meta($post->ID, '_zigurat_crm_owner', true));
+    $owner = $owner_id ? get_userdata($owner_id) : null;
+    $now = current_time('timestamp', true);
+    $day_end = (new DateTime('tomorrow', wp_timezone()))->getTimestamp() - 1;
+    $due_state = 'none';
+    if ($next_at && in_array($status, zigurat_crm_active_statuses(), true)) {
+        $due_state = $next_at < $now ? 'overdue' : ($next_at <= $day_end ? 'today' : 'upcoming');
+    }
+    $history = array_reverse(zigurat_crm_history($post->ID));
+    return array(
+        'id' => (int) $post->ID,
+        'name' => (string) get_post_meta($post->ID, '_zigurat_crm_name', true),
+        'prefix' => (string) get_post_meta($post->ID, '_zigurat_crm_prefix', true),
+        'company' => (string) get_post_meta($post->ID, '_zigurat_crm_company', true),
+        'phone' => (string) get_post_meta($post->ID, '_zigurat_crm_phone', true),
+        'topic' => (string) get_post_meta($post->ID, '_zigurat_crm_topic', true),
+        'status' => isset(zigurat_crm_statuses()[$status]) ? $status : 'new',
+        'status_label' => zigurat_crm_statuses()[$status] ?? zigurat_crm_statuses()['new'],
+        'priority' => isset(zigurat_crm_priorities()[$priority]) ? $priority : 'normal',
+        'priority_label' => zigurat_crm_priorities()[$priority] ?? zigurat_crm_priorities()['normal'],
+        'owner_id' => $owner_id,
+        'owner_name' => $owner ? ($owner->display_name ?: $owner->user_login) : 'همه مدیران',
+        'next_at' => $next_at,
+        'next_input' => zigurat_crm_datetime_input($next_at),
+        'next_label' => zigurat_crm_datetime_label($next_at),
+        'due_state' => $due_state,
+        'notes' => (string) get_post_meta($post->ID, '_zigurat_crm_notes', true),
+        'project_id' => absint(get_post_meta($post->ID, '_zigurat_crm_project_id', true)),
+        'history' => array_map(static function ($item) {
+            $timestamp = isset($item['time']) ? strtotime((string) $item['time']) : 0;
+            return array(
+                'type' => sanitize_key($item['type'] ?? ''),
+                'note' => (string) ($item['note'] ?? ''),
+                'user' => (string) ($item['user'] ?? ''),
+                'time' => $timestamp ? wp_date('Y/m/d H:i', $timestamp, wp_timezone()) : '',
+            );
+        }, array_slice($history, 0, 20)),
+    );
+}
+
+function zigurat_crm_records()
+{
+    static $cached_records = null;
+    if (is_array($cached_records)) {
+        return $cached_records;
+    }
+    $query = new WP_Query(array(
+        'post_type' => 'zig_crm_customer',
+        'post_status' => 'private',
+        'posts_per_page' => 500,
+        'orderby' => 'meta_value_num',
+        'meta_key' => '_zigurat_crm_next_at',
+        'order' => 'ASC',
+        'no_found_rows' => true,
+    ));
+    $records = array_values(array_filter(array_map('zigurat_crm_record', $query->posts)));
+    usort($records, static function ($first, $second) {
+        $rank = array('overdue' => 0, 'today' => 1, 'upcoming' => 2, 'none' => 3);
+        $state_compare = ($rank[$first['due_state']] ?? 9) <=> ($rank[$second['due_state']] ?? 9);
+        if ($state_compare !== 0) {
+            return $state_compare;
+        }
+        return ($first['next_at'] ?: PHP_INT_MAX) <=> ($second['next_at'] ?: PHP_INT_MAX);
+    });
+    $cached_records = $records;
+    return $cached_records;
+}
+
+function zigurat_crm_summary($records = null)
+{
+    $records = is_array($records) ? $records : zigurat_crm_records();
+    $summary = array('overdue' => 0, 'today' => 0, 'upcoming' => 0, 'active' => 0);
+    foreach ($records as $record) {
+        if (in_array($record['status'], zigurat_crm_active_statuses(), true)) {
+            $summary['active']++;
+        }
+        if (isset($summary[$record['due_state']])) {
+            $summary[$record['due_state']]++;
+        }
+    }
+    return $summary;
+}
+
+function zigurat_crm_due_count($user_id = 0)
+{
+    $user_id = $user_id ?: get_current_user_id();
+    static $counts = array();
+    if (isset($counts[$user_id])) {
+        return $counts[$user_id];
+    }
+    $day_end = (new DateTime('tomorrow', wp_timezone()))->getTimestamp() - 1;
+    $meta_query = array(
+        'relation' => 'AND',
+        array('key' => '_zigurat_crm_status', 'value' => zigurat_crm_active_statuses(), 'compare' => 'IN'),
+        array('key' => '_zigurat_crm_next_at', 'value' => array(1, $day_end), 'compare' => 'BETWEEN', 'type' => 'NUMERIC'),
+    );
+    if (!user_can($user_id, 'manage_options')) {
+        $meta_query[] = array(
+            'relation' => 'OR',
+            array('key' => '_zigurat_crm_owner', 'value' => 0, 'compare' => '=', 'type' => 'NUMERIC'),
+            array('key' => '_zigurat_crm_owner', 'value' => (int) $user_id, 'compare' => '=', 'type' => 'NUMERIC'),
+        );
+    }
+    $query = new WP_Query(array(
+        'post_type' => 'zig_crm_customer',
+        'post_status' => 'private',
+        'posts_per_page' => 1,
+        'fields' => 'ids',
+        'meta_query' => $meta_query,
+        'no_found_rows' => false,
+    ));
+    $counts[$user_id] = (int) $query->found_posts;
+    return $counts[$user_id];
+}
+
+function zigurat_crm_schedule_reminder($customer_id, $next_at)
+{
+    $customer_id = absint($customer_id);
+    $old_at = (int) get_post_meta($customer_id, '_zigurat_crm_scheduled_at', true);
+    if ($old_at) {
+        wp_clear_scheduled_hook('zigurat_crm_send_reminder', array($customer_id, $old_at));
+    }
+    delete_post_meta($customer_id, '_zigurat_crm_notified_at');
+    delete_post_meta($customer_id, '_zigurat_crm_scheduled_at');
+    $next_at = (int) $next_at;
+    if (!$next_at) {
+        return;
+    }
+    $send_at = max(time() + 10, $next_at - (15 * MINUTE_IN_SECONDS));
+    wp_schedule_single_event($send_at, 'zigurat_crm_send_reminder', array($customer_id, $next_at));
+    update_post_meta($customer_id, '_zigurat_crm_scheduled_at', $next_at);
+}
+
+function zigurat_crm_save_from_request($data)
+{
+    if (!zigurat_is_manager()) {
+        return new WP_Error('forbidden', 'دسترسی مجاز نیست.');
+    }
+    $customer_id = absint($data['customer_id'] ?? 0);
+    $existing = $customer_id ? get_post($customer_id) : null;
+    if ($customer_id && (!$existing || $existing->post_type !== 'zig_crm_customer' || $existing->post_status !== 'private')) {
+        return new WP_Error('not_found', 'مشتری پیدا نشد.');
+    }
+    $name = sanitize_text_field(wp_unslash((string) ($data['name'] ?? '')));
+    $company = sanitize_text_field(wp_unslash((string) ($data['company'] ?? '')));
+    $phone = sanitize_text_field(wp_unslash((string) ($data['phone'] ?? '')));
+    $topic = sanitize_text_field(wp_unslash((string) ($data['topic'] ?? '')));
+    if ($name === '' && $company === '') {
+        return new WP_Error('missing_name', 'نام مشتری یا شرکت را وارد کنید.');
+    }
+    if ($phone === '') {
+        return new WP_Error('missing_phone', 'شماره تماس را وارد کنید.');
+    }
+    $status = sanitize_key(wp_unslash((string) ($data['status'] ?? 'new')));
+    $priority = sanitize_key(wp_unslash((string) ($data['priority'] ?? 'normal')));
+    $status = isset(zigurat_crm_statuses()[$status]) ? $status : 'new';
+    $priority = isset(zigurat_crm_priorities()[$priority]) ? $priority : 'normal';
+    $owner_id = absint($data['owner_id'] ?? 0);
+    if ($owner_id) {
+        $owner_user = get_userdata($owner_id);
+        if (!$owner_user || !zigurat_user_can_access_manager_panel($owner_user)) {
+            $owner_id = 0;
+        }
+    }
+    $next_at = zigurat_crm_parse_datetime(wp_unslash((string) ($data['next_at'] ?? '')));
+    $title = trim(($company !== '' ? $company : $name) . ($topic !== '' ? ' — ' . $topic : ''));
+    $post_data = array('post_type' => 'zig_crm_customer', 'post_status' => 'private', 'post_title' => $title);
+    if ($existing) {
+        $post_data['ID'] = $customer_id;
+        $result = wp_update_post($post_data, true);
+    } else {
+        $post_data['post_author'] = get_current_user_id();
+        $result = wp_insert_post($post_data, true);
+    }
+    if (is_wp_error($result)) {
+        return $result;
+    }
+    $old_next = $existing ? (int) get_post_meta($result, '_zigurat_crm_next_at', true) : 0;
+    update_post_meta($result, '_zigurat_crm_name', $name);
+    update_post_meta($result, '_zigurat_crm_prefix', sanitize_text_field(wp_unslash((string) ($data['prefix'] ?? ''))));
+    update_post_meta($result, '_zigurat_crm_company', $company);
+    update_post_meta($result, '_zigurat_crm_phone', $phone);
+    update_post_meta($result, '_zigurat_crm_topic', $topic);
+    update_post_meta($result, '_zigurat_crm_status', $status);
+    update_post_meta($result, '_zigurat_crm_priority', $priority);
+    update_post_meta($result, '_zigurat_crm_owner', $owner_id);
+    update_post_meta($result, '_zigurat_crm_next_at', $next_at);
+    update_post_meta($result, '_zigurat_crm_notes', sanitize_textarea_field(wp_unslash((string) ($data['notes'] ?? ''))));
+    if (!$existing) {
+        zigurat_crm_add_history($result, 'created', 'مشتری برای پیگیری ثبت شد.');
+    } elseif ($old_next !== $next_at) {
+        zigurat_crm_add_history($result, 'scheduled', $next_at ? 'پیگیری بعدی: ' . zigurat_crm_datetime_label($next_at) : 'زمان پیگیری حذف شد.');
+    }
+    zigurat_crm_schedule_reminder($result, in_array($status, zigurat_crm_active_statuses(), true) ? $next_at : 0);
+    return zigurat_crm_record($result);
+}
+
+function zigurat_crm_ajax_guard()
+{
+    check_ajax_referer('zigurat_crm', 'nonce');
+    if (!zigurat_is_manager()) {
+        wp_send_json_error(array('message' => 'دسترسی مجاز نیست.'), 403);
+    }
+}
+
+function zigurat_ajax_crm_list()
+{
+    zigurat_crm_ajax_guard();
+    $records = zigurat_crm_records();
+    wp_send_json_success(array('records' => $records, 'summary' => zigurat_crm_summary($records)));
+}
+add_action('wp_ajax_zigurat_crm_list', 'zigurat_ajax_crm_list');
+
+function zigurat_ajax_crm_save()
+{
+    zigurat_crm_ajax_guard();
+    $record = zigurat_crm_save_from_request($_POST);
+    if (is_wp_error($record)) {
+        wp_send_json_error(array('message' => $record->get_error_message()), 400);
+    }
+    wp_send_json_success(array('message' => empty($_POST['customer_id']) ? 'مشتری ثبت شد.' : 'اطلاعات مشتری ذخیره شد.', 'record' => $record));
+}
+add_action('wp_ajax_zigurat_crm_save', 'zigurat_ajax_crm_save');
+
+function zigurat_ajax_crm_log()
+{
+    zigurat_crm_ajax_guard();
+    $customer_id = absint($_POST['customer_id'] ?? 0);
+    $record = zigurat_crm_record($customer_id);
+    if (!$record) {
+        wp_send_json_error(array('message' => 'مشتری پیدا نشد.'), 404);
+    }
+    $note = sanitize_textarea_field(wp_unslash((string) ($_POST['note'] ?? '')));
+    if ($note === '') {
+        wp_send_json_error(array('message' => 'نتیجه تماس را بنویسید.'), 400);
+    }
+    $status = sanitize_key(wp_unslash((string) ($_POST['status'] ?? $record['status'])));
+    $status = isset(zigurat_crm_statuses()[$status]) ? $status : $record['status'];
+    $next_at = zigurat_crm_parse_datetime(wp_unslash((string) ($_POST['next_at'] ?? '')));
+    update_post_meta($customer_id, '_zigurat_crm_status', $status);
+    update_post_meta($customer_id, '_zigurat_crm_next_at', $next_at);
+    zigurat_crm_add_history($customer_id, 'contact', $note);
+    zigurat_crm_schedule_reminder($customer_id, in_array($status, zigurat_crm_active_statuses(), true) ? $next_at : 0);
+    wp_send_json_success(array('message' => 'نتیجه تماس ثبت شد.', 'record' => zigurat_crm_record($customer_id)));
+}
+add_action('wp_ajax_zigurat_crm_log', 'zigurat_ajax_crm_log');
+
+function zigurat_ajax_crm_delete()
+{
+    zigurat_crm_ajax_guard();
+    $customer_id = absint($_POST['customer_id'] ?? 0);
+    $record = zigurat_crm_record($customer_id);
+    if (!$record || !wp_delete_post($customer_id, true)) {
+        wp_send_json_error(array('message' => 'حذف مشتری انجام نشد.'), 400);
+    }
+    wp_send_json_success(array('message' => 'مشتری از فهرست پیگیری حذف شد.'));
+}
+add_action('wp_ajax_zigurat_crm_delete', 'zigurat_ajax_crm_delete');
+
+function zigurat_ajax_crm_convert_project()
+{
+    zigurat_crm_ajax_guard();
+    $customer_id = absint($_POST['customer_id'] ?? 0);
+    $record = zigurat_crm_record($customer_id);
+    if (!$record) {
+        wp_send_json_error(array('message' => 'مشتری پیدا نشد.'), 404);
+    }
+    if ($record['project_id']) {
+        wp_send_json_success(array('message' => 'این مشتری قبلاً به پروژه تبدیل شده است.', 'project_id' => $record['project_id']));
+    }
+    $project = zigurat_workflow_project_save_from_request(array(
+        'title' => $record['topic'] ?: ($record['company'] ?: $record['name']),
+        'client' => trim($record['prefix'] . ' ' . $record['name'] . ($record['company'] ? ' — ' . $record['company'] : '')),
+        'phone' => $record['phone'],
+        'stage' => 'lead',
+        'notes' => "ایجادشده از بخش پیگیری مشتریان.\n" . $record['notes'],
+    ));
+    if (is_wp_error($project)) {
+        wp_send_json_error(array('message' => $project->get_error_message()), 400);
+    }
+    update_post_meta($customer_id, '_zigurat_crm_project_id', (int) $project['id']);
+    update_post_meta($customer_id, '_zigurat_crm_status', 'won');
+    update_post_meta($customer_id, '_zigurat_crm_next_at', 0);
+    zigurat_crm_schedule_reminder($customer_id, 0);
+    zigurat_crm_add_history($customer_id, 'converted', 'به پروژه «' . $project['title'] . '» تبدیل شد.');
+    wp_send_json_success(array('message' => 'کارت پروژه ساخته شد.', 'project_id' => (int) $project['id'], 'record' => zigurat_crm_record($customer_id)));
+}
+add_action('wp_ajax_zigurat_crm_convert_project', 'zigurat_ajax_crm_convert_project');
+
+function zigurat_crm_base64url_encode($value)
+{
+    return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+}
+
+function zigurat_crm_base64url_decode($value)
+{
+    return base64_decode(strtr($value, '-_', '+/') . str_repeat('=', (4 - strlen($value) % 4) % 4));
+}
+
+function zigurat_crm_vapid_keys()
+{
+    $keys = get_option('zigurat_crm_vapid_keys');
+    if (is_array($keys) && !empty($keys['private']) && !empty($keys['public'])) {
+        return $keys;
+    }
+    $resource = openssl_pkey_new(array('private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1'));
+    if (!$resource || !openssl_pkey_export($resource, $private)) {
+        return array('private' => '', 'public' => '');
+    }
+    $details = openssl_pkey_get_details($resource);
+    if (empty($details['ec']['x']) || empty($details['ec']['y'])) {
+        return array('private' => '', 'public' => '');
+    }
+    $public = "\x04" . str_pad($details['ec']['x'], 32, "\0", STR_PAD_LEFT) . str_pad($details['ec']['y'], 32, "\0", STR_PAD_LEFT);
+    $keys = array('private' => $private, 'public' => zigurat_crm_base64url_encode($public));
+    update_option('zigurat_crm_vapid_keys', $keys, false);
+    return $keys;
+}
+
+function zigurat_crm_ajax_push_subscribe()
+{
+    zigurat_crm_ajax_guard();
+    $subscription = json_decode(wp_unslash((string) ($_POST['subscription'] ?? '')), true);
+    $endpoint = esc_url_raw((string) ($subscription['endpoint'] ?? ''));
+    $p256dh = sanitize_text_field((string) ($subscription['keys']['p256dh'] ?? ''));
+    $auth = sanitize_text_field((string) ($subscription['keys']['auth'] ?? ''));
+    if (!$endpoint || !$p256dh || !$auth || strpos($endpoint, 'https://') !== 0) {
+        wp_send_json_error(array('message' => 'اشتراک اعلان معتبر نیست.'), 400);
+    }
+    $subscriptions = get_user_meta(get_current_user_id(), '_zigurat_crm_push_subscriptions', true);
+    $subscriptions = is_array($subscriptions) ? $subscriptions : array();
+    $subscriptions[md5($endpoint)] = array('endpoint' => $endpoint, 'p256dh' => $p256dh, 'auth' => $auth, 'created_at' => time());
+    update_user_meta(get_current_user_id(), '_zigurat_crm_push_subscriptions', $subscriptions);
+    wp_send_json_success(array('message' => 'اعلان گوشی برای این دستگاه فعال شد.'));
+}
+add_action('wp_ajax_zigurat_crm_push_subscribe', 'zigurat_crm_ajax_push_subscribe');
+
+function zigurat_crm_public_key_pem($raw_key)
+{
+    $der = hex2bin('3059301306072a8648ce3d020106082a8648ce3d030107034200') . $raw_key;
+    return "-----BEGIN PUBLIC KEY-----\n" . chunk_split(base64_encode($der), 64, "\n") . "-----END PUBLIC KEY-----\n";
+}
+
+function zigurat_crm_hkdf_expand($prk, $info, $length)
+{
+    $output = '';
+    $last = '';
+    for ($counter = 1; strlen($output) < $length; $counter++) {
+        $last = hash_hmac('sha256', $last . $info . chr($counter), $prk, true);
+        $output .= $last;
+    }
+    return substr($output, 0, $length);
+}
+
+function zigurat_crm_ecdsa_der_to_raw($signature)
+{
+    $offset = 2;
+    if (ord($signature[1]) & 0x80) {
+        $offset = 2 + (ord($signature[1]) & 0x7f);
+    }
+    if (ord($signature[$offset]) !== 2) {
+        return '';
+    }
+    $r_length = ord($signature[$offset + 1]);
+    $r = substr($signature, $offset + 2, $r_length);
+    $offset += 2 + $r_length;
+    if (!isset($signature[$offset]) || ord($signature[$offset]) !== 2) {
+        return '';
+    }
+    $s_length = ord($signature[$offset + 1]);
+    $s = substr($signature, $offset + 2, $s_length);
+    return str_pad(ltrim($r, "\0"), 32, "\0", STR_PAD_LEFT) . str_pad(ltrim($s, "\0"), 32, "\0", STR_PAD_LEFT);
+}
+
+function zigurat_crm_vapid_header($endpoint, $keys)
+{
+    $parts = wp_parse_url($endpoint);
+    if (empty($parts['scheme']) || empty($parts['host'])) {
+        return '';
+    }
+    $audience = $parts['scheme'] . '://' . $parts['host'] . (!empty($parts['port']) ? ':' . $parts['port'] : '');
+    $header = zigurat_crm_base64url_encode(wp_json_encode(array('typ' => 'JWT', 'alg' => 'ES256')));
+    $email = sanitize_email(get_option('admin_email'));
+    $payload = zigurat_crm_base64url_encode(wp_json_encode(array('aud' => $audience, 'exp' => time() + 43200, 'sub' => 'mailto:' . $email)));
+    $input = $header . '.' . $payload;
+    if (!openssl_sign($input, $signature, $keys['private'], OPENSSL_ALGO_SHA256)) {
+        return '';
+    }
+    $raw = zigurat_crm_ecdsa_der_to_raw($signature);
+    return $raw ? 'vapid t=' . $input . '.' . zigurat_crm_base64url_encode($raw) . ', k=' . $keys['public'] : '';
+}
+
+function zigurat_crm_push_payload($subscription, $payload)
+{
+    $client_public = zigurat_crm_base64url_decode($subscription['p256dh']);
+    $auth_secret = zigurat_crm_base64url_decode($subscription['auth']);
+    if (strlen($client_public) !== 65 || strlen($auth_secret) !== 16) {
+        return false;
+    }
+    $client_key = openssl_pkey_get_public(zigurat_crm_public_key_pem($client_public));
+    $server_key = openssl_pkey_new(array('private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1'));
+    $details = $server_key ? openssl_pkey_get_details($server_key) : false;
+    if (!$client_key || !$server_key || empty($details['ec']['x']) || empty($details['ec']['y'])) {
+        return false;
+    }
+    $server_public = "\x04" . str_pad($details['ec']['x'], 32, "\0", STR_PAD_LEFT) . str_pad($details['ec']['y'], 32, "\0", STR_PAD_LEFT);
+    $shared = openssl_pkey_derive($client_key, $server_key, 32);
+    if (!$shared) {
+        return false;
+    }
+    $prk_key = hash_hmac('sha256', $shared, $auth_secret, true);
+    $ikm = zigurat_crm_hkdf_expand($prk_key, "WebPush: info\0" . $client_public . $server_public, 32);
+    $salt = random_bytes(16);
+    $prk = hash_hmac('sha256', $ikm, $salt, true);
+    $cek = zigurat_crm_hkdf_expand($prk, "Content-Encoding: aes128gcm\0", 16);
+    $nonce = zigurat_crm_hkdf_expand($prk, "Content-Encoding: nonce\0", 12);
+    $ciphertext = openssl_encrypt(wp_json_encode($payload, JSON_UNESCAPED_UNICODE) . "\x02", 'aes-128-gcm', $cek, OPENSSL_RAW_DATA, $nonce, $tag);
+    if ($ciphertext === false) {
+        return false;
+    }
+    return $salt . pack('N', 4096) . chr(strlen($server_public)) . $server_public . $ciphertext . $tag;
+}
+
+function zigurat_crm_send_push($subscription, $payload)
+{
+    $keys = zigurat_crm_vapid_keys();
+    $body = zigurat_crm_push_payload($subscription, $payload);
+    $authorization = zigurat_crm_vapid_header($subscription['endpoint'], $keys);
+    if (!$body || !$authorization) {
+        return 0;
+    }
+    $response = wp_remote_post($subscription['endpoint'], array(
+        'timeout' => 15,
+        'headers' => array(
+            'Authorization' => $authorization,
+            'Content-Encoding' => 'aes128gcm',
+            'Content-Type' => 'application/octet-stream',
+            'Content-Length' => strlen($body),
+            'TTL' => 86400,
+            'Urgency' => 'high',
+        ),
+        'body' => $body,
+    ));
+    return is_wp_error($response) ? 0 : (int) wp_remote_retrieve_response_code($response);
+}
+
+function zigurat_crm_send_reminder($customer_id, $scheduled_at)
+{
+    $record = zigurat_crm_record($customer_id);
+    if (!$record || !in_array($record['status'], zigurat_crm_active_statuses(), true) || (int) $record['next_at'] !== (int) $scheduled_at) {
+        return;
+    }
+    if ((int) get_post_meta($customer_id, '_zigurat_crm_notified_at', true) === (int) $scheduled_at) {
+        return;
+    }
+    $user_ids = $record['owner_id'] ? array($record['owner_id']) : get_users(array('role__in' => array('administrator', 'contributor'), 'fields' => 'ids'));
+    $sent = false;
+    foreach ($user_ids as $user_id) {
+        $subscriptions = get_user_meta($user_id, '_zigurat_crm_push_subscriptions', true);
+        $subscriptions = is_array($subscriptions) ? $subscriptions : array();
+        foreach ($subscriptions as $key => $subscription) {
+            $code = zigurat_crm_send_push($subscription, array(
+                'title' => 'پیگیری ' . ($record['company'] ?: $record['name']),
+                'body' => $record['topic'] . ' — ' . $record['next_label'],
+                'url' => zigurat_crm_url(array('customer' => $record['id'])),
+                'tag' => 'zigurat-crm-' . $record['id'] . '-' . $scheduled_at,
+            ));
+            if (in_array($code, array(200, 201, 202), true)) {
+                $sent = true;
+            } elseif (in_array($code, array(404, 410), true)) {
+                unset($subscriptions[$key]);
+            }
+        }
+        update_user_meta($user_id, '_zigurat_crm_push_subscriptions', $subscriptions);
+    }
+    if ($sent) {
+        update_post_meta($customer_id, '_zigurat_crm_notified_at', (int) $scheduled_at);
+    }
+}
+add_action('zigurat_crm_send_reminder', 'zigurat_crm_send_reminder', 10, 2);
+
+function zigurat_crm_cron_schedules($schedules)
+{
+    $schedules['zigurat_five_minutes'] = array('interval' => 300, 'display' => 'هر پنج دقیقه');
+    return $schedules;
+}
+add_filter('cron_schedules', 'zigurat_crm_cron_schedules');
+
+function zigurat_crm_ensure_cron()
+{
+    if (!wp_next_scheduled('zigurat_crm_check_due_reminders')) {
+        wp_schedule_event(time() + 60, 'zigurat_five_minutes', 'zigurat_crm_check_due_reminders');
+    }
+}
+add_action('init', 'zigurat_crm_ensure_cron', 20);
+
+function zigurat_crm_check_due_reminders()
+{
+    $now = time();
+    foreach (zigurat_crm_records() as $record) {
+        if ($record['next_at'] && $record['next_at'] <= $now + (15 * MINUTE_IN_SECONDS) && $record['next_at'] >= $now - DAY_IN_SECONDS) {
+            zigurat_crm_send_reminder($record['id'], $record['next_at']);
+        }
+    }
+}
+add_action('zigurat_crm_check_due_reminders', 'zigurat_crm_check_due_reminders');
+
+function zigurat_crm_serve_service_worker()
+{
+    if (isset($_GET['zigurat_manager_manifest'])) {
+        header('Content-Type: application/manifest+json; charset=utf-8');
+        header('Cache-Control: public, max-age=3600');
+        echo wp_json_encode(array(
+            'name' => 'مدیریت زیگورات',
+            'short_name' => 'زیگورات',
+            'start_url' => zigurat_crm_url(),
+            'scope' => home_url('/'),
+            'display' => 'standalone',
+            'background_color' => '#f8f5ee',
+            'theme_color' => '#211e19',
+            'dir' => 'rtl',
+            'lang' => 'fa',
+            'icons' => array(array(
+                'src' => get_template_directory_uri() . '/assets/images/zigurat-logo.svg',
+                'sizes' => 'any',
+                'type' => 'image/svg+xml',
+                'purpose' => 'any maskable',
+            )),
+        ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+    if (!isset($_GET['zigurat_manager_sw'])) {
+        return;
+    }
+    header('Content-Type: application/javascript; charset=utf-8');
+    header('Service-Worker-Allowed: /');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    $icon_url = esc_js(get_template_directory_uri() . '/assets/images/zigurat-logo.svg');
+    $manager_url = esc_js(zigurat_crm_url());
+    echo "self.addEventListener('push',function(event){var data={};try{data=event.data.json();}catch(e){data={title:'پیگیری مشتری',body:event.data?event.data.text():''};}event.waitUntil(self.registration.showNotification(data.title||'پیگیری مشتری',{body:data.body||'',icon:'{$icon_url}',badge:'{$icon_url}',tag:data.tag||'zigurat-crm',renotify:true,data:{url:data.url||'{$manager_url}'}}));});self.addEventListener('notificationclick',function(event){event.notification.close();var url=event.notification.data&&event.notification.data.url?event.notification.data.url:'{$manager_url}';event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(function(items){for(var i=0;i<items.length;i++){if('focus' in items[i]){items[i].navigate(url);return items[i].focus();}}return clients.openWindow(url);}));});";
+    exit;
+}
+add_action('template_redirect', 'zigurat_crm_serve_service_worker', 0);
+
+function zigurat_crm_manifest_head()
+{
+    if (!(is_page('login') || is_page_template('page-login.php'))) {
+        return;
+    }
+    echo '<link rel="manifest" href="' . esc_url(add_query_arg('zigurat_manager_manifest', '1', home_url('/'))) . '">';
+    echo '<meta name="theme-color" content="#211e19">';
+    echo '<meta name="apple-mobile-web-app-capable" content="yes">';
+    echo '<meta name="apple-mobile-web-app-title" content="زیگورات">';
+}
+add_action('wp_head', 'zigurat_crm_manifest_head', 5);

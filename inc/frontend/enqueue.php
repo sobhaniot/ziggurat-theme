@@ -123,6 +123,20 @@ function zigurat_enqueue_assets()
                 'nonce' => wp_create_nonce('zigurat_workflow_projects'),
             ));
         }
+        if ($manager_section === 'customers' && zigurat_is_manager()) {
+            zigurat_enqueue_theme_style('manager-customers');
+            zigurat_enqueue_theme_script('manager-customers');
+            $vapid_keys = zigurat_crm_vapid_keys();
+            wp_localize_script('zigurat-manager-customers', 'ziguratCrmConfig', array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('zigurat_crm'),
+                'records' => zigurat_crm_records(),
+                'summary' => zigurat_crm_summary(),
+                'currentUserId' => get_current_user_id(),
+                'vapidPublicKey' => (string) ($vapid_keys['public'] ?? ''),
+                'serviceWorkerUrl' => add_query_arg('zigurat_manager_sw', '1', home_url('/')),
+            ));
+        }
     }
 
     if (is_post_type_archive('article')) {

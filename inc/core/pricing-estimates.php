@@ -363,7 +363,7 @@ function zigurat_sanitize_composite_estimate_snapshot($snapshot)
         return new WP_Error('invalid_snapshot', 'اطلاعات محاسبه معتبر نیست.');
     }
     $input_keys = array(
-        'length','width','drip_depth','drip_start_fold','drip_end_fold','bottom_depth','side_depth','install_allowance',
+        'length','width','drip_depth','drip_start_fold','drip_end_fold','bottom_depth','side_depth','side_count','install_allowance',
         'fold_left','fold_right','fold_top','fold_bottom',
         'bottom_fold_left','bottom_fold_right','bottom_fold_top','bottom_fold_bottom',
         'freight','bracing_cost','profit_percent','insurance_tax_percent',
@@ -376,7 +376,7 @@ function zigurat_sanitize_composite_estimate_snapshot($snapshot)
         'price_per_purchased_square_meter','price_per_visible_square_meter','price_per_square_meter','final_price',
     );
     $clean = array(
-        'version' => min(4, max(1, absint($snapshot['version'] ?? 1))),
+        'version' => min(5, max(1, absint($snapshot['version'] ?? 1))),
         'calculator_type' => 'composite',
         'inputs' => array(),
         'rates' => array(),
@@ -396,6 +396,7 @@ function zigurat_sanitize_composite_estimate_snapshot($snapshot)
     foreach ($input_keys as $key) {
         $clean['inputs'][$key] = zigurat_pricing_estimate_number($snapshot['inputs'][$key] ?? 0);
     }
+    $clean['inputs']['side_count'] = ((int) ($snapshot['inputs']['side_count'] ?? 2) === 1) ? 1 : 2;
     foreach ($rate_keys as $key) {
         $clean['rates'][$key] = zigurat_pricing_estimate_number($snapshot['rates'][$key] ?? 0);
     }

@@ -51,6 +51,7 @@
 .manager-project-card__documents > strong { flex: 0 0 100%; color: #6f6658; font-size: 10px; }
 .manager-project-card__documents a { padding: 3px 6px; border-radius: 5px; background: #e8f1f8; color: #265d86; font-size: 10px; font-weight: 800; }
 .manager-project-column__empty { margin: 8px 0 0; padding: 18px 8px; border: 1px dashed #d4cfc4; border-radius: 8px; color: #8a847a; font-size: 11px; text-align: center; }
+.manager-project-mobile-stages { display: none; }
 .manager-projects__guide { display: flex; align-items: center; gap: 8px; margin: 17px 0 0; padding: 11px 13px; border-right: 3px solid #c79328; background: #faf8f3; color: #716a5d; font-size: 12px; line-height: 1.8; }
 .manager-projects__guide > span { color: #9a6b0c; font-size: 20px; }
 .manager-project-archive { margin-top: 28px; padding: 19px; border: 1px solid #ded8cc; border-radius: 13px; background: #fbfaf7; }
@@ -121,9 +122,13 @@
 .manager-active-project button { min-height: 34px; margin-top: 3px; padding: 6px 8px; border: 1px solid #d9bf86; border-radius: 6px; background: #fff9ec; color: #74520e; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
 .manager-active-project button:disabled { opacity: .65; cursor: wait; }
 .manager-active-collaborators__empty { width: 100%; margin: 0; padding: 25px; border: 1px dashed #d1cabd; border-radius: 10px; color: #7b756a; text-align: center; }
-.manager-project-dialog { width: min(760px,calc(100% - 28px)); max-height: calc(100vh - 30px); padding: 0; overflow: auto; border: 0; border-radius: 15px; background: #fff; box-shadow: 0 22px 70px rgba(0,0,0,.28); }
+.manager-project-dialog { width: min(760px,calc(100% - 28px)); max-height: calc(100vh - 30px); max-height: calc(100dvh - 30px); padding: 0; overflow: hidden; border: 0; border-radius: 15px; background: #fff; box-shadow: 0 22px 70px rgba(0,0,0,.28); }
 .manager-project-dialog::backdrop { background: rgba(20,17,12,.6); backdrop-filter: blur(3px); }
-.manager-project-form > header { position: sticky; z-index: 2; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 18px 22px; border-bottom: 1px solid #e7e1d6; background: #1e1b16; color: #fff; }
+html.manager-project-dialog-open,
+body.manager-project-dialog-open { overflow: hidden; overscroll-behavior: none; }
+.manager-project-form { display: flex; max-height: calc(100vh - 30px); max-height: calc(100dvh - 30px); flex-direction: column; overflow: hidden; }
+.manager-project-form__scroll { min-height: 0; flex: 1 1 auto; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.manager-project-form > header { position: sticky; z-index: 2; top: 0; display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 15px; padding: 18px 22px; border-bottom: 1px solid #e7e1d6; background: #1e1b16; color: #fff; }
 .manager-project-form > header span { color: #dcb55d; font-size: 12px; }
 .manager-project-form > header h3 { margin: 4px 0 0; color: #fff; font-size: 22px; }
 .manager-project-form > header button { position: relative; display: grid; width: 38px; height: 38px; padding: 0; place-items: center; border: 1px solid rgba(255,255,255,.2); border-radius: 50%; background: transparent; color: #fff; font: inherit; font-size: 0; line-height: 0; cursor: pointer; }
@@ -185,7 +190,7 @@
 .manager-project-history li span,
 .manager-project-history li small { display: block; }
 .manager-project-history li small { color: #7a7469; }
-.manager-project-form > footer { display: flex; align-items: center; justify-content: flex-start; padding: 15px 22px; border-top: 1px solid #e7e1d6; background: #faf8f3; direction: rtl; }
+.manager-project-form > footer { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-start; padding: 15px 22px; border-top: 1px solid #e7e1d6; background: #faf8f3; direction: rtl; }
 .manager-project-form__footer-actions { display: flex; align-items: center; gap: 9px; width: 100%; }
 .manager-project-form > footer button { min-height: 42px; padding: 8px 14px; border: 1px solid #d4cec2; border-radius: 8px; background: #fff; font: inherit; font-weight: 800; cursor: pointer; }
 .manager-project-form > footer .manager-project-form__save { min-width: 158px; min-height: 49px; padding-inline: 22px; border-color: #c89428; background: #c89428; color: #211a0c; font-size: 15px; }
@@ -215,6 +220,7 @@
 .manager-project-confirm.is-delete [data-project-confirm-accept] { background: #b72e2e; color: #fff; }
 @keyframes manager-project-confirm-in { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
 .manager-project-card--touch-ghost { position: fixed; z-index: 2147482000; margin: 0; pointer-events: none; opacity: .92; transform: translate(18px,-50%); box-shadow: 0 18px 45px rgba(0,0,0,.25); }
+.manager-project-card--touch-ghost.is-mobile-lifted { opacity: .97; transform: translate(18px,-50%) rotate(-1deg) scale(1.03); box-shadow: 0 24px 55px rgba(0,0,0,.3); }
 
 @media (max-width: 1050px) {
   .manager-area--projects > .container { width: 96%; }
@@ -240,6 +246,25 @@
   .manager-project-partner-picker details > div { position: static; width: 100%; margin-top: 5px; box-shadow: none; }
   .manager-project-form__footer-actions { width: 100%; flex-wrap: wrap; }
   .manager-project-form__destructive-actions { width: 100%; margin-inline-start: 0; display: grid; grid-template-columns: 1fr 1fr; }
+  .manager-project-mobile-stages { display: flex; width: 100%; min-height: 54px; align-items: stretch; gap: 3px; margin: 4px 0 0; padding: 3px; overflow: hidden; border: 1px solid #d8d1c4; border-bottom: 0; border-radius: 11px 11px 0 0; background: #f5f2ec; direction: rtl; }
+  .manager-project-mobile-stage { display: flex; min-width: 34px; flex: 0 1 38px; align-items: center; justify-content: center; gap: 6px; padding: 7px 4px; overflow: hidden; border: 0; border-radius: 7px; color: #fff; font: inherit; font-weight: 900; white-space: nowrap; cursor: pointer; transition: flex-basis .3s ease, flex-grow .3s ease, filter .16s ease, transform .16s ease; }
+  .manager-project-mobile-stage.is-active { min-width: 132px; flex: 1 1 48%; padding-inline: 12px; }
+  .manager-project-mobile-stage.is-swipe-target { filter: brightness(1.14); transform: translateY(-2px); box-shadow: 0 3px 0 rgba(39,31,19,.2); }
+  .manager-project-mobile-stage.is-lead { background: #b34a3f; }
+  .manager-project-mobile-stage.is-proforma { background: #8a65a7; }
+  .manager-project-mobile-stage.is-approval { background: #bf8519; }
+  .manager-project-mobile-stage.is-production { background: #356f9c; }
+  .manager-project-mobile-stage.is-delivery { background: #277852; }
+  .manager-project-mobile-stage.is-payment { background: #a8751b; }
+  .manager-project-mobile-stage__label { width: 0; overflow: hidden; opacity: 0; font-size: 14px; text-overflow: ellipsis; transition: width .18s ease, opacity .15s ease; }
+  .manager-project-mobile-stage.is-active .manager-project-mobile-stage__label { width: auto; flex: 1 1 auto; opacity: 1; }
+  .manager-project-mobile-stage__count { display: grid; min-width: 22px; height: 22px; place-items: center; padding-inline: 4px; border-radius: 999px; background: rgba(255,255,255,.22); font-size: 11px; }
+  .manager-project-board { display: block; width: 100%; overflow: hidden; padding: 0; border: 1px solid #d8d1c4; border-top: 0; border-radius: 0 0 11px 11px; background: #f6f4ef; scroll-snap-type: none; touch-action: pan-y; }
+  .manager-project-column { display: none; width: 100%; min-height: 48vh; padding: 9px; border-top: 0; border-radius: 0 0 10px 10px; background: transparent; }
+  .manager-project-column.is-mobile-active { display: block; }
+  .manager-project-column > header { display: none; }
+  .manager-project-column__cards { min-height: 46vh; }
+  .manager-project-card { touch-action: pan-y; will-change: transform; }
 }
 @media (max-width: 430px) {
   .manager-project-confirm { padding: 23px 17px; border-radius: 15px; }
@@ -247,5 +272,5 @@
   .manager-project-confirm__actions { grid-template-columns: 1fr; }
   .manager-projects__summary { grid-template-columns: 1fr 1fr; gap: 7px; }
   .manager-projects__summary > div { min-height: 78px; padding: 11px; }
-  .manager-project-column { width: 84vw; flex-basis: 84vw; }
+  .manager-project-column { width: 100%; flex-basis: auto; }
 }

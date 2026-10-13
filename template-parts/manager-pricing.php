@@ -114,7 +114,7 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
         <header class="manager-pricing__heading">
             <span>برآورد محصول</span>
             <h2 id="manager-pricing-title">محاسبه قیمت تابلو کامپوزیت</h2>
-            <p>تابلو به نما، آبچکان، زیر و دو بغل تفکیک می‌شود و قطعات روی ورق استاندارد کامپوزیت ۳۲۰×۱۲۵ سانتی‌متر چیده می‌شوند.</p>
+            <p>تابلو به نما، آبچکان، زیر و یک یا دو بغل تفکیک می‌شود و قطعات روی ورق استاندارد کامپوزیت ۳۲۰×۱۲۵ سانتی‌متر چیده می‌شوند.</p>
         </header>
 
         <div class="manager-pricing-layout">
@@ -147,7 +147,16 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
                         <label>ارتفاع نما (سانتی‌متر) *<input name="width" type="text" inputmode="decimal" value="<?php echo $last_values['width'] > 0 ? esc_attr($last_values['width']) : ''; ?>" placeholder="مثلاً ۱۲۰" required></label>
                         <label>عرض آبچکان (سانتی‌متر)<input name="drip_depth" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['drip_depth']); ?>" placeholder="مثلاً ۴۰"></label>
                         <label>عرض زیر تابلو (سانتی‌متر)<input name="bottom_depth" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['bottom_depth']); ?>" placeholder="مثلاً ۴۰"></label>
-                        <label>عرض بغل‌ها (سانتی‌متر)<input name="side_depth" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['side_depth']); ?>" placeholder="مثلاً ۴۰"></label>
+                        <div class="manager-composite-side-field">
+                            <div class="manager-composite-side-field__heading">
+                                <label for="composite-side-depth">عرض بغل تابلو (سانتی‌متر)</label>
+                                <label class="manager-pricing-check manager-composite-side-count">
+                                    <input name="side_count" type="checkbox" value="2" <?php checked((int) $last_values['side_count'], 2); ?> aria-label="محاسبه دو بغل تابلو">
+                                    <span data-composite-side-count-label><?php echo (int) $last_values['side_count'] === 1 ? 'یک بغل' : 'دو بغل'; ?></span>
+                                </label>
+                            </div>
+                            <input id="composite-side-depth" name="side_depth" type="text" inputmode="decimal" value="<?php echo esc_attr($last_values['side_depth']); ?>" placeholder="مثلاً ۴۰">
+                        </div>
                         <fieldset class="manager-composite-drip-ends">
                             <legend>خم ابتدا و انتهای آبچکان (سانتی‌متر)</legend>
                             <div class="manager-composite-drip-ends__diagram">

@@ -1,6 +1,6 @@
 /content/
 /hosting/
 /n8n/
-
+/docs/
 /assets/images/*
 !/assets/images/zigurat-logo.svg

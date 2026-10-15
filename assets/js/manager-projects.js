@@ -559,15 +559,17 @@
         invoiceLink.setAttribute('data-project-invoice-link', '');
         documents.appendChild(invoiceLink);
       }
-      var currentStage = card.getAttribute('data-project-current-stage');
-      if (currentStage !== 'payment') {
-        var delivery = board.querySelector('[data-project-stage="delivery"] [data-project-card-list]');
-        var empty = delivery && delivery.querySelector('[data-project-empty]');
-        if (delivery) delivery.insertBefore(card, empty || null);
-        card.setAttribute('data-project-current-stage', 'delivery');
-      }
-      refreshColumnState();
-      showNotice('فاکتور ذخیره شد و کارت پروژه به‌روز شد.', 'success');
+      request('zigurat_get_workflow_project', { project_id: card.getAttribute('data-project-id') }).then(function (data) {
+        var stage = data.project && data.project.stage ? data.project.stage : 'production';
+        var target = board.querySelector('[data-project-stage="' + stage + '"] [data-project-card-list]');
+        var empty = target && target.querySelector('[data-project-empty]');
+        if (target) target.insertBefore(card, empty || null);
+        card.setAttribute('data-project-current-stage', stage);
+        refreshColumnState();
+        showNotice('فاکتور ذخیره شد و کارت پروژه به‌روز شد.', 'success');
+      }).catch(function (error) {
+        showNotice(error.message, 'error');
+      });
       return;
     }
     if (payload.documentType === 'proforma' && !card) {
@@ -681,6 +683,15 @@
       stage: stage
     }).then(function (data) {
       card.classList.remove('is-saving');
+      var confirmedStage = data.stage || stage;
+      var confirmedColumn = board.querySelector('[data-project-stage="' + confirmedStage + '"]');
+      if (confirmedColumn) {
+        var confirmedList = confirmedColumn.querySelector('[data-project-card-list]');
+        confirmedList.insertBefore(card, confirmedList.querySelector('[data-project-empty]'));
+        card.setAttribute('data-project-current-stage', confirmedStage);
+        if (isMobileProjectBoard()) setActiveMobileColumn(confirmedColumn);
+        refreshColumnState();
+      }
       if (data.invoice_id) {
         var createdInvoiceWasLinked = cardDocumentIds(card, 'invoice').indexOf(Number(data.invoice_id)) !== -1;
         addCardDocumentId(card, 'invoice', data.invoice_id);

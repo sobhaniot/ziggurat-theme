@@ -135,6 +135,7 @@ function zigurat_enqueue_assets()
                 'currentUserId' => get_current_user_id(),
                 'vapidPublicKey' => (string) ($vapid_keys['public'] ?? ''),
                 'serviceWorkerUrl' => add_query_arg('zigurat_manager_sw', '1', home_url('/')),
+                'serviceWorkerScope' => trailingslashit((string) (wp_parse_url(home_url('/'), PHP_URL_PATH) ?: '/')),
             ));
         }
     }

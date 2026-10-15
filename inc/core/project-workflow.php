@@ -32,6 +32,22 @@ function zigurat_workflow_project_stages()
     );
 }
 
+/**
+ * صدور فاکتور یعنی پروژه حداقل وارد اجرا شده است، نه اینکه تحویل شده باشد.
+ * مراحل جلوتر را حفظ می‌کنیم تا ویرایش یا اتصال سند باعث عقب‌گرد کارت نشود.
+ */
+function zigurat_workflow_project_stage_with_invoice($stage)
+{
+    $stages = array_keys(zigurat_workflow_project_stages());
+    $stage = sanitize_key((string) $stage);
+    $stage_rank = array_search($stage, $stages, true);
+    $production_rank = array_search('production', $stages, true);
+    if ($stage_rank === false || $stage_rank < $production_rank) {
+        return 'production';
+    }
+    return $stage;
+}
+
 function zigurat_workflow_project_url($args = array())
 {
     return add_query_arg(array_merge(array('manager-section' => 'projects'), $args), zigurat_manager_login_url());
@@ -298,7 +314,9 @@ function zigurat_workflow_sync_saved_invoice($invoice)
     $has_settled_invoice = (bool) array_filter($project_invoices, static function ($project_invoice) {
         return ($project_invoice->payment_status ?? '') === 'settled';
     });
-    $next_stage = ($old_stage === 'payment' || $has_settled_invoice) ? 'payment' : 'delivery';
+    $next_stage = ($old_stage === 'payment' || $has_settled_invoice)
+        ? 'payment'
+        : zigurat_workflow_project_stage_with_invoice($old_stage);
     update_post_meta($project_id, '_zigurat_work_project_stage', $next_stage);
     if ($old_stage !== $next_stage) {
         zigurat_workflow_project_add_history($project_id, $old_stage, $next_stage, 'invoice');
@@ -919,8 +937,8 @@ function zigurat_workflow_merge_projects($target_id, $source_id)
     if ($merged_stage === '' || !isset(zigurat_workflow_project_stages()[$merged_stage])) {
         $merged_stage = 'lead';
     }
-    if (zigurat_workflow_project_document_ids($target_id, 'invoice') && !in_array($merged_stage, array('delivery', 'payment'), true)) {
-        $merged_stage = 'delivery';
+    if (zigurat_workflow_project_document_ids($target_id, 'invoice')) {
+        $merged_stage = zigurat_workflow_project_stage_with_invoice($merged_stage);
     } elseif (zigurat_workflow_project_document_ids($target_id, 'proforma') && $merged_stage === 'lead') {
         $merged_stage = 'proforma';
     }
@@ -991,8 +1009,8 @@ function zigurat_workflow_project_save_from_request($data)
     }
     $proforma_ids = zigurat_workflow_project_valid_document_ids($data['proforma_ids'] ?? ($data['proforma_id'] ?? array()), 'proforma');
     $invoice_ids = zigurat_workflow_project_valid_document_ids($data['invoice_ids'] ?? ($data['invoice_id'] ?? array()), 'invoice');
-    if ($invoice_ids && $stage !== 'payment') {
-        $stage = 'delivery';
+    if ($invoice_ids) {
+        $stage = zigurat_workflow_project_stage_with_invoice($stage);
     } elseif ($proforma_ids && $stage === 'lead') {
         $stage = 'proforma';
     }
@@ -1051,8 +1069,8 @@ function zigurat_workflow_project_save_from_request($data)
     }
     $effective_invoice_ids = zigurat_workflow_project_document_ids($result, 'invoice');
     $effective_proforma_ids = zigurat_workflow_project_document_ids($result, 'proforma');
-    if ($effective_invoice_ids && $stage !== 'payment') {
-        $stage = 'delivery';
+    if ($effective_invoice_ids) {
+        $stage = zigurat_workflow_project_stage_with_invoice($stage);
     } elseif (!$effective_invoice_ids && $effective_proforma_ids && $stage === 'lead') {
         $stage = 'proforma';
     }
@@ -1122,6 +1140,8 @@ function zigurat_ajax_move_workflow_project()
         if ($invoice_id) {
             zigurat_workflow_project_add_document($project_id, 'invoice', $invoice_id);
             $invoice_ids[] = $invoice_id;
+            // ساخت فاکتور شروع اجرای پروژه است؛ تحویل باید بعداً و آگاهانه انجام شود.
+            $stage = 'production';
         }
     }
     if ($stage === 'payment' && !$invoice_ids) {
@@ -1139,7 +1159,7 @@ function zigurat_ajax_move_workflow_project()
         wp_update_post(array('ID' => $project_id, 'post_title' => $project->post_title));
     }
     wp_send_json_success(array(
-        'message' => $created_invoice ? 'فاکتور ساخته شد و کارت به «تحویل و فاکتور» منتقل شد.' : 'مرحله پروژه به «' . $stages[$stage] . '» تغییر کرد.',
+        'message' => $created_invoice ? 'فاکتور ساخته شد و کارت به «در حال اجرا» منتقل شد.' : 'مرحله پروژه به «' . $stages[$stage] . '» تغییر کرد.',
         'stage' => $stage,
         'stage_label' => $stages[$stage],
         'invoice_id' => $invoice_id,

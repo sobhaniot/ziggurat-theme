@@ -1158,12 +1158,15 @@ function zigurat_ajax_move_workflow_project()
         zigurat_workflow_project_add_history($project_id, $old_stage, $stage, 'stage');
         wp_update_post(array('ID' => $project_id, 'post_title' => $project->post_title));
     }
+    $project_record = zigurat_workflow_project_record($project_id);
     wp_send_json_success(array(
         'message' => $created_invoice ? 'فاکتور ساخته شد و کارت به «در حال اجرا» منتقل شد.' : 'مرحله پروژه به «' . $stages[$stage] . '» تغییر کرد.',
         'stage' => $stage,
         'stage_label' => $stages[$stage],
         'invoice_id' => $invoice_id,
         'invoice_url' => $created_invoice ? zigurat_workflow_project_document_url($created_invoice) : '',
+        'can_undo' => !$created_invoice && $old_stage !== $stage,
+        'project' => $project_record,
     ));
 }
 add_action('wp_ajax_zigurat_move_workflow_project', 'zigurat_ajax_move_workflow_project');

@@ -61,8 +61,12 @@ $show_shipping = (int) $invoice->shipping !== 0;
 $show_overhead = (float) ($invoice->overhead_rate ?? 0) !== 0.0 || (int) ($invoice->overhead_amount ?? 0) !== 0;
 $show_insurance = $invoice->brand === 'official' && ((float) ($invoice->insurance_rate ?? 0) !== 0.0 || (int) ($invoice->insurance_amount ?? 0) !== 0);
 $show_tax = (float) ($invoice->tax_rate ?? 0) !== 0.0 || (int) $invoice->tax_amount !== 0;
-$show_paid = (int) $invoice->paid_amount !== 0;
-$show_grand_total = $show_paid;
+$is_invoice = $invoice->document_type === 'invoice';
+$show_paid = $is_invoice || (int) $invoice->paid_amount !== 0;
+$show_grand_total = $is_invoice || $show_paid;
+$accounting_totals = function_exists('zigurat_invoice_accounting_totals')
+    ? zigurat_invoice_accounting_totals($invoice->grand_total, $invoice->deduction_amount ?? 0, $invoice->paid_amount, $invoice->document_type)
+    : array('balance' => (int) $invoice->balance);
 ?>
 <article class="invoice-document invoice-document--<?php echo esc_attr($invoice->brand); ?> <?php echo $invoice->status === 'draft' ? 'is-draft' : ''; ?>" dir="rtl">
     <?php if ($invoice->status === 'draft'): ?><div class="invoice-watermark">پیش‌نویس</div><?php endif; ?>
@@ -87,7 +91,6 @@ $show_grand_total = $show_paid;
         <div class="invoice-party__grid"><?php $render_party_fields($customer_fields); ?></div>
     </section>
 
-    <?php if ($invoice->subject): ?><div class="invoice-subject"><strong>موضوع:</strong> <?php echo esc_html($invoice->subject); ?></div><?php endif; ?>
     <table class="invoice-lines">
         <thead><tr class="invoice-lines-page-spacer" aria-hidden="true"><th colspan="7"></th></tr><tr><th>ردیف</th><th>شرح کالا یا خدمت</th><th>مقدار</th><th>واحد</th><th>مبلغ واحد (ریال)</th><th>تخفیف</th><th>جمع کل (ریال)</th></tr></thead>
         <tbody>
@@ -107,8 +110,8 @@ $show_grand_total = $show_paid;
             <?php if ($show_tax): ?><div><dt>مالیات ارزش افزوده <?php echo esc_html($rate_label($invoice->tax_rate)); ?>٪:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->tax_amount)); ?></dd></div><?php endif; ?>
             <?php if ($show_discount): ?><div><dt>تخفیف کلی:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->discount)); ?></dd></div><?php endif; ?>
             <?php if ($show_grand_total): ?><div><dt>جمع کل:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->grand_total)); ?></dd></div><?php endif; ?>
-            <?php if ($show_paid): ?><div><dt>پرداختی:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->paid_amount)); ?></dd></div><?php endif; ?>
-            <div class="is-payable"><dt>قابل پرداخت:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->balance)); ?></dd></div>
+            <?php if ($show_paid): ?><div class="is-paid"><dt>مبلغ پرداخت‌شده:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->paid_amount)); ?></dd></div><?php endif; ?>
+            <div class="is-payable"><dt>مانده:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($accounting_totals['balance'])); ?></dd></div>
         </dl>
     </div>
     <footer class="invoice-signatures"><div class="invoice-signature invoice-signature--seller invoice-signature--stamp-<?php echo esc_attr($stamp_layout['position']); ?>" style="<?php echo esc_attr($stamp_style); ?>"><span>مهر و امضای فروشنده</span><?php if ($stamp_url): ?><img src="<?php echo esc_url($stamp_url); ?>" class="invoice-stamp-image" alt="مهر فروشنده" loading="eager" decoding="sync"><?php endif; ?></div><div class="invoice-signature"><span>مهر و امضای خریدار</span></div></footer>

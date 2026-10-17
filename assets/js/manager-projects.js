@@ -21,6 +21,22 @@
   var confirmDialog = null;
   var confirmResolver = null;
   var confirmLastFocus = null;
+  var undoStack = [];
+  var redoStack = [];
+  var historyBusy = false;
+  var undoButton = board.querySelector('[data-project-undo]');
+  var redoButton = board.querySelector('[data-project-redo]');
+
+  function syncProjectHistoryButtons() {
+    if (undoButton) undoButton.disabled = historyBusy || undoStack.length === 0;
+    if (redoButton) redoButton.disabled = historyBusy || redoStack.length === 0;
+  }
+
+  function clearProjectHistory() {
+    undoStack = [];
+    redoStack = [];
+    syncProjectHistoryButtons();
+  }
 
   function ensureProjectConfirmDialog() {
     if (confirmDialog && document.documentElement.contains(confirmDialog)) return confirmDialog;
@@ -213,16 +229,34 @@
     return value.split(',').map(function (id) { return Number(id); }).filter(Boolean);
   }
 
-  function addCardDocumentId(card, type, documentId) {
-    var ids = cardDocumentIds(card, type);
-    documentId = Number(documentId);
-    if (documentId && ids.indexOf(documentId) === -1) ids.push(documentId);
-    card.setAttribute('data-project-' + type + '-ids', ids.join(','));
-    card.setAttribute('data-project-' + type + '-id', ids.length ? String(ids[ids.length - 1]) : '0');
-    var summary = card.querySelector('.manager-project-card__documents > strong');
-    if (summary) {
-      summary.textContent = cardDocumentIds(card, 'proforma').length.toLocaleString('fa-IR') + ' پیش‌فاکتور · ' + cardDocumentIds(card, 'invoice').length.toLocaleString('fa-IR') + ' فاکتور';
+  function renderCardDocuments(card, record) {
+    if (!card || !record) return;
+    var proformas = Array.isArray(record.proformas) ? record.proformas : [];
+    var invoices = Array.isArray(record.invoices) ? record.invoices : [];
+    card.setAttribute('data-project-proforma-ids', proformas.map(function (item) { return Number(item.id); }).filter(Boolean).join(','));
+    card.setAttribute('data-project-proforma-id', proformas.length ? String(proformas[proformas.length - 1].id) : '0');
+    card.setAttribute('data-project-invoice-ids', invoices.map(function (item) { return Number(item.id); }).filter(Boolean).join(','));
+    card.setAttribute('data-project-invoice-id', invoices.length ? String(invoices[invoices.length - 1].id) : '0');
+    var documents = card.querySelector('.manager-project-card__documents');
+    if (!proformas.length && !invoices.length) {
+      if (documents) documents.remove();
+      return;
     }
+    if (!documents) {
+      documents = document.createElement('div');
+      documents.className = 'manager-project-card__documents';
+      card.appendChild(documents);
+    }
+    documents.replaceChildren();
+    proformas.concat(invoices).forEach(function (documentRecord, index) {
+      if (!documentRecord || !documentRecord.url) return;
+      var isInvoice = index >= proformas.length;
+      var link = document.createElement('a');
+      link.href = documentRecord.url;
+      link.textContent = (isInvoice ? 'فاکتور ' : 'پیش‌فاکتور ') + String(documentRecord.number || documentRecord.id || '');
+      if (isInvoice) link.setAttribute('data-project-invoice-link', '');
+      documents.appendChild(link);
+    });
   }
 
   function openDialog(project) {
@@ -480,25 +514,7 @@
       card.appendChild(meta);
     }
     if ((record.proformas && record.proformas.length) || (record.invoices && record.invoices.length)) {
-      var documents = document.createElement('div');
-      documents.className = 'manager-project-card__documents';
-      var documentSummary = document.createElement('strong');
-      documentSummary.textContent = Number((record.proformas || []).length).toLocaleString('fa-IR') + ' پیش‌فاکتور · ' + Number((record.invoices || []).length).toLocaleString('fa-IR') + ' فاکتور';
-      documents.appendChild(documentSummary);
-      (record.proformas || []).forEach(function (documentRecord, index) {
-        var proforma = document.createElement('a');
-        proforma.href = documentRecord.url;
-        proforma.textContent = 'پیش‌فاکتور ' + Number(index + 1).toLocaleString('fa-IR');
-        documents.appendChild(proforma);
-      });
-      (record.invoices || []).forEach(function (documentRecord, index) {
-        var invoice = document.createElement('a');
-        invoice.href = documentRecord.url;
-        invoice.textContent = 'فاکتور ' + Number(index + 1).toLocaleString('fa-IR');
-        invoice.setAttribute('data-project-invoice-link', '');
-        documents.appendChild(invoice);
-      });
-      card.appendChild(documents);
+      renderCardDocuments(card, record);
     }
     list.insertBefore(card, list.querySelector('[data-project-empty]'));
     refreshColumnState();
@@ -541,25 +557,8 @@
       return;
     }
     if (payload.documentType === 'invoice' && card) {
-      var invoiceWasLinked = cardDocumentIds(card, 'invoice').indexOf(Number(invoiceId)) !== -1;
-      addCardDocumentId(card, 'invoice', invoiceId);
-      if (payload.invoiceUrl && !invoiceWasLinked) {
-        var documents = card.querySelector('.manager-project-card__documents');
-        if (!documents) {
-          documents = document.createElement('div');
-          documents.className = 'manager-project-card__documents';
-          var eventSummary = document.createElement('strong');
-          eventSummary.textContent = cardDocumentIds(card, 'proforma').length.toLocaleString('fa-IR') + ' پیش‌فاکتور · ' + cardDocumentIds(card, 'invoice').length.toLocaleString('fa-IR') + ' فاکتور';
-          documents.appendChild(eventSummary);
-          card.appendChild(documents);
-        }
-        var invoiceLink = document.createElement('a');
-        invoiceLink.href = payload.invoiceUrl;
-        invoiceLink.textContent = 'فاکتور ' + cardDocumentIds(card, 'invoice').length.toLocaleString('fa-IR');
-        invoiceLink.setAttribute('data-project-invoice-link', '');
-        documents.appendChild(invoiceLink);
-      }
       request('zigurat_get_workflow_project', { project_id: card.getAttribute('data-project-id') }).then(function (data) {
+        if (data.project) renderCardDocuments(card, data.project);
         var stage = data.project && data.project.stage ? data.project.stage : 'production';
         var target = board.querySelector('[data-project-stage="' + stage + '"] [data-project-card-list]');
         var empty = target && target.querySelector('[data-project-empty]');
@@ -659,26 +658,26 @@
     originalStage = '';
   }
 
-  function moveCard(card, column) {
-    if (!card || !column) return;
+  function moveCard(card, column, historyAction, historyEntry) {
+    if (!card || !column || (historyBusy && !historyAction)) return Promise.resolve(false);
     var stage = column.getAttribute('data-project-stage');
     var previousColumn = card.closest('[data-project-stage]');
     var previousStage = card.getAttribute('data-project-current-stage') || (previousColumn ? previousColumn.getAttribute('data-project-stage') : '');
     if (!stage || stage === previousStage) {
       clearDragState();
-      return;
+      return Promise.resolve(false);
     }
     if (stage === 'delivery' && cardDocumentIds(card, 'invoice').length === 0 && previousStage === 'proforma' && cardDocumentIds(card, 'proforma').length === 0) {
         clearDragState();
         showNotice('این کارت به پیش‌فاکتوری متصل نیست؛ ابتدا پیش‌فاکتور را در ویرایش پروژه انتخاب کنید.', 'error');
-        return;
+        return Promise.resolve(false);
     }
     column.querySelector('[data-project-card-list]').insertBefore(card, column.querySelector('[data-project-empty]'));
     card.setAttribute('data-project-current-stage', stage);
     card.classList.add('is-saving');
     if (isMobileProjectBoard()) setActiveMobileColumn(column);
     refreshColumnState();
-    request('zigurat_move_workflow_project', {
+    return request('zigurat_move_workflow_project', {
       project_id: card.getAttribute('data-project-id'),
       stage: stage
     }).then(function (data) {
@@ -692,29 +691,27 @@
         if (isMobileProjectBoard()) setActiveMobileColumn(confirmedColumn);
         refreshColumnState();
       }
-      if (data.invoice_id) {
-        var createdInvoiceWasLinked = cardDocumentIds(card, 'invoice').indexOf(Number(data.invoice_id)) !== -1;
-        addCardDocumentId(card, 'invoice', data.invoice_id);
-        if (data.invoice_url && !createdInvoiceWasLinked) {
-          var documents = card.querySelector('.manager-project-card__documents');
-          if (!documents) {
-            documents = document.createElement('div');
-            documents.className = 'manager-project-card__documents';
-            var createdSummary = document.createElement('strong');
-            createdSummary.textContent = cardDocumentIds(card, 'proforma').length.toLocaleString('fa-IR') + ' پیش‌فاکتور · ' + cardDocumentIds(card, 'invoice').length.toLocaleString('fa-IR') + ' فاکتور';
-            documents.appendChild(createdSummary);
-            card.appendChild(documents);
-          }
-          var invoiceLink = document.createElement('a');
-          invoiceLink.href = data.invoice_url;
-          invoiceLink.textContent = 'فاکتور ' + cardDocumentIds(card, 'invoice').length.toLocaleString('fa-IR');
-          invoiceLink.setAttribute('data-project-invoice-link', '');
-          documents.appendChild(invoiceLink);
-        }
+      if (data.project) renderCardDocuments(card, data.project);
+      if (data.invoice_url && data.invoice_id) {
         // Keep an already-open invoice list in sync with the newly created invoice.
         broadcastWorkflowEvent('invoice-created', data.invoice_id);
       }
+      if (historyAction === 'undo' && historyEntry) {
+        undoStack.pop();
+        redoStack.push(historyEntry);
+      } else if (historyAction === 'redo' && historyEntry) {
+        redoStack.pop();
+        undoStack.push(historyEntry);
+      } else if (data.can_undo) {
+        undoStack.push({ projectId: Number(card.getAttribute('data-project-id')), from: previousStage, to: confirmedStage });
+        if (undoStack.length > 50) undoStack.shift();
+        redoStack = [];
+      } else if (previousStage !== confirmedStage) {
+        clearProjectHistory();
+      }
+      syncProjectHistoryButtons();
       showNotice(data.message, 'success');
+      return true;
     }).catch(function (error) {
       card.classList.remove('is-saving');
       card.setAttribute('data-project-current-stage', previousStage);
@@ -722,10 +719,40 @@
       if (isMobileProjectBoard() && previousColumn) setActiveMobileColumn(previousColumn);
       refreshColumnState();
       showNotice(error.message, 'error');
+      return false;
     }).finally(clearDragState);
   }
 
   board.addEventListener('click', function (event) {
+    var undoControl = event.target.closest('[data-project-undo]');
+    var redoControl = event.target.closest('[data-project-redo]');
+    if (undoControl || redoControl) {
+      event.preventDefault();
+      var isUndo = Boolean(undoControl);
+      var stack = isUndo ? undoStack : redoStack;
+      var entry = stack[stack.length - 1];
+      if (!entry || historyBusy) return;
+      var historyCard = board.querySelector('[data-project-card][data-project-id="' + entry.projectId + '"]');
+      var expectedStage = isUndo ? entry.to : entry.from;
+      var targetStage = isUndo ? entry.from : entry.to;
+      if (!historyCard || historyCard.getAttribute('data-project-current-stage') !== expectedStage) {
+        clearProjectHistory();
+        showNotice('مرحلهٔ این کارت از جای دیگری تغییر کرده؛ سابقهٔ واگرد پاک شد.', 'error');
+        return;
+      }
+      var targetColumn = board.querySelector('[data-project-stage="' + targetStage + '"]');
+      if (!targetColumn) {
+        clearProjectHistory();
+        return;
+      }
+      historyBusy = true;
+      syncProjectHistoryButtons();
+      moveCard(historyCard, targetColumn, isUndo ? 'undo' : 'redo', entry).finally(function () {
+        historyBusy = false;
+        syncProjectHistoryButtons();
+      });
+      return;
+    }
     var removeDocumentButton = event.target.closest('[data-document-remove]');
     var newButton = event.target.closest('[data-project-new]');
     var archiveJump = event.target.closest('[data-project-archive-jump]');
@@ -863,6 +890,7 @@
     showFormResult('در حال ذخیره پروژه…', 'success');
     request('zigurat_save_workflow_project', values)
       .then(function (data) {
+        clearProjectHistory();
         showFormResult(data.message, 'success');
         window.setTimeout(function () { window.location.reload(); }, 450);
       })

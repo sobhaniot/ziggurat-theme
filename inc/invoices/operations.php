@@ -35,12 +35,15 @@ function zigurat_invoice_accounting_totals($grand_total, $deduction_amount, $pai
     $deduction_amount = max(0, min((int) $deduction_amount, $grand_total));
     $paid_amount = max(0, (int) $paid_amount);
     $net_payable = max(0, $grand_total - $deduction_amount);
-    $balance = max(0, $net_payable - $paid_amount);
+    // The visible invoice balance is gross (deductions never change it).
+    // Deductions are applied only to determine the final net balance/status.
+    $balance = max(0, $grand_total - $paid_amount);
+    $net_balance = max(0, $balance - $deduction_amount);
     $payment_status = $document_type !== 'invoice'
         ? 'not_applicable'
-        : ($net_payable > 0 && $paid_amount >= $net_payable ? 'settled' : ($paid_amount > 0 ? 'partial' : 'unpaid'));
+        : ($net_balance === 0 ? 'settled' : (($paid_amount > 0 || $deduction_amount > 0) ? 'partial' : 'unpaid'));
 
-    return compact('deduction_amount', 'paid_amount', 'net_payable', 'balance', 'payment_status');
+    return compact('deduction_amount', 'paid_amount', 'net_payable', 'balance', 'net_balance', 'payment_status');
 }
 
 function zigurat_invoice_tax_status_label($status)

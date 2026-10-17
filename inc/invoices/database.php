@@ -36,7 +36,7 @@ function zigurat_invoice_trash_table_name()
 function zigurat_install_invoice_tables()
 {
     global $wpdb;
-    $version = '13';
+    $version = '15';
     $invoices = zigurat_invoices_table_name();
     $items = zigurat_invoice_items_table_name();
     $sequences = zigurat_invoice_sequences_table_name();
@@ -205,18 +205,17 @@ function zigurat_install_invoice_tables()
         }
         if ($wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'payment_status'")) {
             $wpdb->query("UPDATE {$invoices}
-                SET payment_status = CASE
+                SET balance = GREATEST(grand_total - LEAST(paid_amount, grand_total), 0),
+                    payment_status = CASE
                     WHEN document_type <> 'invoice' THEN 'not_applicable'
-                    WHEN (grand_total - LEAST(deduction_amount, grand_total)) > 0
-                         AND paid_amount >= (grand_total - LEAST(deduction_amount, grand_total)) THEN 'settled'
-                    WHEN paid_amount > 0 THEN 'partial'
+                    WHEN paid_amount >= (grand_total - LEAST(deduction_amount, grand_total)) THEN 'settled'
+                    WHEN paid_amount > 0 OR deduction_amount > 0 THEN 'partial'
                     ELSE 'unpaid' END");
             $wpdb->query("UPDATE {$invoices}
                 SET settled_at = COALESCE(settled_at, updated_at),
                     locked_at = COALESCE(locked_at, updated_at),
                     locked_reason = IF(locked_reason = '', 'settled', locked_reason)
                 WHERE document_type = 'invoice' AND status = 'issued'
-                  AND (grand_total - LEAST(deduction_amount, grand_total)) > 0
                   AND paid_amount >= (grand_total - LEAST(deduction_amount, grand_total))");
         }
     }

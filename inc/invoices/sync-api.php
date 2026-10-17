@@ -115,6 +115,7 @@ function zigurat_invoice_sync_get_invoices()
             'deduction_note' => (string) $invoice->deduction_note,
             'paid_amount' => (int) $invoice->paid_amount,
             'balance' => (int) $accounting['balance'],
+            'net_balance' => (int) $accounting['net_balance'],
             'payment_status' => (string) $accounting['payment_status'],
             'tax_status' => (string) $invoice->tax_status,
             'tax_registered' => in_array(
@@ -167,6 +168,7 @@ function zigurat_invoice_sync_update_invoice(WP_REST_Request $request)
         'deduction_note' => $deduction_note,
         'paid_amount' => $accounting['paid_amount'],
         'balance' => $accounting['balance'],
+        'net_balance' => $accounting['net_balance'],
         'payment_status' => $accounting['payment_status'],
         'settled_at' => $settled ? ($invoice->settled_at ?: $now) : null,
         'updated_by' => get_current_user_id(),

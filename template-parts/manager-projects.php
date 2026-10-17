@@ -41,7 +41,14 @@ $stage_classes = array(
             <h2>مدیریت پروژه‌ها</h2>
             <p>مسیر هر مشتری را از اولین پیگیری تا تحویل و صدور فاکتور نهایی مدیریت کنید.</p>
         </div>
-        <div class="manager-projects__heading-actions"><button type="button" class="manager-projects__new" data-project-new><span aria-hidden="true">＋</span> پروژه جدید</button><button type="button" class="manager-projects__archive-jump" data-project-archive-jump>دیدن آرشیو</button></div>
+        <div class="manager-projects__heading-actions">
+            <div class="manager-project-history-controls" aria-label="واگرد و ازنوِ جابه‌جایی کارت‌ها">
+                <button type="button" data-project-undo disabled aria-label="واگرد آخرین جابه‌جایی" title="واگرد آخرین جابه‌جایی">↶ واگرد</button>
+                <button type="button" data-project-redo disabled aria-label="ازنو آخرین جابه‌جایی" title="ازنو آخرین جابه‌جایی">↷ ازنو</button>
+            </div>
+            <button type="button" class="manager-projects__new" data-project-new><span aria-hidden="true">＋</span> پروژه جدید</button>
+            <button type="button" class="manager-projects__archive-jump" data-project-archive-jump>دیدن آرشیو</button>
+        </div>
     </header>
 
     <div class="manager-projects__notice" data-project-notice role="status" aria-live="polite" hidden></div>
@@ -91,9 +98,8 @@ $stage_classes = array(
                             <?php endif; ?>
                             <?php if ($record['proformas'] || $record['invoices']): ?>
                                 <div class="manager-project-card__documents">
-                                    <strong><?php echo esc_html(number_format_i18n(count($record['proformas']))); ?> پیش‌فاکتور · <?php echo esc_html(number_format_i18n(count($record['invoices']))); ?> فاکتور</strong>
-                                    <?php foreach ($record['proformas'] as $index => $document): ?><a href="<?php echo esc_url($document['url']); ?>">پیش‌فاکتور <?php echo esc_html(number_format_i18n($index + 1)); ?></a><?php endforeach; ?>
-                                    <?php foreach ($record['invoices'] as $index => $document): ?><a href="<?php echo esc_url($document['url']); ?>" data-project-invoice-link>فاکتور <?php echo esc_html(number_format_i18n($index + 1)); ?></a><?php endforeach; ?>
+                                    <?php foreach ($record['proformas'] as $document): ?><a href="<?php echo esc_url($document['url']); ?>">پیش‌فاکتور <?php echo esc_html($document['number'] ?: $document['id']); ?></a><?php endforeach; ?>
+                                    <?php foreach ($record['invoices'] as $document): ?><a href="<?php echo esc_url($document['url']); ?>" data-project-invoice-link>فاکتور <?php echo esc_html($document['number'] ?: $document['id']); ?></a><?php endforeach; ?>
                                 </div>
                             <?php endif; ?>
                         </article>

@@ -941,7 +941,9 @@
     var discount = Math.min(grossTotal, requestedDiscount);
     var grand = Math.max(0, grossTotal - discount);
     var deduction = Math.min(grand, money(editor.querySelector('[name="deduction_amount"]')));
-    var balance = Math.max(0, grand - deduction - money(editor.querySelector('[name="paid_amount"]')));
+    var paidAmount = money(editor.querySelector('[name="paid_amount"]'));
+    var balance = Math.max(0, grand - paidAmount);
+    var netBalance = Math.max(0, balance - deduction);
     editor.querySelector('[data-subtotal]').textContent = format(subtotal);
     var shippingOutput = editor.querySelector('[data-shipping]');
     var discountOutput = editor.querySelector('[data-discount]');
@@ -954,6 +956,8 @@
     editor.querySelector('[data-tax]').textContent = format(tax);
     editor.querySelector('[data-grand-total]').textContent = format(grand);
     editor.querySelector('[data-balance]').textContent = format(balance);
+    var netBalanceOutput = editor.querySelector('[data-net-balance]');
+    if (netBalanceOutput) netBalanceOutput.textContent = format(netBalance);
   }
   function updateRowNumbers() {
     body.querySelectorAll('tr').forEach(function (row, index) {

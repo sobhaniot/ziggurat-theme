@@ -6,6 +6,10 @@
 .manager-projects__heading h2 { margin: 5px 0 7px; font-size: 30px; }
 .manager-projects__heading p { margin: 0; color: #6e695f; }
 .manager-projects__heading-actions { order: -1; display: flex; align-items: center; gap: 8px; }
+.manager-project-history-controls { display: flex; align-items: center; gap: 5px; }
+.manager-project-history-controls button { min-height: 38px; padding: 7px 10px; border: 1px solid #d8d1c4; border-radius: 8px; background: #fff; color: #514a3e; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+.manager-project-history-controls button:disabled { opacity: .45; cursor: not-allowed; }
+.manager-project-history-controls button:not(:disabled):hover { border-color: #c89428; background: #fffaf0; }
 .manager-projects__archive-jump { min-height: 42px; padding: 9px 14px; border: 1px solid #c89428; border-radius: 9px; background: #fffaf0; color: #79550f; font: inherit; font-weight: 800; cursor: pointer; }
 .manager-projects__new { display: inline-flex; min-height: 46px; align-items: center; gap: 7px; padding: 10px 17px; border: 0; border-radius: 9px; background: #d4a238; color: #201a0e; font: inherit; font-weight: 800; cursor: pointer; }
 .manager-projects__new span { font-size: 21px; line-height: 1; }
@@ -48,7 +52,6 @@
 .manager-project-card__work b { color: #302b24; }
 .manager-project-card__work small { color: #936916; font-weight: 800; }
 .manager-project-card__documents { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; padding-top: 5px; border-top: 1px solid #eee9df; }
-.manager-project-card__documents > strong { flex: 0 0 100%; color: #6f6658; font-size: 10px; }
 .manager-project-card__documents a { padding: 3px 6px; border-radius: 5px; background: #e8f1f8; color: #265d86; font-size: 10px; font-weight: 800; }
 .manager-project-column__empty { margin: 8px 0 0; padding: 18px 8px; border: 1px dashed #d4cfc4; border-radius: 8px; color: #8a847a; font-size: 11px; text-align: center; }
 .manager-project-mobile-stages { display: none; }
@@ -231,6 +234,7 @@ body.manager-project-dialog-open { overflow: hidden; overscroll-behavior: none; 
 @media (max-width: 720px) {
   .manager-projects__heading { align-items: stretch; flex-direction: column; }
   .manager-projects__heading-actions { justify-content: flex-end; }
+  .manager-project-history-controls { justify-content: flex-end; }
   .manager-project-archive__heading { align-items: stretch; flex-direction: column; }
   .manager-project-archive__axis { margin-right: 0; }
   .manager-active-collaborators > header { align-items: stretch; flex-direction: column; }

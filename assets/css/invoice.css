@@ -294,9 +294,17 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
 .invoice-editor-bottom fieldset { display: grid; gap: 12px; }
 .invoice-live-totals { margin-top: 14px; border-top: 1px solid #ddd; }
 .invoice-live-totals div { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
-.invoice-live-totals div:nth-last-child(2) { font-size: 20px; font-weight: 800; }
+.invoice-live-totals .is-grand-total { font-size: 18px; font-weight: 900; }
+.invoice-live-totals .is-paid { color: #55492f; font-weight: 700; }
+.invoice-live-totals .is-paid dd { margin: 0; }
+.invoice-live-totals .is-paid input { width: min(230px, 55vw); min-height: 36px; padding: 5px 9px; border: 1px solid #d8d1c4; border-radius: 6px; background: #fff; color: #302a21; font: inherit; text-align: left; direction: ltr; }
+.invoice-live-totals .is-paid input[readonly] { background: #f3f0e8; cursor: default; }
+.invoice-live-totals .is-balance { padding: 9px 10px; border-radius: 7px; background: #f3eee3; font-weight: 900; }
 .invoice-field-hint { margin: 0 0 12px; color: #6b6254; font-size: 13px; }
 .invoice-accounting-fields { background: #fffaf0; }
+.invoice-net-balance { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 46px; padding: 8px 11px; border: 1px solid #dfc98f; border-radius: 8px; background: #fff; color: #51421f; }
+.invoice-net-balance strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+.invoice-accounting-fields input[readonly] { background: #f3f0e8; color: #514b41; cursor: default; }
 .invoice-shipping-field { display: grid; gap: 5px; font-weight: 700; }
 .invoice-shipping-field > input[type="hidden"] { display: none !important; }
 .invoice-shipping-field__title { display: flex; align-items: center; gap: 8px; min-height: 34px; }
@@ -738,8 +746,6 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
 .invoice-status-quick__menu button + button { margin-top: 4px; }
 .invoice-status-quick__menu button:hover:not(:disabled) { background: #d6e2ff; }
 .invoice-status-quick__menu button:disabled { background: #f2f3f5; color: #9198a4; cursor: default; }
-.invoice-editor--payment-readonly label:has(> input[name="paid_amount"]) { display: none; }
-.invoice-editor--payment-readonly:not(.invoice-editor--readonly) .invoice-accounting-fields { display: none; }
 .invoice-editor--readonly input:disabled,
 .invoice-editor--readonly select:disabled,
 .invoice-editor--readonly textarea:disabled { opacity: 1; color: #302a21; background: #f4f1eb; cursor: default; }

@@ -1308,15 +1308,3 @@ function zigurat_invoice_sanitize_customer_names($customer_names)
     return array_values(array_unique($clean));
 }
 
-function zigurat_invoice_customer_names($brand)
-{
-    global $wpdb;
-    if (!in_array($brand, array('official', 'unofficial'), true)) {
-        return array();
-    }
-    $table = zigurat_invoices_table_name();
-    return array_values(array_filter(array_map('strval', $wpdb->get_col($wpdb->prepare(
-        "SELECT DISTINCT customer_name FROM {$table} WHERE brand=%s AND customer_name<>'' ORDER BY customer_name ASC",
-        $brand
-    ))), static function ($name) { return $name !== ''; }));
-}

@@ -36,7 +36,7 @@ function zigurat_invoice_trash_table_name()
 function zigurat_install_invoice_tables()
 {
     global $wpdb;
-    $version = '16';
+    $version = '17';
     $invoices = zigurat_invoices_table_name();
     $items = zigurat_invoice_items_table_name();
     $sequences = zigurat_invoice_sequences_table_name();
@@ -123,7 +123,8 @@ function zigurat_install_invoice_tables()
         KEY parent_invoice_id (parent_invoice_id),
         KEY tax_period (brand,document_type,tax_year,tax_quarter),
         KEY issue_date (issue_date),
-        KEY customer_name (customer_name(100))
+        KEY customer_name (customer_name(100)),
+        KEY brand_customer_name (brand,customer_name(100))
     ) {$charset};");
     dbDelta("CREATE TABLE {$items} (
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,

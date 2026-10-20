@@ -154,38 +154,181 @@
   }
 
   function setupInvoiceBuyerFilters(root) {
-    (root || document).querySelectorAll('.invoice-buyer-filter details').forEach(function (dropdown) {
-      if (dropdown.dataset.buyerFilterReady === '1') return;
-      dropdown.dataset.buyerFilterReady = '1';
-      var form = dropdown.closest('form');
+    (root || document).querySelectorAll('[data-buyer-filter]').forEach(function (wrapper) {
+      if (wrapper.dataset.buyerFilterReady === '1') return;
+      wrapper.dataset.buyerFilterReady = '1';
+      var form = wrapper.closest('form');
+      var selected = wrapper.querySelector('[data-buyer-selected]');
+      var summary = wrapper.querySelector('[data-buyer-summary]');
+      var search = wrapper.querySelector('[data-buyer-search]');
+      var toggle = wrapper.querySelector('[data-buyer-toggle]');
+      var panel = wrapper.querySelector('[data-buyer-panel]');
+      var results = wrapper.querySelector('[data-buyer-results]');
+      var config = window.ziguratInvoiceConfig || {};
       var changed = false;
       var submitting = false;
-      if (!form) return;
+      var timer = null;
+      var requestId = 0;
+      var buyerNames = [];
+      var moreBuyers = false;
+      var nextBuyerOffset = 0;
+      if (!form || !selected || !summary || !search || !toggle || !panel || !results) return;
 
-      dropdown.querySelectorAll('input[name="filter_buyers[]"]').forEach(function (checkbox) {
-        checkbox.addEventListener('change', function () { changed = true; });
+      function setOpen(open) {
+        wrapper.classList.toggle('is-open', open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        panel.hidden = !open;
+        if (open) search.focus({preventScroll:true});
+      }
+
+      function selectedNames() {
+        return Array.from(selected.querySelectorAll('input[name="filter_buyers[]"]')).map(function (input) { return input.value; });
+      }
+      function updateSummary() {
+        var names = selectedNames();
+        summary.textContent = names.length ? names.length.toLocaleString('fa-IR') + ' خریدار انتخاب شد' : 'همه خریداران';
+      }
+      function showResultMessage(message) {
+        results.replaceChildren();
+        var note = document.createElement('small');
+        note.textContent = message;
+        results.appendChild(note);
+      }
+      function addBuyer(name) {
+        if (!name || selectedNames().includes(name)) return;
+        requestId += 1;
+        var chip = document.createElement('span');
+        chip.className = 'invoice-buyer-chip';
+        chip.setAttribute('data-buyer-chip', '');
+        var label = document.createElement('span');
+        label.textContent = name;
+        var hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'filter_buyers[]';
+        hidden.value = name;
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.setAttribute('data-remove-buyer', '');
+        remove.setAttribute('aria-label', 'حذف خریدار ' + name);
+        remove.textContent = '×';
+        chip.append(label, hidden, remove);
+        selected.appendChild(chip);
+        changed = true;
+        updateSummary();
+        search.value = '';
+        setOpen(true);
+        lookup();
+        search.focus({preventScroll:true});
+      }
+      function renderResults(names) {
+        results.replaceChildren();
+        var chosen = selectedNames();
+        var available = names.filter(function (name) { return name && !chosen.includes(name); });
+        if (!available.length && !moreBuyers) showResultMessage('خریدار دیگری مطابق فیلترهای فعلی پیدا نشد.');
+        available.forEach(function (name) {
+          var option = document.createElement('button');
+          option.type = 'button';
+          option.className = 'invoice-buyer-filter__option';
+          option.setAttribute('role', 'option');
+          option.textContent = name;
+          option.title = name;
+          option.addEventListener('click', function () { addBuyer(name); });
+          results.appendChild(option);
+        });
+        if (moreBuyers) {
+          var more = document.createElement('button');
+          more.type = 'button';
+          more.className = 'invoice-buyer-filter__option';
+          more.textContent = 'نمایش خریداران بیشتر…';
+          more.addEventListener('click', function () { more.disabled = true; lookup(true); });
+          results.appendChild(more);
+        }
+      }
+      function lookup(append) {
+        append = append === true;
+        clearTimeout(timer);
+        var term = search.value.trim();
+        if (!config.ajaxUrl || !config.buyerFilterNonce) {
+          showResultMessage('جستجوی خریدار در دسترس نیست.');
+          return;
+        }
+        var currentRequest = ++requestId;
+        var params = new URLSearchParams({
+          action: 'zigurat_invoice_buyer_filter_lookup',
+          nonce: config.buyerFilterNonce || '',
+          brand: wrapper.dataset.buyerBrand || '',
+          term: term
+        });
+        ['filter_type', 'tax_year', 'tax_quarter', 'filter_payment_status', 'filter_tax_status', 'invoice_search'].forEach(function (key) {
+          var field = form.elements.namedItem(key);
+          if (field) params.set(key, field.value);
+        });
+        params.set('offset', append ? nextBuyerOffset : 0);
+        if (!append) showResultMessage('در حال دریافت خریداران…');
+        fetch(config.ajaxUrl + '?' + params.toString(), {credentials:'same-origin'})
+          .then(function (response) { return response.json(); })
+          .then(function (response) {
+            if (currentRequest !== requestId) return;
+            if (!response.success || !response.data || !Array.isArray(response.data.names)) {
+              showResultMessage('جستجوی خریدار انجام نشد. دوباره تلاش کنید.');
+              return;
+            }
+            buyerNames = append ? buyerNames.concat(response.data.names) : response.data.names;
+            moreBuyers = response.data.has_more;
+            nextBuyerOffset = response.data.next_offset;
+            renderResults(buyerNames);
+          })
+          .catch(function () {
+            if (currentRequest === requestId) showResultMessage('اتصال برای جستجوی خریدار برقرار نشد.');
+          });
+      }
+
+      selected.addEventListener('click', function (event) {
+        var remove = event.target.closest('[data-remove-buyer]');
+        if (!remove) return;
+        var chip = remove.closest('[data-buyer-chip]');
+        if (chip) {
+          chip.remove();
+          changed = true;
+          updateSummary();
+          setOpen(true);
+          lookup();
+          search.focus({preventScroll:true});
+        }
       });
-
-      dropdown.addEventListener('toggle', function () {
-        if (dropdown.open || !changed || submitting) return;
-        changed = false;
-        submitting = true;
-        if (typeof form.requestSubmit === 'function') form.requestSubmit();
-        else form.submit();
+      toggle.addEventListener('click', function (event) {
+        event.preventDefault();
+        setOpen(true);
+        lookup();
       });
-
+      search.addEventListener('input', function () {
+        setOpen(true);
+        requestId += 1;
+        clearTimeout(timer);
+        showResultMessage('در حال جستجو…');
+        timer = setTimeout(lookup, 300);
+      });
       document.addEventListener('click', function (event) {
-        if (!dropdown.open || dropdown.contains(event.target)) return;
+        // A selected result is removed while its click bubbles. The original
+        // event path still identifies that click as occurring inside the filter.
+        var inside = typeof event.composedPath === 'function' ? event.composedPath().includes(wrapper) : wrapper.contains(event.target);
+        if (!wrapper.classList.contains('is-open') || inside) return;
         var target = event.target instanceof Element ? event.target : null;
         if (!target) return;
         var formControl = target.closest('button, input, select, textarea, a');
-        dropdown.open = false;
-        // Let the clicked control perform its own submit or navigation. The
-        // dropdown's toggle handler submits changed buyer selections otherwise.
-        if (formControl && (form.contains(formControl) || formControl.matches('a'))) {
+        setOpen(false);
+        clearTimeout(timer);
+        requestId += 1;
+        // A form control or link may have its own action; a click on the page
+        // background applies buyer selections immediately.
+        if (changed && !submitting && !formControl) {
           changed = false;
+          submitting = true;
+          if (typeof form.requestSubmit === 'function') form.requestSubmit();
+          else form.submit();
         }
       });
+      updateSummary();
     });
   }
 

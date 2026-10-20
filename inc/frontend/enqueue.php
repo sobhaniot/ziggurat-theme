@@ -194,6 +194,7 @@ function zigurat_enqueue_assets()
         wp_localize_script('zigurat-invoice', 'ziguratInvoiceConfig', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'customerNonce' => wp_create_nonce('zigurat_invoice_customer_lookup'),
+            'buyerFilterNonce' => wp_create_nonce('zigurat_invoice_buyer_filter'),
             'stampLayoutNonce' => wp_create_nonce('zigurat_invoice_stamp_layout'),
             'managerName' => (static function () {
                 $user = wp_get_current_user();

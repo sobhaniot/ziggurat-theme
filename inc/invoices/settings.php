@@ -274,6 +274,72 @@ function zigurat_invoice_ajax_customer_lookup()
 }
 add_action('wp_ajax_zigurat_invoice_customer_lookup', 'zigurat_invoice_ajax_customer_lookup');
 
+function zigurat_invoice_buyer_filter_matches($term, $brand, $limit = 50, $filters = array(), $offset = 0)
+{
+    global $wpdb;
+    $term = sanitize_text_field($term);
+    if (!in_array($brand, array('official', 'unofficial'), true)) {
+        return array();
+    }
+    $table = zigurat_invoices_table_name();
+    $where = array('brand=%s', "TRIM(customer_name) <> ''");
+    $values = array($brand);
+    if ($term !== '') {
+        $where[] = 'customer_name LIKE %s';
+        $values[] = $wpdb->esc_like($term) . '%';
+    }
+    $type = $filters['filter_type'] ?? '';
+    if (in_array($type, array('invoice', 'proforma'), true)) {
+        $where[] = 'document_type=%s';
+        $values[] = $type;
+    }
+    $year = absint($filters['tax_year'] ?? 0);
+    $quarter = absint($filters['tax_quarter'] ?? 0);
+    if ($year) { $where[] = 'tax_year=%d'; $values[] = $year; }
+    if ($quarter >= 1 && $quarter <= 4) { $where[] = 'tax_quarter=%d'; $values[] = $quarter; }
+    $payment = $filters['filter_payment_status'] ?? '';
+    if ($payment === 'unpaid') { $where[] = "payment_status IN ('unpaid','partial')"; }
+    elseif ($payment === 'settled') { $where[] = "payment_status='settled'"; }
+    $tax_status = $filters['filter_tax_status'] ?? '';
+    if ($tax_status === 'not_submitted') { $where[] = "tax_status IN ('not_submitted','ready','rejected')"; }
+    elseif ($tax_status === 'submitted') { $where[] = "tax_status IN ('submitted','confirmed','corrected','voided')"; }
+    $invoice_search = $filters['invoice_search'] ?? '';
+    if ($invoice_search !== '') {
+        $like = '%' . $wpdb->esc_like($invoice_search) . '%';
+        $where[] = "(customer_name LIKE %s OR project_name LIKE %s OR subject LIKE %s OR CONCAT(document_number, IF(number_suffix > 0, CONCAT('/', number_suffix), '')) LIKE %s)";
+        array_push($values, $like, $like, $like, $like);
+    }
+    $where_sql = implode(' AND ', $where);
+    $limit = max(1, min(51, absint($limit)));
+    array_push($values, $limit, absint($offset));
+    return array_map('strval', $wpdb->get_col($wpdb->prepare(
+        "SELECT customer_name FROM {$table}
+         WHERE {$where_sql}
+         GROUP BY customer_name
+         ORDER BY MAX(id) DESC
+         LIMIT %d OFFSET %d",
+        $values
+    )));
+}
+
+function zigurat_invoice_ajax_buyer_filter_lookup()
+{
+    check_ajax_referer('zigurat_invoice_buyer_filter', 'nonce');
+    if (!zigurat_is_manager()) {
+        wp_send_json_error(array('message' => 'دسترسی مجاز نیست.'), 403);
+    }
+    $term = isset($_GET['term']) ? sanitize_text_field(wp_unslash($_GET['term'])) : '';
+    $brand = isset($_GET['brand']) ? sanitize_key(wp_unslash($_GET['brand'])) : '';
+    $filters = array();
+    foreach (array('filter_type', 'tax_year', 'tax_quarter', 'filter_payment_status', 'filter_tax_status', 'invoice_search') as $key) {
+        $filters[$key] = isset($_GET[$key]) ? sanitize_text_field(wp_unslash($_GET[$key])) : '';
+    }
+    $offset = absint($_GET['offset'] ?? 0);
+    $names = zigurat_invoice_buyer_filter_matches($term, $brand, 51, $filters, $offset);
+    wp_send_json_success(array('names' => array_slice($names, 0, 50), 'has_more' => count($names) > 50, 'next_offset' => $offset + 50));
+}
+add_action('wp_ajax_zigurat_invoice_buyer_filter_lookup', 'zigurat_invoice_ajax_buyer_filter_lookup');
+
 function zigurat_invoice_ajax_save_stamp_layout()
 {
     check_ajax_referer('zigurat_invoice_stamp_layout', 'nonce');

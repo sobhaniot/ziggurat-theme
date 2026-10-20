@@ -335,15 +335,35 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
 .invoice-list-filters { display: grid; grid-template-columns: repeat(4,minmax(140px,1fr)) auto auto; gap: 10px; align-items: end; margin-bottom: 20px; padding: 16px; border-radius: 10px; background: #f5f5f5; }
 .invoice-list-filters label { display: grid; gap: 5px; font-weight: 700; }
 .invoice-buyer-filter { position: relative; display: grid; min-width: 0; gap: 5px; font-weight: 700; }
-.invoice-buyer-filter > details > summary { display: flex; min-height: 44px; box-sizing: border-box; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 11px; border: 1px solid #d5d5d5; border-radius: 7px; background: #fff; color: #333; font-weight: 400; cursor: pointer; list-style: none; }
-.invoice-buyer-filter > details > summary::-webkit-details-marker { display: none; }
-.invoice-buyer-filter > details > summary::after { content: '⌄'; color: #777; }
-.invoice-buyer-filter > details[open] > summary { border-color: #c89b3c; border-radius: 7px 7px 0 0; }
-.invoice-buyer-filter__options { position: absolute; z-index: 30; inset-inline: 0; top: calc(100% - 1px); max-height: min(280px,55vh); overflow: auto; padding: 6px; border: 1px solid #d5d5d5; border-radius: 0 0 8px 8px; background: #fff; box-shadow: 0 10px 24px rgba(0,0,0,.14); }
-.invoice-buyer-filter__options label { display: flex; grid-template-columns: none; align-items: center; gap: 8px; padding: 7px 6px; border-radius: 5px; font-weight: 400; cursor: pointer; }
-.invoice-buyer-filter__options label:hover { background: #f7f3e9; }
-.invoice-buyer-filter__options input { flex: 0 0 auto; width: 16px; min-height: 16px; margin: 0; accent-color: #a77b1b; }
-.invoice-buyer-filter__options span { overflow-wrap: anywhere; }
+.invoice-buyer-filter__trigger { display: flex; width: 100%; min-height: 44px; min-width: 0; box-sizing: border-box; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 11px; border: 1px solid #d5d5d5; border-radius: 7px; background: #fff; color: #333; font: inherit; font-weight: 400; text-align: start; cursor: pointer; }
+.invoice-buyer-filter__trigger > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.invoice-buyer-filter__trigger > span:last-child { flex: 0 0 auto; color: #777; }
+.invoice-buyer-filter.is-open .invoice-buyer-filter__trigger { border-color: #c89b3c; border-radius: 7px 7px 0 0; }
+.invoice-buyer-filter__panel { position: absolute; z-index: 30; inset-inline: 0; top: 100%; display: grid; grid-auto-rows: max-content; gap: 8px; max-height: min(560px,75vh); overflow: auto; padding: 9px; border: 1px solid #d5d5d5; border-top: 0; border-radius: 0 0 8px 8px; background: #fff; box-shadow: 0 10px 24px rgba(0,0,0,.14); }
+.invoice-buyer-filter__panel[hidden] { display: none; }
+.invoice-buyer-filter__selected { display: flex; flex-wrap: wrap; gap: 5px; }
+.invoice-buyer-filter__selected:empty { display: none; }
+.invoice-buyer-chip { display: inline-flex; max-width: 100%; align-items: center; gap: 5px; padding: 3px 6px 3px 3px; border: 1px solid #dfc98f; border-radius: 999px; background: #fff8e9; color: #59420d; font-size: 12px; }
+.invoice-buyer-chip > span { overflow-wrap: anywhere; }
+.invoice-buyer-chip > button { display: inline-grid; width: 22px; height: 22px; flex: 0 0 22px; place-items: center; padding: 0; border: 0; border-radius: 50%; background: #eee4d0; color: #46340c; font: inherit; line-height: 1; cursor: pointer; }
+.invoice-buyer-chip > button:hover { background: #e3d1a8; }
+.invoice-buyer-filter__panel > input[type="search"] { width: 100%; min-height: 40px; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d5d5d5; border-radius: 6px; font: inherit; }
+.invoice-buyer-filter__results { display: grid; grid-auto-rows: 36px; gap: 3px; max-height: min(387px,50vh); overflow-y: auto; overscroll-behavior: contain; }
+.invoice-buyer-filter__results[hidden] { display: none; }
+.invoice-buyer-filter__results > small { padding: 7px 5px; color: #777; font-weight: 400; }
+.invoice-buyer-filter__option { width: 100%; padding: 8px; border: 0; border-radius: 5px; background: transparent; color: #333; font: inherit; text-align: start; cursor: pointer; }
+.invoice-buyer-filter__option:hover,
+.invoice-buyer-filter__option:focus-visible { outline: none; background: #f7f3e9; }
+.invoice-list-filters .invoice-buyer-filter .invoice-buyer-filter__trigger { height: var(--zigurat-control-height,48px); min-height: var(--zigurat-control-height,48px); max-height: var(--zigurat-control-height,48px); padding: 9px 11px; border: 1px solid #d5d5d5; background: #fff; color: #222; box-shadow: none; justify-content: space-between; font-weight: 700; }
+.invoice-list-filters select,
+.invoice-list-filters .invoice-buyer-filter .invoice-buyer-filter__trigger { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='m1 1 4 4 4-4' fill='none' stroke='%23222' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-size: 10px 6px; background-position: right 11px center; padding-inline-end: 30px; }
+.invoice-list-filters select:dir(rtl),
+.invoice-list-filters .invoice-buyer-filter .invoice-buyer-filter__trigger:dir(rtl) { background-position: left 11px center; }
+.invoice-buyer-filter__trigger > span:last-child { display: none; }
+.invoice-list-filters .invoice-buyer-filter .invoice-buyer-chip > button { width: 22px; height: 22px; min-height: 22px; padding: 0; border: 0; border-radius: 50%; background: #eee4d0; color: #46340c; box-shadow: none; line-height: 1; }
+.invoice-list-filters .invoice-buyer-filter .invoice-buyer-filter__option { display: block; height: 36px; min-height: 36px; box-sizing: border-box; padding: 6px 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; background: transparent; color: #333; box-shadow: none; font-weight: 400; }
+.invoice-list-filters .invoice-buyer-filter .invoice-buyer-filter__option:hover,
+.invoice-list-filters .invoice-buyer-filter .invoice-buyer-filter__option:focus-visible { background: #f7f3e9; }
 .invoice-trash-filters { grid-template-columns: minmax(220px,1fr) auto auto; }
 .invoice-tax-period { margin: 0 0 22px; padding: 18px; border: 1px solid #dfc98f; border-radius: 13px; background: linear-gradient(145deg,#fffdf7,#fff7e3); }
 .invoice-tax-period__heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 14px; }

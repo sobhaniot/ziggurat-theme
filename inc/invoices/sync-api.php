@@ -85,7 +85,7 @@ function zigurat_invoice_sync_get_invoices()
     $table = zigurat_invoices_table_name();
     $rows = $wpdb->get_results(
         "SELECT id, brand, document_type, document_number, number_suffix,
-                subject, customer_name, issue_date, grand_total, deduction_amount,
+                subject, project_name, customer_name, issue_date, grand_total, deduction_amount,
                 deduction_note, payment_status, paid_amount, balance, status,
                 tax_status, locked_at, locked_reason
          FROM {$table}
@@ -105,7 +105,8 @@ function zigurat_invoice_sync_get_invoices()
             'brand' => (string) $invoice->brand,
             'document_type' => 'invoice',
             'number' => zigurat_invoice_object_number($invoice),
-            'project' => (string) $invoice->subject,
+            'project' => (string) $invoice->project_name,
+            'project_name' => (string) $invoice->project_name,
             'subject' => (string) $invoice->subject,
             'customer_name' => (string) $invoice->customer_name,
             'issue_date' => (string) $invoice->issue_date,
@@ -168,7 +169,6 @@ function zigurat_invoice_sync_update_invoice(WP_REST_Request $request)
         'deduction_note' => $deduction_note,
         'paid_amount' => $accounting['paid_amount'],
         'balance' => $accounting['balance'],
-        'net_balance' => $accounting['net_balance'],
         'payment_status' => $accounting['payment_status'],
         'settled_at' => $settled ? ($invoice->settled_at ?: $now) : null,
         'updated_by' => get_current_user_id(),
@@ -207,6 +207,7 @@ function zigurat_invoice_sync_update_invoice(WP_REST_Request $request)
         'deduction_amount' => $accounting['deduction_amount'],
         'paid_amount' => $accounting['paid_amount'],
         'balance' => $accounting['balance'],
+        'net_balance' => $accounting['net_balance'],
         'payment_status' => $accounting['payment_status'],
     ));
 }

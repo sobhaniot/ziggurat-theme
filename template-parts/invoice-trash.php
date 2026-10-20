@@ -31,14 +31,14 @@ $trash = zigurat_invoice_trash_list(array(
 <form class="invoice-list-filters invoice-trash-filters no-print" method="get">
     <input type="hidden" name="invoice_brand" value="<?php echo esc_attr($brand); ?>">
     <input type="hidden" name="invoice_view" value="trash">
-    <label>جستجو<input type="search" name="trash_search" value="<?php echo esc_attr($search); ?>" placeholder="شماره، خریدار یا موضوع"></label>
+    <label>جستجو<input type="search" name="trash_search" value="<?php echo esc_attr($search); ?>" placeholder="شماره، خریدار یا نام پروژه"></label>
     <button type="submit">جستجو</button>
     <?php if ($search !== ''): ?><a href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'trash'))); ?>">حذف فیلتر</a><?php endif; ?>
 </form>
 
 <div class="invoice-list-table-wrap">
     <table class="invoice-list-table invoice-trash-table">
-        <thead><tr><th>شماره قبلی</th><th>نوع سند</th><th>تاریخ سند</th><th>خریدار</th><th>موضوع</th><th>جمع کل</th><th>حذف‌شده توسط</th><th>زمان حذف</th><th>عملیات</th></tr></thead>
+        <thead><tr><th>شماره قبلی</th><th>نوع سند</th><th>تاریخ سند</th><th>خریدار</th><th>نام پروژه</th><th>جمع کل</th><th>حذف‌شده توسط</th><th>زمان حذف</th><th>عملیات</th></tr></thead>
         <tbody>
         <?php if ($trash['items']): foreach ($trash['items'] as $row): ?>
             <?php
@@ -50,7 +50,7 @@ $trash = zigurat_invoice_trash_list(array(
                 <td><?php echo esc_html(zigurat_invoice_document_label($row->document_type)); ?></td>
                 <td><?php echo esc_html($row->issue_date); ?></td>
                 <td><?php echo esc_html($row->customer_name ?: '—'); ?></td>
-                <td><?php echo esc_html($row->subject ?: '—'); ?></td>
+                <td><?php echo esc_html($row->project_name ?: '—'); ?></td>
                 <td><?php echo esc_html(zigurat_invoice_format_money($row->grand_total)); ?></td>
                 <td><?php echo esc_html($row->deleted_by_name ?: 'مدیر کل'); ?></td>
                 <td><?php echo esc_html(function_exists('zigurat_inventory_format_jalali_datetime') ? zigurat_inventory_format_jalali_datetime($row->deleted_at) : $row->deleted_at); ?></td>

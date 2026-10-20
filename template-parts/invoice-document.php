@@ -91,6 +91,7 @@ $accounting_totals = function_exists('zigurat_invoice_accounting_totals')
         <div class="invoice-party__grid"><?php $render_party_fields($customer_fields); ?></div>
     </section>
 
+    <?php if (!empty($invoice->subject)): ?><div class="invoice-subject"><strong>موضوع:</strong> <?php echo esc_html($invoice->subject); ?></div><?php endif; ?>
     <table class="invoice-lines">
         <thead><tr class="invoice-lines-page-spacer" aria-hidden="true"><th colspan="7"></th></tr><tr><th>ردیف</th><th>شرح کالا یا خدمت</th><th>مقدار</th><th>واحد</th><th>مبلغ واحد (ریال)</th><th>تخفیف</th><th>جمع کل (ریال)</th></tr></thead>
         <tbody>

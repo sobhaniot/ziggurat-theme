@@ -36,7 +36,7 @@ function zigurat_invoice_trash_table_name()
 function zigurat_install_invoice_tables()
 {
     global $wpdb;
-    $version = '15';
+    $version = '16';
     $invoices = zigurat_invoices_table_name();
     $items = zigurat_invoice_items_table_name();
     $sequences = zigurat_invoice_sequences_table_name();
@@ -64,6 +64,7 @@ function zigurat_install_invoice_tables()
         tax_quarter tinyint(1) unsigned NOT NULL DEFAULT 0,
         status varchar(20) NOT NULL DEFAULT 'issued',
         subject varchar(191) NOT NULL DEFAULT '',
+        project_name varchar(191) NOT NULL DEFAULT '',
         source_proforma_id bigint(20) unsigned NOT NULL DEFAULT 0,
         copied_from_invoice_id bigint(20) unsigned NOT NULL DEFAULT 0,
         seller_json longtext NULL,
@@ -169,6 +170,7 @@ function zigurat_install_invoice_tables()
         issue_date varchar(10) NOT NULL DEFAULT '',
         customer_name varchar(191) NOT NULL DEFAULT '',
         subject varchar(191) NOT NULL DEFAULT '',
+        project_name varchar(191) NOT NULL DEFAULT '',
         grand_total bigint(20) unsigned NOT NULL DEFAULT 0,
         snapshot_json longtext NOT NULL,
         deleted_by bigint(20) unsigned NOT NULL DEFAULT 0,
@@ -181,6 +183,11 @@ function zigurat_install_invoice_tables()
         KEY customer_name (customer_name(100))
     ) {$charset};");
     if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $invoices)) === $invoices) {
+        if ($wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'project_name'")) {
+            // تا پیش از این نسخه، فیلد موضوع عملاً نام پروژه بود؛ آن را حفظ می‌کنیم
+            // و موضوع چاپی جدید را برای فاکتورهای قدیمی خالی می‌گذاریم.
+            $wpdb->query("UPDATE {$invoices} SET project_name = subject, subject = '' WHERE project_name = '' AND subject <> ''");
+        }
         $old_number_index = $wpdb->get_var("SHOW INDEX FROM {$invoices} WHERE Key_name = 'brand_type_number'");
         if ($old_number_index) {
             $wpdb->query("ALTER TABLE {$invoices} DROP INDEX brand_type_number");
@@ -219,6 +226,10 @@ function zigurat_install_invoice_tables()
                   AND paid_amount >= (grand_total - LEAST(deduction_amount, grand_total))");
         }
     }
+    if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $trash)) === $trash
+        && $wpdb->get_var("SHOW COLUMNS FROM {$trash} LIKE 'project_name'")) {
+        $wpdb->query("UPDATE {$trash} SET project_name = subject, subject = '' WHERE project_name = '' AND subject <> ''");
+    }
     if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $payments)) === $payments) {
         // پرداخت‌های قبلی را یک‌بار به‌عنوان مانده اولیه وارد می‌کنیم تا سابقه
         // و جمع پرداخت‌ها از این پس از جدول مستقل قابل محاسبه باشد.
@@ -246,7 +257,9 @@ function zigurat_install_invoice_tables()
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'contract_number'")
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'contract_date'")
         && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'tax_status'")
-        && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'copied_from_invoice_id'")) {
+        && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'copied_from_invoice_id'")
+        && $wpdb->get_var("SHOW COLUMNS FROM {$invoices} LIKE 'project_name'")
+        && $wpdb->get_var("SHOW COLUMNS FROM {$trash} LIKE 'project_name'")) {
         update_option('zigurat_invoice_schema_version', $version, false);
     }
 }

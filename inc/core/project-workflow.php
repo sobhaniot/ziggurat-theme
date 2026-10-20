@@ -271,7 +271,7 @@ function zigurat_workflow_sync_saved_invoice($invoice)
             }
             return;
         }
-        $title = trim((string) ($invoice->subject ?? ''));
+        $title = trim((string) ($invoice->project_name ?? ''));
         if ($title === '') {
             $number = function_exists('zigurat_invoice_object_number') ? zigurat_invoice_object_number($invoice) : (string) $invoice->document_number;
             $title = 'پیش‌فاکتور ' . $number;
@@ -367,6 +367,7 @@ function zigurat_workflow_create_invoice_from_proforma($proforma)
         'contract_number' => (string) ($proforma->contract_number ?? ''),
         'contract_date' => (string) ($proforma->contract_date ?? ''),
         'subject' => (string) ($proforma->subject ?? ''),
+        'project_name' => (string) ($proforma->project_name ?? ''),
         'status' => 'issued',
         'discount' => (int) ($proforma->discount ?? 0),
         'shipping_mode' => (string) ($proforma->shipping_mode ?? 'fixed'),

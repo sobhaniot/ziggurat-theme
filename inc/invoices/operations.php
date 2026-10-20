@@ -349,6 +349,10 @@ function zigurat_invoice_trash_get_invoice($trash_id)
         return null;
     }
     $invoice = (object) $snapshot['invoice'];
+    if (empty($invoice->project_name) && !empty($invoice->subject)) {
+        $invoice->project_name = $invoice->subject;
+        $invoice->subject = '';
+    }
     $invoice->items = array_map(static function ($item) {
         return (object) $item;
     }, is_array($snapshot['items'] ?? null) ? $snapshot['items'] : array());
@@ -371,8 +375,8 @@ function zigurat_invoice_trash_list($args = array())
     }
     if ($args['search'] !== '') {
         $like = '%' . $wpdb->esc_like($args['search']) . '%';
-        $where[] = "(customer_name LIKE %s OR subject LIKE %s OR CONCAT(document_number, IF(number_suffix > 0, CONCAT('/', number_suffix), '')) LIKE %s)";
-        array_push($values, $like, $like, $like);
+        $where[] = "(customer_name LIKE %s OR project_name LIKE %s OR subject LIKE %s OR CONCAT(document_number, IF(number_suffix > 0, CONCAT('/', number_suffix), '')) LIKE %s)";
+        array_push($values, $like, $like, $like, $like);
     }
     $table = zigurat_invoice_trash_table_name();
     $where_sql = implode(' AND ', $where);
@@ -426,6 +430,10 @@ function zigurat_invoice_restore_from_trash($trash_id, $use_new_number = false)
         return new WP_Error('not_found', 'نسخه حذف‌شده فاکتور پیدا نشد.');
     }
     $invoice_data = $snapshot['invoice'];
+    if (empty($invoice_data['project_name']) && !empty($invoice_data['subject'])) {
+        $invoice_data['project_name'] = $invoice_data['subject'];
+        $invoice_data['subject'] = '';
+    }
     $original_id = absint($invoice_data['id'] ?? 0);
     $brand = sanitize_key((string) ($invoice_data['brand'] ?? ''));
     $type = sanitize_key((string) ($invoice_data['document_type'] ?? ''));
@@ -611,12 +619,13 @@ function zigurat_invoice_delete($invoice_id)
             'issue_date' => $invoice_row['issue_date'],
             'customer_name' => $invoice_row['customer_name'],
             'subject' => $invoice_row['subject'],
+            'project_name' => $invoice_row['project_name'] ?? '',
             'grand_total' => $invoice_row['grand_total'],
             'snapshot_json' => $snapshot,
             'deleted_by' => get_current_user_id(),
             'deleted_at' => current_time('mysql', true),
         ),
-        array('%d','%s','%s','%d','%d','%s','%s','%s','%d','%s','%d','%s')
+        array('%d','%s','%s','%d','%d','%s','%s','%s','%s','%d','%s','%d','%s')
     ) : false;
     if (!$trash_saved) {
         $wpdb->query('ROLLBACK');
@@ -1153,6 +1162,7 @@ function zigurat_invoice_save($data)
         'contract_date'=>$contract_date, 'tax_year'=>$tax_period['year'],
         'tax_quarter'=>$tax_period['quarter'], 'status'=>$status,
         'subject'=>sanitize_text_field(wp_unslash((string) ($data['subject'] ?? ''))),
+        'project_name'=>sanitize_text_field(wp_unslash((string) ($data['project_name'] ?? ''))),
         'source_proforma_id'=>$source_proforma_id,
         'copied_from_invoice_id'=>$copied_from_invoice_id,
         'tax_subject'=>$tax_subject,
@@ -1232,12 +1242,17 @@ function zigurat_invoice_save($data)
 function zigurat_invoice_list($args = array())
 {
     global $wpdb;
-    $args = wp_parse_args($args, array('brand'=>'','type'=>'','status'=>'','payment_status'=>'','tax_status'=>'','search'=>'','tax_year'=>0,'tax_quarter'=>0,'page'=>1,'per_page'=>30));
+    $args = wp_parse_args($args, array('brand'=>'','type'=>'','status'=>'','payment_status'=>'','tax_status'=>'','customer_names'=>array(),'search'=>'','tax_year'=>0,'tax_quarter'=>0,'page'=>1,'per_page'=>30));
     $where = array('1=1');
     $values = array();
     if (in_array($args['brand'], array('official','unofficial'), true)) { $where[]='brand=%s'; $values[]=$args['brand']; }
     if (in_array($args['type'], array('invoice','proforma'), true)) { $where[]='document_type=%s'; $values[]=$args['type']; }
     if (in_array($args['status'], array('draft','issued'), true)) { $where[]='status=%s'; $values[]=$args['status']; }
+    $customer_names = zigurat_invoice_sanitize_customer_names($args['customer_names']);
+    if ($customer_names) {
+        $where[] = 'customer_name IN (' . implode(',', array_fill(0, count($customer_names), '%s')) . ')';
+        array_push($values, ...$customer_names);
+    }
     if ($args['payment_status'] === 'unpaid') { $where[]="payment_status IN ('unpaid','partial')"; }
     elseif ($args['payment_status'] === 'settled') { $where[]='payment_status=%s'; $values[]='settled'; }
     if ($args['tax_status'] === 'not_submitted') { $where[]="tax_status IN ('not_submitted','ready','rejected')"; }
@@ -1246,8 +1261,8 @@ function zigurat_invoice_list($args = array())
     if (absint($args['tax_quarter']) >= 1 && absint($args['tax_quarter']) <= 4) { $where[]='tax_quarter=%d'; $values[]=absint($args['tax_quarter']); }
     if ($args['search'] !== '') {
         $like = '%' . $wpdb->esc_like($args['search']) . '%';
-        $where[] = "(customer_name LIKE %s OR subject LIKE %s OR CONCAT(document_number, IF(number_suffix > 0, CONCAT('/', number_suffix), '')) LIKE %s)";
-        array_push($values, $like, $like, $like);
+        $where[] = "(customer_name LIKE %s OR project_name LIKE %s OR subject LIKE %s OR CONCAT(document_number, IF(number_suffix > 0, CONCAT('/', number_suffix), '')) LIKE %s)";
+        array_push($values, $like, $like, $like, $like);
     }
     $table = zigurat_invoices_table_name();
     $where_sql = implode(' AND ', $where);
@@ -1273,4 +1288,35 @@ function zigurat_invoice_list($args = array())
         'items'=>$wpdb->get_results($wpdb->prepare($sql, array_merge($values, array($per_page,$offset)))),
         'total'=>$total, 'pages'=>max(1,(int)ceil($total/$per_page)), 'page'=>$page,
     );
+}
+
+function zigurat_invoice_sanitize_customer_names($customer_names)
+{
+    if (!is_array($customer_names)) {
+        return array();
+    }
+    $clean = array();
+    foreach (array_slice($customer_names, 0, 500) as $customer_name) {
+        if (!is_scalar($customer_name)) {
+            continue;
+        }
+        $customer_name = sanitize_text_field((string) $customer_name);
+        if ($customer_name !== '') {
+            $clean[] = $customer_name;
+        }
+    }
+    return array_values(array_unique($clean));
+}
+
+function zigurat_invoice_customer_names($brand)
+{
+    global $wpdb;
+    if (!in_array($brand, array('official', 'unofficial'), true)) {
+        return array();
+    }
+    $table = zigurat_invoices_table_name();
+    return array_values(array_filter(array_map('strval', $wpdb->get_col($wpdb->prepare(
+        "SELECT DISTINCT customer_name FROM {$table} WHERE brand=%s AND customer_name<>'' ORDER BY customer_name ASC",
+        $brand
+    ))), static function ($name) { return $name !== ''; }));
 }

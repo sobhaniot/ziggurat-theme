@@ -153,6 +153,42 @@
     });
   }
 
+  function setupInvoiceBuyerFilters(root) {
+    (root || document).querySelectorAll('.invoice-buyer-filter details').forEach(function (dropdown) {
+      if (dropdown.dataset.buyerFilterReady === '1') return;
+      dropdown.dataset.buyerFilterReady = '1';
+      var form = dropdown.closest('form');
+      var changed = false;
+      var submitting = false;
+      if (!form) return;
+
+      dropdown.querySelectorAll('input[name="filter_buyers[]"]').forEach(function (checkbox) {
+        checkbox.addEventListener('change', function () { changed = true; });
+      });
+
+      dropdown.addEventListener('toggle', function () {
+        if (dropdown.open || !changed || submitting) return;
+        changed = false;
+        submitting = true;
+        if (typeof form.requestSubmit === 'function') form.requestSubmit();
+        else form.submit();
+      });
+
+      document.addEventListener('click', function (event) {
+        if (!dropdown.open || dropdown.contains(event.target)) return;
+        var target = event.target instanceof Element ? event.target : null;
+        if (!target) return;
+        var formControl = target.closest('button, input, select, textarea, a');
+        dropdown.open = false;
+        // Let the clicked control perform its own submit or navigation. The
+        // dropdown's toggle handler submits changed buyer selections otherwise.
+        if (formControl && (form.contains(formControl) || formControl.matches('a'))) {
+          changed = false;
+        }
+      });
+    });
+  }
+
   // The project board can create an invoice in another tab. Refresh only an
   // actual invoice-list view when that event arrives; invoice editor pages are
   // intentionally left untouched so unsaved work is never lost.
@@ -274,7 +310,7 @@
         result.net += Math.max(0, numberFrom(row, 'grandTotal') - numberFrom(row, 'deductionAmount'));
         result.tax += numberFrom(row, 'taxAmount');
         result.paid += numberFrom(row, 'paidAmount');
-        result.balance += numberFrom(row, 'balance');
+        result.balance += numberFrom(row, 'netBalance');
         return result;
       }, { grand: 0, net: 0, tax: 0, paid: 0, balance: 0 });
       summary.classList.toggle('is-visible', selected.length > 0);
@@ -608,6 +644,7 @@
   approvedHistoryNavigation = false;
   if (leaveDialog && !leaveDialog.hidden) closeLeaveDialog(false);
   setupInvoiceListAutoFilters(root);
+  setupInvoiceBuyerFilters(root);
   setupInvoiceRowSelection(root);
   setupInvoiceDeleteControls(root);
   setupInvoiceRestoreControls(root);

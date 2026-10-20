@@ -341,6 +341,11 @@ function zigurat_invoice_export_rows($args)
         $where[] = 'status = %s';
         $values[] = $args['status'];
     }
+    $customer_names = zigurat_invoice_sanitize_customer_names($args['customer_names'] ?? array());
+    if ($customer_names) {
+        $where[] = 'customer_name IN (' . implode(',', array_fill(0, count($customer_names), '%s')) . ')';
+        array_push($values, ...$customer_names);
+    }
     if (($args['payment_status'] ?? '') === 'unpaid') {
         $where[] = "payment_status IN ('unpaid','partial')";
     } elseif (($args['payment_status'] ?? '') === 'settled') {
@@ -365,8 +370,8 @@ function zigurat_invoice_export_rows($args)
     $search = (string) ($args['search'] ?? '');
     if ($search !== '') {
         $like = '%' . $wpdb->esc_like($search) . '%';
-        $where[] = "(customer_name LIKE %s OR subject LIKE %s OR CONCAT(document_number, IF(number_suffix > 0, CONCAT('/', number_suffix), '')) LIKE %s)";
-        array_push($values, $like, $like, $like);
+        $where[] = "(customer_name LIKE %s OR project_name LIKE %s OR subject LIKE %s OR CONCAT(document_number, IF(number_suffix > 0, CONCAT('/', number_suffix), '')) LIKE %s)";
+        array_push($values, $like, $like, $like, $like);
     }
     $sql = 'SELECT * FROM ' . zigurat_invoices_table_name() . ' WHERE ' . implode(' AND ', $where) . ' ORDER BY id DESC LIMIT 10000';
     return $values ? $wpdb->get_results($wpdb->prepare($sql, $values)) : $wpdb->get_results($sql);
@@ -379,7 +384,7 @@ function zigurat_invoice_build_xlsx($args)
     }
 
     $rows = zigurat_invoice_export_rows($args);
-    $headers = array('نوع مجموعه', 'نوع سند', 'شماره', 'تاریخ', 'شماره قرارداد', 'تاریخ قرارداد', 'سال مالیاتی', 'فصل مالیاتی', 'وضعیت سند', 'وضعیت پرداخت', 'وضعیت مؤدیان', 'موضوع', 'خریدار', 'شناسه/ثبت', 'شماره اقتصادی', 'استان', 'شهر', 'تلفن', 'جمع اقلام', 'تخفیف', 'حمل', 'ضریب بالاسری/سود (%)', 'مبلغ بالاسری/سود', 'ضریب بیمه (%)', 'مبلغ بیمه', 'مالیات', 'جمع کل', 'پرداختی', 'مانده');
+    $headers = array('نوع مجموعه', 'نوع سند', 'شماره', 'تاریخ', 'شماره قرارداد', 'تاریخ قرارداد', 'سال مالیاتی', 'فصل مالیاتی', 'وضعیت سند', 'وضعیت پرداخت', 'وضعیت مؤدیان', 'نام پروژه', 'خریدار', 'شناسه/ثبت', 'شماره اقتصادی', 'استان', 'شهر', 'تلفن', 'جمع اقلام', 'تخفیف', 'حمل', 'ضریب بالاسری/سود (%)', 'مبلغ بالاسری/سود', 'ضریب بیمه (%)', 'مبلغ بیمه', 'مالیات', 'جمع کل', 'پرداختی', 'مانده');
     $sheet_rows = array($headers);
     foreach ($rows as $row) {
         $sheet_rows[] = array(
@@ -394,7 +399,7 @@ function zigurat_invoice_build_xlsx($args)
             zigurat_invoice_status_label($row->status),
             $row->document_type === 'invoice' ? zigurat_invoice_payment_status_label($row->payment_status ?? 'unpaid') : '',
             $row->brand === 'official' && $row->document_type === 'invoice' ? zigurat_invoice_tax_status_label($row->tax_status ?? 'not_submitted') : '',
-            $row->subject,
+            $row->project_name,
             $row->customer_name,
             $row->customer_national_id,
             $row->customer_economic_no,

@@ -13,18 +13,19 @@ if (have_posts()): while (have_posts()): the_post();
     $official_url = zigurat_download_meta($post_id, 'official_url');
     $source_url = zigurat_download_source_url($post_id);
     $version_history = zigurat_download_version_history($post_id);
-    $sketchup = zigurat_download_term_names($post_id, 'sketchup_version');
+    $compatibility = zigurat_download_compatibility_names($post_id);
+    $tags = get_the_terms($post_id, 'download_tag');
     $os = zigurat_download_term_names($post_id, 'download_os');
     $categories = zigurat_download_term_names($post_id, 'download_category');
     $facts = array_filter(array(
-        'نوع فایل' => zigurat_download_primary_type($post_id),
+        'نوع محتوا' => zigurat_download_primary_type($post_id),
         'نسخه' => $version,
         'حجم فایل' => $file_size,
         'فرمت' => $format,
         'سازنده / ناشر' => $developer,
         'مجوز' => $license,
         'سیستم‌عامل' => $os ? implode('، ', $os) : '',
-        'نسخه‌های SketchUp' => $sketchup ? implode('، ', $sketchup) : '',
+        'سازگاری / محیط اجرا' => $compatibility ? implode('، ', $compatibility) : '',
         'دسته‌بندی' => $categories ? implode('، ', $categories) : '',
     ));
 ?>
@@ -44,6 +45,7 @@ if (have_posts()): while (have_posts()): the_post();
                 <span class="download-type-badge"><?php echo esc_html(zigurat_download_primary_type($post_id)); ?></span>
                 <h1><?php the_title(); ?></h1>
                 <?php if (has_excerpt()): ?><p><?php echo esc_html(get_the_excerpt()); ?></p><?php endif; ?>
+                <?php if ($tags && !is_wp_error($tags)): ?><div class="download-card-tags" aria-label="برچسب‌ها"><?php foreach ($tags as $tag): ?><a href="<?php echo esc_url(add_query_arg('download_tag', $tag->slug, get_post_type_archive_link('zig_download'))); ?>"><?php echo esc_html($tag->name); ?></a><?php endforeach; ?></div><?php endif; ?>
                 <div class="download-quick-stats">
                     <?php if ($version): ?><span><strong>نسخه</strong><?php echo esc_html($version); ?></span><?php endif; ?>
                     <?php if ($file_size): ?><span><strong>حجم</strong><?php echo esc_html($file_size); ?></span><?php endif; ?>
@@ -77,7 +79,7 @@ if (have_posts()): while (have_posts()): the_post();
                     <section class="download-panel download-version-archive">
                         <div class="download-version-archive-heading">
                             <div><span>نسخه‌های پیشین</span><h2>آرشیو نسخه‌ها</h2></div>
-                            <p>برای سازگاری با پروژه‌های قدیمی می‌توانید نسخه‌های قبلی را نیز دریافت کنید.</p>
+                            <p>در صورت نیاز می‌توانید نسخه‌های قبلی این محتوا را نیز دریافت کنید.</p>
                         </div>
                         <div class="download-version-list">
                             <?php foreach ($version_history as $version_index => $old_version):
@@ -108,7 +110,7 @@ if (have_posts()): while (have_posts()): the_post();
                 </section>
                 <section class="download-safety-note">
                     <strong>دانلود مطمئن</strong>
-                    <p>پیش از نصب، سازگاری نسخه و راهنمای ارائه‌شده در همین صفحه را بررسی کنید.</p>
+                    <p>پیش از دریافت و استفاده، پیش‌نیازها، سازگاری و راهنمای همین صفحه را بررسی کنید.</p>
                 </section>
             </aside>
         </div>

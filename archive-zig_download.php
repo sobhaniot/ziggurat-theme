@@ -2,11 +2,12 @@
 get_header();
 $archive_url = get_post_type_archive_link('zig_download');
 $filter_taxonomies = array(
-    'download_type'     => 'همه انواع فایل',
+    'download_type'     => 'همه انواع محتوا',
     'download_category' => 'همه دسته‌ها',
     'download_os'       => 'همه سیستم‌عامل‌ها',
+    'sketchup_version'  => 'همه محیط‌های اجرا',
 );
-$has_filter = !empty($_GET['download_search']) || !empty($_GET['download_sort']);
+$has_filter = !empty($_GET['download_search']) || !empty($_GET['download_sort']) || !empty($_GET['download_tag']);
 foreach (array_keys($filter_taxonomies) as $filter_key) {
     $has_filter = $has_filter || !empty($_GET[$filter_key]);
 }
@@ -14,17 +15,18 @@ foreach (array_keys($filter_taxonomies) as $filter_key) {
 <main class="download-archive">
     <section class="download-hero">
         <div class="container">
-            <span class="download-eyebrow">منابع کاربردی برای طراحان و مجریان</span>
+            <span class="download-eyebrow">نرم‌افزار، ابزار و منابع کاربردی</span>
             <h1>مرکز دانلود زیگورات</h1>
-            <p>نرم‌افزارها، پلاگین‌های SketchUp، مستندات و فایل‌های آموزشی را همراه با مشخصات نسخه و راهنمای نصب دریافت کنید.</p>
+            <p>نرم‌افزارها، ابزارها، افزونه‌ها، مستندات و فایل‌های آموزشی را همراه با مشخصات، پیش‌نیازها و راهنمای استفاده دریافت کنید.</p>
         </div>
     </section>
 
     <div class="container">
         <form class="download-filters" method="get" action="<?php echo esc_url($archive_url); ?>" data-auto-filter-form>
+            <?php if (!empty($_GET['download_tag']) && is_string($_GET['download_tag'])): ?><input type="hidden" name="download_tag" value="<?php echo esc_attr(sanitize_title(wp_unslash($_GET['download_tag']))); ?>"><?php endif; ?>
             <label class="download-search-field">
                 <span class="screen-reader-text">جستجو در مرکز دانلود</span>
-                <input type="search" name="download_search" value="<?php echo isset($_GET['download_search']) && is_string($_GET['download_search']) ? esc_attr(wp_unslash($_GET['download_search'])) : ''; ?>" placeholder="نام نرم‌افزار، پلاگین یا مستند...">
+                <input type="search" name="download_search" value="<?php echo isset($_GET['download_search']) && is_string($_GET['download_search']) ? esc_attr(wp_unslash($_GET['download_search'])) : ''; ?>" placeholder="نام نرم‌افزار، ابزار یا فایل...">
             </label>
             <?php foreach ($filter_taxonomies as $taxonomy => $placeholder):
                 $terms = get_terms(array('taxonomy' => $taxonomy, 'hide_empty' => true));
@@ -35,7 +37,7 @@ foreach (array_keys($filter_taxonomies) as $filter_key) {
                     <select name="<?php echo esc_attr($taxonomy); ?>">
                         <option value=""><?php echo esc_html($placeholder); ?></option>
                         <?php if (!is_wp_error($terms)): foreach ($terms as $term): ?>
-                            <option value="<?php echo esc_attr($term->slug); ?>" <?php selected($selected, $term->slug); ?>><?php echo esc_html($term->name); ?></option>
+                            <option value="<?php echo esc_attr($term->slug); ?>" <?php selected($selected, $term->slug); ?>><?php echo esc_html($taxonomy === 'sketchup_version' ? zigurat_download_compatibility_name($term->name) : $term->name); ?></option>
                         <?php endforeach; endif; ?>
                     </select>
                 </label>
@@ -57,7 +59,7 @@ foreach (array_keys($filter_taxonomies) as $filter_key) {
                     $post_id = get_the_ID();
                     $version = zigurat_download_meta($post_id, 'version');
                     $os = zigurat_download_term_names($post_id, 'download_os');
-                    $sketchup = zigurat_download_term_names($post_id, 'sketchup_version');
+                    $compatibility = zigurat_download_compatibility_names($post_id);
                 ?>
                     <article class="download-card">
                         <a class="download-card-image" href="<?php the_permalink(); ?>">
@@ -72,7 +74,7 @@ foreach (array_keys($filter_taxonomies) as $filter_key) {
                             <div class="download-card-tags">
                                 <?php if ($version): ?><span>نسخه <?php echo esc_html($version); ?></span><?php endif; ?>
                                 <?php if ($os): ?><span><?php echo esc_html(implode('، ', $os)); ?></span><?php endif; ?>
-                                <?php if ($sketchup): ?><span>SketchUp <?php echo esc_html(implode('، ', $sketchup)); ?></span><?php endif; ?>
+                                <?php if ($compatibility): ?><span><?php echo esc_html(implode('، ', $compatibility)); ?></span><?php endif; ?>
                             </div>
                             <div class="download-card-footer">
                                 <span><?php echo esc_html(number_format_i18n(zigurat_download_count($post_id))); ?> دانلود</span>

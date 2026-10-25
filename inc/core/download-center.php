@@ -31,32 +31,44 @@ function zigurat_register_download_center()
         'supports'     => array('title', 'editor', 'excerpt', 'thumbnail', 'revisions', 'comments'),
     ));
 
-    zigurat_register_taxonomy_helper('download_type', 'نوع فایل', 'انواع فایل', 'download-type', array('zig_download'));
-    zigurat_register_taxonomy_helper('download_category', 'دسته دانلود', 'دسته‌های دانلود', 'download-category', array('zig_download'));
-    zigurat_register_taxonomy_helper('sketchup_version', 'نسخه SketchUp', 'نسخه‌های SketchUp', 'sketchup-version', array('zig_download'), false);
+    zigurat_register_taxonomy_helper('download_type', 'نوع محتوا', 'انواع محتوا', 'download-type', array('zig_download'));
+    zigurat_register_taxonomy_helper('download_category', 'دسته‌بندی دانلود', 'دسته‌بندی‌های دانلود', 'download-category', array('zig_download'));
+    // Retain the taxonomy key and URLs so existing assignments and links survive.
+    zigurat_register_taxonomy_helper('sketchup_version', 'سازگاری / محیط اجرا', 'سازگاری و محیط اجرا', 'sketchup-version', array('zig_download'), false);
     zigurat_register_taxonomy_helper('download_os', 'سیستم‌عامل', 'سیستم‌عامل‌ها', 'download-os', array('zig_download'), false);
+    zigurat_register_taxonomy_helper('download_tag', 'برچسب دانلود', 'برچسب‌های دانلود', 'download-tag', array('zig_download'), false);
 }
 add_action('init', 'zigurat_register_download_center', 20);
 
 /** ایجاد داده‌های پایه و بازسازی rewrite فقط یک بار. */
 function zigurat_install_download_center()
 {
-    $version = '1';
+    $version = '2';
     if (get_option('zigurat_download_center_version') === $version) {
         return;
     }
 
-    foreach (array('پلاگین اسکچ‌آپ', 'نرم‌افزار', 'مستندات', 'قالب و فایل آموزشی') as $term) {
-        if (!term_exists($term, 'download_type')) {
-            wp_insert_term($term, 'download_type');
-        }
+    $complete = true;
+    $old_type = term_exists('پلاگین اسکچ‌آپ', 'download_type');
+    if ($old_type && !is_wp_error($old_type) && !term_exists('افزونه و ابزار جانبی', 'download_type')) {
+        $renamed = wp_update_term((int) $old_type['term_id'], 'download_type', array('name' => 'افزونه و ابزار جانبی'));
+        $complete = !is_wp_error($renamed);
     }
-    foreach (array('ویندوز', 'مک', 'چندسیستمی') as $term) {
-        if (!term_exists($term, 'download_os')) {
-            wp_insert_term($term, 'download_os');
+    $defaults = array(
+        'download_type' => array('نرم‌افزار', 'افزونه و ابزار جانبی', 'مستندات', 'قالب و فایل آموزشی'),
+        'download_category' => array('ابزارهای سیستم و شبکه', 'طراحی و مدل‌سازی', 'آموزش و راهنما'),
+        'download_os' => array('ویندوز', 'مک', 'لینوکس', 'اندروید', 'iOS', 'تحت وب', 'چندسیستمی'),
+    );
+    foreach ($defaults as $taxonomy => $terms) {
+        foreach ($terms as $term) {
+            if (!term_exists($term, $taxonomy)) {
+                $created = wp_insert_term($term, $taxonomy);
+                if (is_wp_error($created)) $complete = false;
+            }
         }
     }
 
+    if (!$complete) return;
     flush_rewrite_rules(false);
     update_option('zigurat_download_center_version', $version, false);
 }
@@ -184,7 +196,7 @@ function zigurat_filter_download_archive($query)
     }
     $query->set('posts_per_page', 12);
     $tax_query = array();
-    foreach (array('download_type', 'download_category', 'sketchup_version', 'download_os') as $taxonomy) {
+    foreach (array('download_type', 'download_category', 'sketchup_version', 'download_os', 'download_tag') as $taxonomy) {
         if (!empty($_GET[$taxonomy]) && is_string($_GET[$taxonomy])) {
             $tax_query[] = array(
                 'taxonomy' => $taxonomy,
@@ -228,4 +240,16 @@ function zigurat_download_primary_type($post_id)
 {
     $names = zigurat_download_term_names($post_id, 'download_type');
     return $names ? reset($names) : 'فایل دانلودی';
+}
+
+/** Year-only terms from the original SketchUp taxonomy remain meaningful. */
+function zigurat_download_compatibility_name($name)
+{
+    $digits = strtr((string) $name, array('۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4','۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9'));
+    return preg_match('/^20\d{2}(?:\.\d+)?$/', trim($digits)) ? 'SketchUp ' . $name : $name;
+}
+
+function zigurat_download_compatibility_names($post_id)
+{
+    return array_map('zigurat_download_compatibility_name', zigurat_download_term_names($post_id, 'sketchup_version'));
 }

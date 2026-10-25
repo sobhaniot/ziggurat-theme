@@ -26,6 +26,7 @@ function zigurat_invoice_builtin_brand_settings($brand)
             'stamp_x_percent' => 75,
             'stamp_bottom_mm' => 0,
             'tax_rate' => 10,
+            'bottom_borders' => false,
         );
     }
 
@@ -49,6 +50,7 @@ function zigurat_invoice_builtin_brand_settings($brand)
         'stamp_x_percent' => 75,
         'stamp_bottom_mm' => 0,
         'tax_rate' => 0,
+        'bottom_borders' => false,
     );
 }
 
@@ -160,6 +162,7 @@ function zigurat_invoice_save_initial_settings($data)
             'stamp_x_percent' => zigurat_invoice_stamp_number($data['setting_' . $brand . '_stamp_x_percent'] ?? '', 10, 90, $stamp_position === 'right' ? 75 : 25),
             'stamp_bottom_mm' => zigurat_invoice_stamp_number($data['setting_' . $brand . '_stamp_bottom_mm'] ?? '', 0, 30, $brand_defaults['stamp_bottom_mm']),
             'tax_rate' => max(0, min(100, $tax_rate)),
+            'bottom_borders' => ($data['setting_' . $brand . '_bottom_borders'] ?? '') === '1',
         );
     }
 

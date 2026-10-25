@@ -1,0 +1,47 @@
+.invoice-pdf-modal { position: fixed; inset: 0; z-index: 100120; display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.5); }
+.invoice-pdf-modal[hidden] { display: none; }
+.invoice-pdf-dialog { position: relative; width: min(760px,100%); max-height: 90vh; overflow: auto; box-sizing: border-box; padding: 24px; border: 1px solid #d6bd83; border-radius: 15px; background: #fffdf8; color: #29251d; box-shadow: 0 16px 55px #0004; }
+.invoice-pdf-dialog h2 { margin: 0 0 12px; font-size: 22px; }
+.invoice-pdf-dialog p { margin: 8px 0 16px; }
+.invoice-pdf-choices { display: flex; gap: 10px; border: 0; padding: 0; margin: 0 0 16px; }
+.invoice-pdf-choices legend { margin-bottom: 8px; font-weight: 700; }
+.invoice-pdf-choices label { display: flex; flex: 1; gap: 8px; align-items: center; padding: 12px; border: 1px solid #dfd4bc; border-radius: 8px; background: #fff; cursor: pointer; }
+.invoice-pdf-choices input { accent-color: #ad7f25; }
+.invoice-pdf-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.invoice-pdf-actions button,.invoice-pdf-actions a { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; box-sizing: border-box; padding: 8px 16px; border: 1px solid #c89b3c; border-radius: 7px; background: #fff; color: #47340d; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+.invoice-pdf-actions button[data-pdf-generate] { background: #c89b3c; color: #171717; }
+.invoice-pdf-actions button:disabled { opacity: .5; cursor: wait; }
+.invoice-pdf-actions [hidden] { display: none; }
+.invoice-pdf-status { display: block; min-height: 24px; margin: 14px 0 0; color: #66522b; }
+.invoice-pdf-status.is-error { color: #b52222; }
+.invoice-pdf-preview { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 12px; max-height: 48vh; overflow: auto; margin-top: 12px; }
+.invoice-pdf-preview figure { margin: 0; padding: 8px; background: #eae7df; border: 1px solid #d8d2c5; border-radius: 7px; }
+.invoice-pdf-preview img { display: block; width: 100%; height: auto; background: #fff; }
+.invoice-pdf-preview figcaption { margin-top: 6px; text-align: center; font-size: 12px; }
+.invoice-pdf-stage { position: absolute; left: -20000px; top: 0; pointer-events: none; }
+.invoice-pdf-page { box-sizing: border-box; padding: 8mm; background: #fff; color: #111; direction: rtl; font-family: Tanha,sans-serif; }
+.invoice-pdf-page .invoice-document { display: flex; flex-direction: column; height: 100%; width: 100%; box-sizing: border-box; font-size: 8pt; line-height: 1.25; }
+.invoice-pdf-page .invoice-document__header { flex: 0 0 auto; min-height: 18mm; }
+.invoice-pdf-page .invoice-brand { font-size: 17pt; }
+.invoice-pdf-page .invoice-document__header h1 { font-size: 13pt; }
+.invoice-pdf-page .invoice-document__header dl div { justify-content: center; }
+.invoice-pdf-page .invoice-document__header dt,.invoice-pdf-page .invoice-document__header dd { flex-shrink: 0; white-space: nowrap; margin: 0; }
+.invoice-pdf-page .invoice-party { flex: 0 0 auto; padding-right: 8mm; }
+.invoice-pdf-page .invoice-party h2 { width: 8mm; padding: 1mm .6mm; font-size: 7.5pt; }
+.invoice-pdf-page .invoice-party__grid > div { min-height: 6mm; padding: .55mm 1.2mm; }
+.invoice-pdf-page .invoice-party__grid strong { flex-shrink: 0; white-space: nowrap; font-size: 7pt; }
+.invoice-pdf-page .invoice-subject { flex: 0 0 auto; min-height: 6mm; padding: .55mm 1.2mm; box-sizing: border-box; }
+.invoice-pdf-flow { flex: 1 1 0; min-height: 0; }
+.invoice-pdf-page .invoice-lines { margin: 0; border-collapse: collapse; }
+.invoice-pdf-page .invoice-lines th,.invoice-pdf-page .invoice-lines td { height: 6mm; padding: .55mm 1.2mm; box-sizing: border-box; }
+.invoice-pdf-page .invoice-lines thead { display: table-header-group; }
+.invoice-pdf-page .invoice-bottom { grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0; }
+.invoice-pdf-page .invoice-notes { min-height: 30mm; }
+.invoice-pdf-page .invoice-totals dt,.invoice-pdf-page .invoice-totals dd { padding: 1mm 1.5mm; }
+.invoice-pdf-page .invoice-totals .is-payable { font-size: 10pt; }
+.invoice-pdf-page .invoice-signatures { flex: 0 0 auto; min-height: 30mm; overflow: visible; }
+.invoice-pdf-page .invoice-signature > span { position: relative !important; top: auto !important; left: auto !important; right: auto !important; width: auto !important; }
+.invoice-pdf-page .invoice-pdf-notes-part { margin: 0; padding: 2mm; white-space: pre-wrap; overflow-wrap: anywhere; }
+.invoice-pdf-page .invoice-pdf-notes-title { margin: 0; padding: 1mm 2mm; background: #efefef; font-size: 9pt; }
+@media (max-width:500px) { .invoice-pdf-modal { padding: 8px; } .invoice-pdf-dialog { padding: 17px; } .invoice-pdf-choices { flex-direction: column; } }
+@media print { .invoice-pdf-modal,.invoice-pdf-stage { display: none !important; } }

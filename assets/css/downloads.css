@@ -24,7 +24,7 @@
 
 .download-filters {
   display: grid;
-  grid-template-columns: 1.5fr repeat(4,minmax(130px,1fr)) auto;
+  grid-template-columns: 1.5fr repeat(5,minmax(110px,1fr)) auto;
   gap: 10px;
   padding: 18px;
   margin-bottom: 32px;
@@ -59,7 +59,8 @@
 .download-card h2 { margin: 0 0 10px; font-size: 22px; }
 .download-card p { color: var(--download-muted); font-size: 14px; }
 .download-card-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
-.download-card-tags span { padding: 4px 8px; border-radius: 7px; background: var(--download-soft); color: #645b4b; font-size: 12px; }
+.download-card-tags span,.download-card-tags a { padding: 4px 8px; border-radius: 7px; background: var(--download-soft); color: #645b4b; font-size: 12px; }
+.download-card-tags a:hover { color: #171717; text-decoration: underline; }
 .download-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 15px; margin-top: auto; border-top: 1px solid #eee9df; font-size: 13px; color: var(--download-muted); }
 .download-card-footer a { color: #805b16; font-weight: 700; }
 .download-pagination { margin-top: 38px; text-align: center; }

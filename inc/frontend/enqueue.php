@@ -22,6 +22,25 @@ function zigurat_enqueue_theme_script($name, $dependencies = array())
 
 function zigurat_enqueue_assets()
 {
+    $requested_invoice_view = $_REQUEST['invoice_view'] ?? $_REQUEST['view'] ?? '';
+    $invoice_print_view = is_string($requested_invoice_view) ? sanitize_key(wp_unslash($requested_invoice_view)) : '';
+    if ((is_page('invoices') || is_page_template('page-invoices.php')) && in_array($invoice_print_view, array('print', 'trash_print'), true)) {
+        zigurat_enqueue_theme_style('main', array());
+        zigurat_enqueue_theme_style('invoice');
+        zigurat_enqueue_theme_style('invoice-pdf', array('zigurat-invoice'));
+        zigurat_enqueue_theme_script('invoice-pdf');
+        $pdf_vendor = get_template_directory_uri() . '/assets/vendor/invoice-pdf/';
+        wp_localize_script('zigurat-invoice-pdf', 'ziguratInvoicePdfConfig', array(
+            'pdfUrl' => $pdf_vendor . 'pdf-lib-1.17.1.min.js',
+            'fontkitUrl' => $pdf_vendor . 'fontkit-1.1.1.min.js',
+            'bidiUrl' => $pdf_vendor . 'bidi-1.0.3.min.js',
+            'fontUrl' => get_template_directory_uri() . '/assets/fonts/Tanha-FD.woff2',
+            'pdfFontUrl' => get_template_directory_uri() . '/assets/fonts/Tanha-FD.ttf',
+            'previewUrl' => get_template_directory_uri() . '/assets/vendor/pdfjs/pdf.min.mjs',
+            'workerUrl' => get_template_directory_uri() . '/assets/vendor/pdfjs/pdf.worker.min.mjs',
+        ));
+        return;
+    }
     if (is_front_page()) {
         zigurat_enqueue_theme_style('front-page', array());
     } else {

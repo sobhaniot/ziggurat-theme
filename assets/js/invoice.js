@@ -1087,6 +1087,7 @@
     }
     toggle.addEventListener('change', updateNumberPreview);
     updateNumberPreview();
+    return updateNumberPreview;
   }
   function calculate() {
     var subtotal = 0;
@@ -1375,8 +1376,134 @@
   }
   applyShippingMode(shippingModeField && shippingModeField.value, false);
   setupCustomerLookup();
-  setupBranchNumberPreview();
+  var updateInvoiceNumber = setupBranchNumberPreview();
   calculate();
+  if (!isReadonlyInvoice) setupInvoiceHistory();
+  function setupInvoiceHistory() {
+    var toolbar = document.createElement('div');
+    toolbar.className = 'invoice-history no-print';
+    toolbar.setAttribute('role', 'group');
+    toolbar.setAttribute('aria-label', 'Invoice history');
+    toolbar.innerHTML = '<button type="button" data-invoice-undo title="Undo (Ctrl+Z)" aria-label="Undo"><span aria-hidden="true">↶</span><small>Undo</small></button><button type="button" data-invoice-redo title="Redo (Ctrl+Y)" aria-label="Redo"><span aria-hidden="true">↷</span><small>Redo</small></button>';
+    editor.appendChild(toolbar);
+    var undo = toolbar.querySelector('[data-invoice-undo]');
+    var redo = toolbar.querySelector('[data-invoice-redo]');
+    var states = [];
+    var position = -1;
+    var timer;
+    var restoring = false;
+    var rowIds = new WeakMap();
+    var nextRowId = 0;
+    function fields(container, outsideRows) {
+      return Array.from(container.querySelectorAll('input,select,textarea')).filter(function (field) {
+        return field.type !== 'file' && (!outsideRows || !body.contains(field));
+      });
+    }
+    function readFields(container, outsideRows) {
+      return fields(container, outsideRows).map(function (field) {
+        var value = field.value;
+        if (value === '' && field.dataset.clearOnFocusActive === '1') value = field.dataset.clearOnFocusPreviousValue || '';
+        if (value === '' && field.dataset.quantityBeforeEdit) value = field.dataset.quantityBeforeEdit;
+        if (value === '' && field.hasAttribute('data-money')) value = Number(0).toLocaleString('fa-IR');
+        return {value:value, checked:field.checked, selected:field.multiple ? Array.from(field.options).map(function (option) { return option.selected; }) : null, manual:field.dataset.unitManual, auto:field.dataset.unitAuto, customer:field.dataset.customerLoaded};
+      });
+    }
+    function writeFields(container, values, outsideRows) {
+      fields(container, outsideRows).forEach(function (field, index) {
+        var saved = values[index];
+        if (!saved) return;
+        field.value = saved.value;
+        if (typeof saved.checked === 'boolean') field.checked = saved.checked;
+        if (saved.selected) Array.from(field.options).forEach(function (option, i) { option.selected = saved.selected[i]; });
+        [['unitManual',saved.manual],['unitAuto',saved.auto],['customerLoaded',saved.customer]].forEach(function (entry) {
+          if (entry[1] === undefined) delete field.dataset[entry[0]];
+          else field.dataset[entry[0]] = entry[1];
+        });
+        delete field.dataset.clearOnFocusActive;
+        delete field.dataset.clearOnFocusPreviousValue;
+        delete field.dataset.quantityBeforeEdit;
+        field.setCustomValidity('');
+      });
+    }
+    function snapshot() {
+      var rows = Array.from(body.querySelectorAll('tr')).map(function (row) {
+        if (!rowIds.has(row)) rowIds.set(row, ++nextRowId);
+        return {node:row, id:rowIds.get(row), fields:readFields(row)};
+      });
+      var saved = {rows:rows, fields:readFields(editor,true), fixed:shippingFixedValue, percent:shippingPercentValue};
+      saved.key = JSON.stringify({rows:rows.map(function (row) { return {id:row.id, fields:row.fields}; }), fields:saved.fields, fixed:saved.fixed, percent:saved.percent});
+      return saved;
+    }
+    function updateButtons() {
+      undo.disabled = position <= 0;
+      redo.disabled = position >= states.length - 1;
+    }
+    function record() {
+      clearTimeout(timer);
+      if (restoring || !editor.isConnected) return;
+      var saved = snapshot();
+      if (position >= 0 && saved.key === states[position].key) { updateButtons(); return; }
+      states = states.slice(0, position + 1);
+      states.push(saved);
+      if (states.length > 80) states.shift();
+      position = states.length - 1;
+      updateButtons();
+    }
+    function schedule(delay) {
+      if (restoring) return;
+      clearTimeout(timer);
+      timer = setTimeout(record, delay);
+      // Allow the first undo before the typing group has been committed.
+      undo.disabled = false;
+    }
+    function restore(direction) {
+      record();
+      var target = position + direction;
+      if (target < 0 || target >= states.length) return;
+      var saved = states[target];
+      restoring = true;
+      try {
+        body.replaceChildren.apply(body, saved.rows.map(function (row) { return row.node; }));
+        saved.rows.forEach(function (row) { writeFields(row.node,row.fields); });
+        writeFields(editor,saved.fields,true);
+        shippingFixedValue = saved.fixed;
+        shippingPercentValue = saved.percent;
+        applyShippingMode(shippingModeField && shippingModeField.value,false);
+        if (updateInvoiceNumber) updateInvoiceNumber();
+        updateRowNumbers();
+        calculate();
+        markInvoiceChanged();
+        position = target;
+        updateButtons();
+      } finally { restoring = false; }
+    }
+    // Keep the focused field's automatic blur formatting out of the undo step.
+    toolbar.addEventListener('mousedown', function (event) { event.preventDefault(); });
+    undo.addEventListener('click', function () { restore(-1); });
+    redo.addEventListener('click', function () { restore(1); });
+    editor.addEventListener('input', function () { schedule(450); });
+    // Target handlers have already updated switches, caches and calculated
+    // values. Commit now so the next interaction cannot swallow this step.
+    editor.addEventListener('change', record);
+    editor.addEventListener('focusout', record);
+    editor.addEventListener('click', function (event) {
+      if (toolbar.contains(event.target) || event.target.closest('[type="submit"]')) return;
+      if (event.target.closest('button')) record();
+    });
+    editor.addEventListener('drop', record);
+    editor.addEventListener('dragend', record);
+    editor.addEventListener('pointerup', function (event) { if (event.target.closest('[data-row-drag-handle]')) record(); });
+    editor.addEventListener('pointercancel', function (event) { if (event.target.closest('[data-row-drag-handle]')) record(); });
+    editor.addEventListener('keydown', function (event) {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && (event.code === 'KeyZ' || event.code === 'KeyY')) {
+        event.preventDefault();
+        restore(event.code === 'KeyY' || event.shiftKey ? 1 : -1);
+      } else if (event.code === 'ArrowUp' || event.code === 'ArrowDown') {
+        if (event.target.closest('[data-row-drag-handle]')) record();
+      }
+    });
+    record();
+  }
   if (isReadonlyInvoice) {
     editor.querySelectorAll('input,select,textarea,button').forEach(function (control) { control.disabled = true; });
     editor.addEventListener('submit', function (event) { event.preventDefault(); });

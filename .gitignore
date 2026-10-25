@@ -2,5 +2,7 @@
 /hosting/
 /n8n/
 /docs/
+/tests/
+/outputs/
 /assets/images/*
 !/assets/images/zigurat-logo.svg

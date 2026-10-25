@@ -88,6 +88,7 @@ function zigurat_seo_has_archive_filters()
         'download_category',
         'sketchup_version',
         'download_os',
+        'download_tag',
         'download_sort',
     );
     foreach ($filter_keys as $key) {
@@ -465,7 +466,7 @@ function zigurat_output_seo_head()
     } elseif (is_singular('zig_download')) {
         $post_id = get_queried_object_id();
         $type = function_exists('zigurat_download_primary_type') ? zigurat_download_primary_type($post_id) : '';
-        $is_software = preg_match('/نرم.?افزار|پلاگین|SketchUp|اسکچ/u', $type . ' ' . get_the_title($post_id));
+        $is_software = preg_match('/نرم.?افزار|پلاگین|افزونه|ابزار جانبی|SketchUp|اسکچ/u', $type . ' ' . get_the_title($post_id));
         $download_schema = array(
             '@type' => $is_software ? 'SoftwareApplication' : 'DigitalDocument',
             '@id' => $canonical . '#download',
@@ -486,7 +487,7 @@ function zigurat_output_seo_head()
             $version = zigurat_download_meta($post_id, 'version');
             $os = zigurat_download_term_names($post_id, 'download_os');
             $license = zigurat_download_meta($post_id, 'license');
-            $download_schema['applicationCategory'] = strpos($type, 'پلاگین') !== false ? 'DesignApplication' : 'UtilitiesApplication';
+            $download_schema['applicationCategory'] = 'UtilitiesApplication';
             if ($version) {
                 $download_schema['softwareVersion'] = $version;
             }

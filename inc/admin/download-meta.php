@@ -13,9 +13,9 @@ function zigurat_render_download_meta_box($post)
 {
     wp_nonce_field('zigurat_save_download_meta', 'zigurat_download_meta_nonce');
     $fields = array(
-        'version'       => array('نسخه فایل', 'text', 'مثلاً 2.4.1'),
+        'version'       => array('نسخه / ویرایش', 'text', 'مثلاً 2.4.1؛ در صورت نیاز'),
         'file_size'     => array('حجم فایل', 'text', 'مثلاً 8.5 مگابایت'),
-        'file_format'   => array('فرمت فایل', 'text', 'مثلاً RBZ، ZIP یا PDF'),
+        'file_format'   => array('فرمت / نوع بسته', 'text', 'مثلاً ZIP، EXE، MSI، PDF یا RBZ'),
         'developer'     => array('سازنده / ناشر', 'text', 'نام شرکت یا توسعه‌دهنده'),
         'license'       => array('نوع مجوز', 'text', 'رایگان، تجاری، آزمایشی و...'),
         'official_url'  => array('وب‌سایت یا صفحه رسمی', 'url', 'https://example.com'),
@@ -39,6 +39,7 @@ function zigurat_render_download_meta_box($post)
         @media(max-width:782px){.zigurat-version-row-grid{grid-template-columns:1fr 1fr}}
     </style>
     <div class="zigurat-download-fields">
+        <p class="wide zigurat-download-help">این بخش برای نرم‌افزار، ابزار، افزونه، مستندات و فایل آموزشی است. «نوع محتوا» ماهیت فایل و «دسته‌بندی دانلود» موضوع آن را مشخص می‌کند. در «سازگاری و محیط اجرا» در صورت نیاز نام کامل محیط و نسخه را بنویسید؛ مثلاً Windows 10/11، SketchUp 2026 یا WordPress 6. برچسب‌ها اختیاری‌اند.</p>
         <?php foreach ($fields as $key => $field): ?>
             <label>
                 <span><?php echo esc_html($field[0]); ?></span>
@@ -57,22 +58,22 @@ function zigurat_render_download_meta_box($post)
                 <button type="button" class="button button-secondary" id="zigurat-download-select-file">انتخاب فایل</button>
                 <button type="button" class="button" id="zigurat-download-remove-file">حذف انتخاب</button>
             </span>
-            <span class="zigurat-download-help">برای PDF، ZIP و RBZ از کتابخانه رسانه استفاده کنید. فایل اجرایی نرم‌افزار را ترجیحاً از لینک رسمی سازنده ارائه دهید.</span>
+            <span class="zigurat-download-help">نرم‌افزار خودتان را می‌توانید داخل بسته ZIP از رسانه بارگذاری کنید. برای فایل نصب روی هاست یا منبع دیگر نیز از فیلد لینک دانلود استفاده کنید.</span>
         </label>
 
         <label class="wide">
-            <span>لینک دانلود خارجی / رسمی</span>
+            <span>لینک مستقیم دانلود (هاست یا منبع دیگر)</span>
             <input type="url" name="zigurat_download[external_url]" value="<?php echo esc_attr(zigurat_download_meta($post->ID, 'external_url')); ?>" placeholder="https://example.com/download">
             <span class="zigurat-download-help">اگر فایل داخلی انتخاب شده باشد، همان فایل اولویت دارد.</span>
         </label>
 
         <label class="wide">
-            <span>نیازمندی‌های سیستم</span>
+            <span>پیش‌نیازها و سازگاری</span>
             <textarea rows="3" name="zigurat_download[requirements]" placeholder="نسخه سیستم‌عامل، حافظه و سایر پیش‌نیازها"><?php echo esc_textarea(zigurat_download_meta($post->ID, 'requirements')); ?></textarea>
         </label>
         <label class="wide">
-            <span>راهنمای نصب</span>
-            <textarea rows="5" name="zigurat_download[installation]" placeholder="مراحل نصب و فعال‌سازی"><?php echo esc_textarea(zigurat_download_meta($post->ID, 'installation')); ?></textarea>
+            <span>راهنمای نصب و استفاده</span>
+            <textarea rows="5" name="zigurat_download[installation]" placeholder="مراحل نصب، اجرای نسخه پرتابل یا روش استفاده از فایل"><?php echo esc_textarea(zigurat_download_meta($post->ID, 'installation')); ?></textarea>
         </label>
         <label class="wide">
             <span>تغییرات نسخه</span>
@@ -225,7 +226,7 @@ add_action('admin_enqueue_scripts', 'zigurat_download_admin_assets');
 
 function zigurat_download_columns($columns)
 {
-    $columns['download_type'] = 'نوع فایل';
+    $columns['download_type'] = 'نوع محتوا';
     $columns['download_version'] = 'نسخه';
     $columns['download_count'] = 'دانلود';
     return $columns;

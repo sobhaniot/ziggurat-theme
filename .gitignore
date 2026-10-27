@@ -4,5 +4,54 @@
 /docs/
 /tests/
 /outputs/
+
+# Local diagnostics must never be committed or uploaded.
+/diagnose-*.php
+
+# Local tooling, caches and machine-specific files.
+/.vscode/
+/.idea/
+/.codex/
+/.agents/
+/node_modules/
+/.venv/
+/venv/
+/env/
+/tmp/
+/temp/
+/.cache/
+/.pytest_cache/
+/.phpunit.cache/
+__pycache__/
+*.py[cod]
+*.log
+*.log.*
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Credentials and local backups.
+.env
+.env.*
+/.ftpconfig
+/.ftppass
+*.bak
+*.backup
+*.orig
+*.rej
+/backups/
+
+# Generated files at the theme root only. Public downloads in assets stay valid.
+/*.zip
+/*.7z
+/*.tar
+/*.gz
+/*.sql
+/*.sqlite
+/*.sqlite3
+
 /assets/images/*
 !/assets/images/zigurat-logo.svg

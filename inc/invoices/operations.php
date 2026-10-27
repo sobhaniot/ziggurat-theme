@@ -331,6 +331,9 @@ function zigurat_invoice_get($invoice_id)
 
 function zigurat_invoice_trash_get_record($trash_id)
 {
+    if (!current_user_can('manage_options')) {
+        return null;
+    }
     global $wpdb;
     return $wpdb->get_row($wpdb->prepare(
         'SELECT * FROM ' . zigurat_invoice_trash_table_name() . ' WHERE id = %d',
@@ -365,6 +368,9 @@ function zigurat_invoice_trash_get_invoice($trash_id)
 
 function zigurat_invoice_trash_list($args = array())
 {
+    if (!current_user_can('manage_options')) {
+        return array('items'=>array(), 'total'=>0, 'pages'=>1, 'page'=>1);
+    }
     global $wpdb;
     $args = wp_parse_args($args, array('brand'=>'', 'search'=>'', 'page'=>1, 'per_page'=>30));
     $where = array('1=1');
@@ -573,8 +579,8 @@ function zigurat_invoice_delete_from_trash($trash_id)
  */
 function zigurat_invoice_delete($invoice_id)
 {
-    if (!current_user_can('manage_options')) {
-        return new WP_Error('forbidden', 'فقط مدیرکل اجازه حذف فاکتور را دارد.');
+    if (!zigurat_is_manager()) {
+        return new WP_Error('forbidden', 'اجازه حذف فاکتور را ندارید.');
     }
 
     $invoice_id = absint($invoice_id);
@@ -1239,10 +1245,72 @@ function zigurat_invoice_save($data)
     return $saved_invoice;
 }
 
+function zigurat_invoice_sort_options()
+{
+    return array(
+        'default' => 'پیش‌فرض',
+        'created_desc' => 'تاریخ ساخت — جدیدتر اول',
+        'created_asc' => 'تاریخ ساخت — قدیمی‌تر اول',
+        'number_desc' => 'شماره فاکتور — بزرگ‌تر اول',
+        'number_asc' => 'شماره فاکتور — کوچک‌تر اول',
+        'buyer_asc' => 'نام خریدار — الف تا ی',
+        'buyer_desc' => 'نام خریدار — ی تا الف',
+        'issue_desc' => 'تاریخ فاکتور — جدیدتر اول',
+        'issue_asc' => 'تاریخ فاکتور — قدیمی‌تر اول',
+    );
+}
+
+function zigurat_invoice_normalize_sort($sort)
+{
+    return is_string($sort) && array_key_exists($sort, zigurat_invoice_sort_options()) ? $sort : 'default';
+}
+
+function zigurat_invoice_get_user_sort()
+{
+    $user_id = get_current_user_id();
+    if (!$user_id || !zigurat_is_manager()) {
+        return 'default';
+    }
+    return zigurat_invoice_normalize_sort(get_user_meta($user_id, 'zigurat_invoice_list_sort', true));
+}
+
+function zigurat_invoice_resolve_user_sort($requested, $nonce = '')
+{
+    $saved = zigurat_invoice_get_user_sort();
+    if (!is_string($requested) || !array_key_exists($requested, zigurat_invoice_sort_options())) {
+        return $saved;
+    }
+    // Explicit links may override the view, but only a nonce-protected form
+    // submission can change the current user's persistent preference.
+    if ($requested !== $saved && get_current_user_id() && zigurat_is_manager()
+        && is_string($nonce) && wp_verify_nonce($nonce, 'zigurat_invoice_sort_preference')) {
+        update_user_meta(get_current_user_id(), 'zigurat_invoice_list_sort', $requested);
+    }
+    return $requested;
+}
+
+function zigurat_invoice_sort_sql($sort, $qualified = false)
+{
+    $prefix = $qualified ? 'current_invoice.' : '';
+    $sort = zigurat_invoice_normalize_sort($sort);
+    if ($sort === 'default') {
+        return "COALESCE(NULLIF({$prefix}parent_invoice_id,0),{$prefix}id) DESC, {$prefix}number_suffix DESC, {$prefix}id DESC";
+    }
+    $direction = substr($sort, -4) === '_asc' ? 'ASC' : 'DESC';
+    if (strpos($sort, 'number_') === 0) {
+        return "{$prefix}document_number {$direction}, {$prefix}number_suffix {$direction}, {$prefix}id {$direction}";
+    }
+    if (strpos($sort, 'buyer_') === 0) {
+        return "REPLACE(REPLACE(TRIM({$prefix}customer_name),'ي','ی'),'ك','ک') {$direction}, {$prefix}id {$direction}";
+    }
+    $column = strpos($sort, 'issue_') === 0 ? 'issue_date' : 'created_at';
+    return "{$prefix}{$column} {$direction}, {$prefix}id {$direction}";
+}
+
 function zigurat_invoice_list($args = array())
 {
     global $wpdb;
-    $args = wp_parse_args($args, array('brand'=>'','type'=>'','status'=>'','payment_status'=>'','tax_status'=>'','customer_names'=>array(),'search'=>'','tax_year'=>0,'tax_quarter'=>0,'page'=>1,'per_page'=>30));
+    $args = wp_parse_args($args, array('brand'=>'','type'=>'','status'=>'','payment_status'=>'','tax_status'=>'','customer_names'=>array(),'search'=>'','tax_year'=>0,'tax_quarter'=>0,'page'=>1,'per_page'=>30,'sort'=>'default'));
     $where = array('1=1');
     $values = array();
     if (in_array($args['brand'], array('official','unofficial'), true)) { $where[]='brand=%s'; $values[]=$args['brand']; }
@@ -1271,6 +1339,7 @@ function zigurat_invoice_list($args = array())
     $per_page = max(1, min(100, absint($args['per_page'])));
     $page = max(1, absint($args['page']));
     $offset = ($page - 1) * $per_page;
+    $order_by = zigurat_invoice_sort_sql($args['sort'], true);
     $sql = "SELECT current_invoice.*,
             EXISTS(
                 SELECT 1 FROM {$table} related_invoice
@@ -1280,9 +1349,7 @@ function zigurat_invoice_list($args = array())
             ) AS has_related_documents
             FROM {$table} current_invoice
             WHERE {$where_sql}
-            ORDER BY COALESCE(NULLIF(current_invoice.parent_invoice_id,0),current_invoice.id) DESC,
-                     current_invoice.number_suffix DESC,
-                     current_invoice.id DESC
+            ORDER BY {$order_by}
             LIMIT %d OFFSET %d";
     return array(
         'items'=>$wpdb->get_results($wpdb->prepare($sql, array_merge($values, array($per_page,$offset)))),

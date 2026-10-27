@@ -127,7 +127,7 @@
   });
 
   function setupInvoiceListAutoFilters(root) {
-    (root || document).querySelectorAll('.invoice-list-filters select[name="filter_type"], .invoice-list-filters select[name="filter_status"], .invoice-list-filters select[name="filter_payment_status"], .invoice-list-filters select[name="filter_tax_status"], .invoice-list-filters select[name="tax_year"]').forEach(function (select) {
+    (root || document).querySelectorAll('.invoice-list-filters select[name="filter_type"], .invoice-list-filters select[name="filter_status"], .invoice-list-filters select[name="filter_payment_status"], .invoice-list-filters select[name="filter_tax_status"], .invoice-list-filters select[name="tax_year"], .invoice-list-filters select[name="sort"]').forEach(function (select) {
       if (select.dataset.autoFilterReady === '1') return;
       select.dataset.autoFilterReady = '1';
       select.addEventListener('change', function () {

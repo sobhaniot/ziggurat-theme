@@ -1,0 +1,57 @@
+# Deployment exclusions (gitignore-style patterns).
+# Configure the uploader/packager to read this file; manual FTP/cPanel uploads
+# do not automatically honor ignore files. Do not use .gitignore as the upload
+# list: its existing image exclusions are a separate source-control policy.
+# Keep runtime PHP, assets (including images/fonts/vendor/downloads), and .htaccess.
+/.git/
+/.gitignore
+/.gitattributes
+/.github/
+/.deployignore
+/.vscode/
+/.idea/
+/.codex/
+/.agents/
+/AGENTS.md
+/tests/
+/docs/
+/content/
+/hosting/
+/n8n/
+/outputs/
+/diagnose-*.php
+/node_modules/
+/.venv/
+/venv/
+/env/
+/tmp/
+/temp/
+/.cache/
+/.pytest_cache/
+/.phpunit.cache/
+__pycache__/
+*.py[cod]
+*.log
+*.log.*
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+.env
+.env.*
+/.ftpconfig
+/.ftppass
+*.bak
+*.backup
+*.orig
+*.rej
+/backups/
+/*.zip
+/*.7z
+/*.tar
+/*.gz
+/*.sql
+/*.sqlite
+/*.sqlite3

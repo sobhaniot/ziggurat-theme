@@ -442,7 +442,9 @@ function zigurat_invoice_export_rows($args)
         $where[] = "(customer_name LIKE %s OR project_name LIKE %s OR subject LIKE %s OR CONCAT(document_number, IF(number_suffix > 0, CONCAT('/', number_suffix), '')) LIKE %s)";
         array_push($values, $like, $like, $like, $like);
     }
-    $sql = 'SELECT * FROM ' . zigurat_invoices_table_name() . ' WHERE ' . implode(' AND ', $where) . ' ORDER BY id DESC LIMIT 10000';
+    $sort = zigurat_invoice_normalize_sort($args['sort'] ?? 'default');
+    $order_by = $sort === 'default' ? 'id DESC' : zigurat_invoice_sort_sql($sort);
+    $sql = 'SELECT * FROM ' . zigurat_invoices_table_name() . ' WHERE ' . implode(' AND ', $where) . ' ORDER BY ' . $order_by . ' LIMIT 10000';
     return $values ? $wpdb->get_results($wpdb->prepare($sql, $values)) : $wpdb->get_results($sql);
 }
 

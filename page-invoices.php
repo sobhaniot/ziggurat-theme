@@ -5,6 +5,11 @@ zigurat_require_manager();
 
 $brand = isset($_REQUEST['invoice_brand']) ? sanitize_key(wp_unslash($_REQUEST['invoice_brand'])) : (isset($_REQUEST['brand']) ? sanitize_key(wp_unslash($_REQUEST['brand'])) : '');
 $view = isset($_REQUEST['invoice_view']) ? sanitize_key(wp_unslash($_REQUEST['invoice_view'])) : (isset($_REQUEST['view']) ? sanitize_key(wp_unslash($_REQUEST['view'])) : '');
+$invoice_list_sort_selection = zigurat_invoice_resolve_user_sort(
+    $_GET['sort'] ?? null,
+    $_SERVER['REQUEST_METHOD'] === 'GET' && $view === 'list' && is_string($_GET['invoice_sort_nonce'] ?? null)
+        ? wp_unslash($_GET['invoice_sort_nonce']) : ''
+);
 $document_type = isset($_REQUEST['invoice_type']) ? sanitize_key(wp_unslash($_REQUEST['invoice_type'])) : (isset($_REQUEST['type']) ? sanitize_key(wp_unslash($_REQUEST['type'])) : 'proforma');
 $edit_id = isset($_REQUEST['invoice_edit']) ? absint($_REQUEST['invoice_edit']) : (isset($_REQUEST['edit']) ? absint($_REQUEST['edit']) : 0);
 $from_proforma_id = isset($_REQUEST['invoice_from_proforma'])
@@ -174,6 +179,7 @@ if ($view === 'export') {
     }
     zigurat_invoice_download_xlsx(array(
         'brand' => $brand,
+        'sort' => $invoice_list_sort_selection,
         'type' => isset($_GET['filter_type']) ? sanitize_key(wp_unslash($_GET['filter_type'])) : '',
         'status' => isset($_GET['filter_status']) ? sanitize_key(wp_unslash($_GET['filter_status'])) : '',
         'customer_names' => zigurat_invoice_sanitize_customer_names(isset($_GET['filter_buyers']) ? wp_unslash($_GET['filter_buyers']) : array()),
@@ -454,6 +460,7 @@ get_header();
                 $list_payment_status = isset($_GET['filter_payment_status']) ? sanitize_key(wp_unslash($_GET['filter_payment_status'])) : '';
                 $list_tax_status = $brand === 'official' && isset($_GET['filter_tax_status']) ? sanitize_key(wp_unslash($_GET['filter_tax_status'])) : '';
                 $list_search = isset($_GET['invoice_search']) ? sanitize_text_field(wp_unslash($_GET['invoice_search'])) : '';
+                $list_sort = $invoice_list_sort_selection;
                 $list_page = isset($_GET['invoice_page']) ? max(1, absint($_GET['invoice_page'])) : 1;
                 $list_tax_year = $has_tax_year_filter ? absint($_GET['tax_year']) : 0;
                 $list_tax_quarter = isset($_GET['tax_quarter']) ? absint($_GET['tax_quarter']) : 0;
@@ -482,6 +489,7 @@ get_header();
                 }
                 $invoice_list = zigurat_invoice_list(array(
                     'brand'=>$brand,
+                    'sort'=>$list_sort,
                     'type'=>$list_type,
                     'status'=>$list_status,
                     'customer_names'=>$list_buyers,
@@ -503,12 +511,14 @@ get_header();
                     'tax_year'             => $list_tax_year,
                     'tax_quarter'          => $list_tax_quarter,
                     'invoice_page'         => $list_page,
+                    'sort'                 => $list_sort,
                 ));
                 ?>
-                <?php $excel_url=wp_nonce_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'export','filter_type'=>$list_type,'filter_buyers'=>$list_buyers,'filter_payment_status'=>$list_payment_status,'filter_tax_status'=>$list_tax_status,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>$list_tax_quarter)),'zigurat_invoice_export'); ?>
+                <?php $excel_url=wp_nonce_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'export','filter_type'=>$list_type,'filter_buyers'=>$list_buyers,'filter_payment_status'=>$list_payment_status,'filter_tax_status'=>$list_tax_status,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>$list_tax_quarter,'sort'=>$list_sort)),'zigurat_invoice_export'); ?>
                 <div class="invoice-list-heading"><h2>لیست فاکتورها</h2><div class="invoice-list-heading__actions no-print"><strong><?php echo esc_html(number_format_i18n($invoice_list['total'])); ?> سند</strong><a class="invoice-excel-button" href="<?php echo esc_url($excel_url); ?>">خروجی اکسل</a></div></div>
                 <?php if ($list_error): ?><div class="invoice-notice is-error" role="alert"><?php echo esc_html($list_error->get_error_message()); ?></div><?php elseif (!empty($_GET['invoice-status']) && $_GET['invoice-status'] === 'saved-locked'): ?><div class="invoice-notice is-success">فاکتور ذخیره و قفل شد.</div><?php elseif (!empty($_GET['invoice-status']) && $_GET['invoice-status'] === 'deleted'): ?><div class="invoice-notice is-success">فاکتور حذف شد، به سطل زباله رفت و شماره آن آزاد شد.</div><?php endif; ?>
                 <form class="invoice-list-filters no-print" method="get">
+                    <?php wp_nonce_field('zigurat_invoice_sort_preference', 'invoice_sort_nonce', false); ?>
                     <input type="hidden" name="invoice_brand" value="<?php echo esc_attr($brand); ?>">
                     <input type="hidden" name="invoice_view" value="list">
                     <input type="hidden" name="tax_quarter" value="<?php echo esc_attr($list_tax_quarter); ?>">
@@ -518,17 +528,18 @@ get_header();
                     <?php if ($brand === 'official'): ?><label>سامانه مؤدیان<select name="filter_tax_status"><option value="">همه</option><option value="not_submitted" <?php selected($list_tax_status,'not_submitted'); ?>>ثبت‌نشده</option><option value="submitted" <?php selected($list_tax_status,'submitted'); ?>>ثبت‌شده</option></select></label><?php endif; ?>
                     <label><?php echo $brand === 'official' ? 'سال مالیاتی' : 'سال گزارش'; ?><select name="tax_year"><option value="0">همه سال‌ها</option><?php foreach ($tax_years as $tax_year): ?><option value="<?php echo esc_attr($tax_year); ?>" <?php selected($list_tax_year, $tax_year); ?>><?php echo esc_html($tax_year); ?></option><?php endforeach; ?></select></label>
                     <label>جستجو<input type="search" name="invoice_search" value="<?php echo esc_attr($list_search); ?>" placeholder="شماره، خریدار یا نام پروژه"></label>
+                    <?php get_template_part('template-parts/invoice-sort-control', null, array('sort'=>$list_sort)); ?>
                     <button type="submit">اعمال فیلتر</button>
-                    <?php if($list_type||$list_buyers||$list_status||$list_payment_status||$list_tax_status||$list_search||$list_tax_year||$list_tax_quarter): ?><a href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>'','tax_year'=>0))); ?>">حذف فیلتر</a><?php endif; ?>
+                    <?php if($list_type||$list_buyers||$list_status||$list_payment_status||$list_tax_status||$list_search||$list_tax_year||$list_tax_quarter): ?><a href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>'','tax_year'=>0,'sort'=>$list_sort))); ?>">حذف فیلتر</a><?php endif; ?>
                 </form>
                 <?php if ($tax_summary): ?>
                     <section class="invoice-tax-period no-print" aria-labelledby="invoice-tax-period-title">
                         <div class="invoice-tax-period__heading">
                             <div><span>گزارش‌های سال <?php echo esc_html($list_tax_year); ?></span><h3 id="invoice-tax-period-title">خلاصه سالانه و فصلی فاکتورهای <?php echo $brand === 'official' ? 'رسمی' : 'غیررسمی'; ?></h3></div>
-                            <a class="<?php echo $list_tax_quarter === 0 ? 'is-active' : ''; ?>" href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>'invoice','filter_buyers'=>$list_buyers,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>0))); ?>">نمایش کل سال</a>
+                            <a class="<?php echo $list_tax_quarter === 0 ? 'is-active' : ''; ?>" href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>'invoice','filter_buyers'=>$list_buyers,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>0,'sort'=>$list_sort))); ?>">نمایش کل سال</a>
                         </div>
                         <div class="invoice-tax-cards">
-                            <a class="invoice-tax-card invoice-tax-card--year <?php echo $list_tax_quarter === 0 ? 'is-active' : ''; ?>" href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>'invoice','filter_buyers'=>$list_buyers,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>0))); ?>">
+                            <a class="invoice-tax-card invoice-tax-card--year <?php echo $list_tax_quarter === 0 ? 'is-active' : ''; ?>" href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>'invoice','filter_buyers'=>$list_buyers,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>0,'sort'=>$list_sort))); ?>">
                                 <header><strong>گزارش سالانه <?php echo esc_html($list_tax_year); ?></strong><span><?php echo esc_html(number_format_i18n((int) $year_summary->invoice_count)); ?> فاکتور</span></header>
                                 <dl>
                                     <div><dt>فروش کل سال</dt><dd><?php echo esc_html(zigurat_invoice_format_money($year_summary->grand_total)); ?></dd></div>
@@ -539,7 +550,7 @@ get_header();
                                 </dl>
                             </a>
                             <?php foreach ($tax_summary as $quarter=>$quarter_summary): ?>
-                                <a class="invoice-tax-card <?php echo $list_tax_quarter === (int) $quarter ? 'is-active' : ''; ?>" href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>'invoice','filter_buyers'=>$list_buyers,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>$quarter))); ?>">
+                                <a class="invoice-tax-card <?php echo $list_tax_quarter === (int) $quarter ? 'is-active' : ''; ?>" href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>'invoice','filter_buyers'=>$list_buyers,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>$quarter,'sort'=>$list_sort))); ?>">
                                     <header><strong><?php echo esc_html(zigurat_invoice_tax_quarter_label($quarter)); ?></strong><span><?php echo esc_html(number_format_i18n((int) $quarter_summary->invoice_count)); ?> فاکتور</span></header>
                                     <dl>
                                         <div><dt>فروش کل</dt><dd><?php echo esc_html(zigurat_invoice_format_money($quarter_summary->grand_total)); ?></dd></div>
@@ -593,7 +604,7 @@ get_header();
                                         <a class="invoice-converted-link" href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$conversion->brand,'view'=>'form','type'=>'invoice','edit'=>$conversion->id))); ?>">فاکتور <bdi class="invoice-number" dir="ltr"><?php echo esc_html(zigurat_invoice_object_number($conversion)); ?></bdi></a>
                                     <?php endif; ?>
                                     <?php if ($latest_correction): ?><a class="invoice-converted-link" href="<?php echo esc_url(zigurat_invoice_page_url(array('view'=>'print','id'=>$latest_correction->id))); ?>" target="_blank" rel="noopener">اصلاحیه <?php echo esc_html(zigurat_invoice_object_number($latest_correction)); ?></a><?php endif; ?>
-                                    <?php if (current_user_can('manage_options') && empty($row->has_related_documents)): ?><form class="invoice-delete-form" method="post" data-invoice-delete-form data-invoice-number="<?php echo esc_attr(zigurat_invoice_object_number($row)); ?>"><input type="hidden" name="delete_invoice" value="1"><input type="hidden" name="invoice_id" value="<?php echo (int) $row->id; ?>"><input type="hidden" name="invoice_return_url" value="<?php echo esc_url($list_return_url); ?>"><?php wp_nonce_field('zigurat_delete_invoice_' . $row->id, 'invoice_delete_nonce'); ?><button type="submit">حذف</button></form><?php endif; ?>
+                                    <?php if (zigurat_is_manager() && empty($row->has_related_documents)): ?><form class="invoice-delete-form" method="post" data-invoice-delete-form data-invoice-number="<?php echo esc_attr(zigurat_invoice_object_number($row)); ?>"><input type="hidden" name="delete_invoice" value="1"><input type="hidden" name="invoice_id" value="<?php echo (int) $row->id; ?>"><input type="hidden" name="invoice_return_url" value="<?php echo esc_url($list_return_url); ?>"><?php wp_nonce_field('zigurat_delete_invoice_' . $row->id, 'invoice_delete_nonce'); ?><button type="submit">حذف</button></form><?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; else: ?>
@@ -605,7 +616,7 @@ get_header();
                 <?php if ($invoice_list['pages'] > 1): ?>
                     <nav class="invoice-pagination no-print" aria-label="صفحه‌بندی فاکتورها">
                         <?php echo wp_kses_post(paginate_links(array(
-                            'base'      => esc_url_raw(add_query_arg('invoice_page', '%#%', zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>$list_type,'filter_buyers'=>$list_buyers,'filter_payment_status'=>$list_payment_status,'filter_tax_status'=>$list_tax_status,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>$list_tax_quarter)))),
+                            'base'      => esc_url_raw(add_query_arg('invoice_page', '%#%', zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>$list_type,'filter_buyers'=>$list_buyers,'filter_payment_status'=>$list_payment_status,'filter_tax_status'=>$list_tax_status,'invoice_search'=>$list_search,'tax_year'=>$list_tax_year,'tax_quarter'=>$list_tax_quarter,'sort'=>$list_sort)))),
                             'format'    => '',
                             'current'   => $invoice_list['page'],
                             'total'     => $invoice_list['pages'],

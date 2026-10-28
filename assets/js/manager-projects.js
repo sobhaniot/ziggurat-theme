@@ -8,6 +8,8 @@
   var dialog = board.querySelector('[data-project-dialog]');
   var form = board.querySelector('[data-project-form]');
   var notice = board.querySelector('[data-project-notice]');
+  window.ziguratFollowupPicker(board);
+  window.ziguratFollowupPush(board, config, showNotice);
   var destructiveActions = form.querySelector('[data-project-destructive-actions]');
   var archiveButton = form.querySelector('[data-project-archive-action]');
   var deleteButton = form.querySelector('[data-project-delete-action]');
@@ -268,6 +270,7 @@
     form.elements.phone.value = project ? project.phone : '';
     form.elements.stage.value = project ? project.stage : 'lead';
     form.elements.followup.value = project ? project.followup : '';
+    if (form.elements.repeat_daily) form.elements.repeat_daily.checked = !!(project && project.repeat_daily);
     renderDocumentSelection('proforma', project && Array.isArray(project.proformas) ? project.proformas : []);
     renderDocumentSelection('invoice', project && Array.isArray(project.invoices) ? project.invoices : []);
     form.elements.notes.value = project ? project.notes : '';
@@ -510,6 +513,7 @@
       meta.className = 'manager-project-card__meta';
       var followup = document.createElement('span');
       followup.textContent = 'پیگیری: ' + record.followup;
+      followup.classList.toggle('is-due', !!record.followup_due && record.stage !== 'delivery');
       meta.appendChild(followup);
       card.appendChild(meta);
     }
@@ -526,6 +530,12 @@
     if (!event || event.key !== 'zigurat_workflow_event' || !event.newValue) return;
     var payload;
     try { payload = JSON.parse(event.newValue); } catch (error) { return; }
+    if (payload && payload.type === 'project-created' && Number(payload.projectId)) {
+      request('zigurat_get_workflow_project', {project_id:Number(payload.projectId)}).then(function (data) {
+        if (data.project && !data.project.archived) appendProjectCard(data.project);
+      }).catch(function (error) { showNotice(error.message, 'error'); });
+      return;
+    }
     if (!payload || payload.type !== 'invoice-saved' || !Number(payload.invoiceId)) return;
     var invoiceId = String(Number(payload.invoiceId));
     var sourceId = String(Number(payload.sourceProformaId || 0));
@@ -769,9 +779,13 @@
     if (archiveJump) {
       var archive = board.querySelector('[data-project-archive]');
       if (archive) {
-        archive.hidden = false;
-        archive.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        loadArchiveRecords();
+        var opening = archive.hidden;
+        archive.hidden = !opening;
+        archiveJump.setAttribute('aria-expanded', opening ? 'true' : 'false');
+        archiveJump.textContent = opening ? 'پنهان کردن آرشیو' : 'دیدن آرشیو';
+        if (opening) {
+          loadArchiveRecords();
+        }
       }
       return;
     }
@@ -1380,4 +1394,10 @@
   initMobileProjectBoard();
   refreshColumnState();
   refreshActiveCollaborators();
+  var requestedProject = Number(new URLSearchParams(window.location.search).get('project'));
+  if (requestedProject) {
+    request('zigurat_get_workflow_project', {project_id:requestedProject}).then(function (data) {
+      if (data.project && !data.project.archived) openDialog(data.project);
+    }).catch(function (error) { showNotice(error.message, 'error'); });
+  }
 }());

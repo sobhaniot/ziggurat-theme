@@ -18,6 +18,8 @@
 /content/
 /hosting/
 /n8n/
+/seo-agent/
+/ziggurat-manager/
 /outputs/
 /diagnose-*.php
 /node_modules/

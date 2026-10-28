@@ -124,7 +124,9 @@ get_header();
                     </div>
                 </div>
                 <?php
-                if ($manager_section === 'applications') {
+                if ($manager_section === 'activity') {
+                    get_template_part('template-parts/manager-activity');
+                } elseif ($manager_section === 'applications') {
                     get_template_part('template-parts/manager-applications');
                 } elseif ($manager_section === 'application-detail') {
                     get_template_part('template-parts/manager-application-resume');

@@ -5,12 +5,25 @@
 .manager-projects__heading > div > span { color: #926812; font-size: 13px; font-weight: 800; }
 .manager-projects__heading h2 { margin: 5px 0 7px; font-size: 30px; }
 .manager-projects__heading p { margin: 0; color: #6e695f; }
-.manager-projects__heading-actions { order: -1; display: flex; align-items: center; gap: 8px; }
-.manager-project-history-controls { display: flex; align-items: center; gap: 5px; }
-.manager-project-history-controls button { min-height: 38px; padding: 7px 10px; border: 1px solid #d8d1c4; border-radius: 8px; background: #fff; color: #514a3e; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
-.manager-project-history-controls button:disabled { opacity: .45; cursor: not-allowed; }
-.manager-project-history-controls button:not(:disabled):hover { border-color: #c89428; background: #fffaf0; }
-.manager-projects__archive-jump { min-height: 42px; padding: 9px 14px; border: 1px solid #c89428; border-radius: 9px; background: #fffaf0; color: #79550f; font: inherit; font-weight: 800; cursor: pointer; }
+.manager-projects__heading-actions { order: -1; display: flex; flex: 0 0 auto; flex-direction: column; align-items: center; gap: 8px; }
+.manager-projects__primary-actions { display: flex; align-self: stretch; align-items: center; gap: 8px; }
+.manager-projects__primary-actions .manager-projects__new { width: 100%; justify-content: center; box-sizing: border-box; }
+.manager-projects__primary-actions > button { flex-shrink: 0; white-space: nowrap; }
+.manager-projects__notification-tools { display: flex; align-self: stretch; justify-content: center; margin: 0; }
+.manager-projects__notification-tools [data-crm-push] { display: inline-flex; align-items: center; justify-content: center; gap: 7px; max-width: 100%; min-height: 38px; padding: 7px 12px; border: 1px solid #d8d1c4; border-radius: 9px; background: #fffaf0; color: #695527; font: inherit; font-size: 12px; cursor: pointer; }
+.manager-projects__notification-tools [data-crm-push].is-enabled { border-color: #91bba0; background: #e9f7ef; color: #22613d; }
+.manager-projects__notification-tools [data-crm-push]:disabled { opacity: .6; cursor: wait; }
+.manager-projects__notification-tools [data-crm-push] { width: 100%; box-sizing: border-box; }
+.manager-project-history-controls { position: fixed; left: max(12px,env(safe-area-inset-left)); top: 50%; z-index: 90; display: grid; gap: 5px; padding: 5px; transform: translateY(-50%); border: 1px solid #dfd3b8; border-radius: 12px; background: #fffdf8; box-shadow: 0 4px 16px rgba(0,0,0,.14); }
+.manager-project-history-controls button { display: grid; width: 48px; height: 52px; min-height: 52px; box-sizing: border-box; place-content: center; gap: 2px; padding: 3px; border: 0; border-radius: 8px; background: #f5ead0; color: #59420d; box-shadow: none; cursor: pointer; }
+.manager-project-history-controls button span { font: 27px/1 Arial,sans-serif; }
+.manager-project-history-controls button small { font: 11px/1.3 Tanha,sans-serif; }
+.manager-project-history-controls button:disabled { opacity: .35; cursor: default; }
+.manager-project-history-controls button:not(:disabled):hover { background: #e8d4a3; }
+.manager-project-history-controls button:focus-visible { outline: 2px solid #8c6714; outline-offset: 2px; }
+@media(max-width:650px) { .manager-project-history-controls { left: max(6px,env(safe-area-inset-left)); top: auto; bottom: max(22px,env(safe-area-inset-bottom)); transform: none; } .manager-project-history-controls button { width:42px; height:46px; min-height:46px; } }
+@media print { .manager-project-history-controls { display:none !important; } }
+.manager-projects__archive-jump { display: block; width: 100%; box-sizing: border-box; min-height: 42px; margin-top: 18px; padding: 9px 14px; border: 0; border-radius: 9px; background: #d4a238; color: #201a0e; font: inherit; font-weight: 800; cursor: pointer; }
 .manager-projects__new { display: inline-flex; min-height: 46px; align-items: center; gap: 7px; padding: 10px 17px; border: 0; border-radius: 9px; background: #d4a238; color: #201a0e; font: inherit; font-weight: 800; cursor: pointer; }
 .manager-projects__new span { font-size: 21px; line-height: 1; }
 .manager-projects__notice { margin: 0 0 16px; padding: 11px 14px; border: 1px solid; border-radius: 9px; }
@@ -57,7 +70,7 @@
 .manager-project-mobile-stages { display: none; }
 .manager-projects__guide { display: flex; align-items: center; gap: 8px; margin: 17px 0 0; padding: 11px 13px; border-right: 3px solid #c79328; background: #faf8f3; color: #716a5d; font-size: 12px; line-height: 1.8; }
 .manager-projects__guide > span { color: #9a6b0c; font-size: 20px; }
-.manager-project-archive { margin-top: 28px; padding: 19px; border: 1px solid #ded8cc; border-radius: 13px; background: #fbfaf7; }
+.manager-project-archive { margin-top: 8px; padding: 19px; border: 1px solid #ded8cc; border-radius: 13px; background: #fbfaf7; }
 .manager-project-archive__heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 16px; }
 .manager-project-archive__heading span { color: #926812; font-size: 12px; font-weight: 800; }
 .manager-project-archive__heading h3 { margin: 4px 0 0; font-size: 22px; }
@@ -234,7 +247,6 @@ body.manager-project-dialog-open { overflow: hidden; overscroll-behavior: none; 
 @media (max-width: 720px) {
   .manager-projects__heading { align-items: stretch; flex-direction: column; }
   .manager-projects__heading-actions { justify-content: flex-end; }
-  .manager-project-history-controls { justify-content: flex-end; }
   .manager-project-archive__heading { align-items: stretch; flex-direction: column; }
   .manager-project-archive__axis { margin-right: 0; }
   .manager-active-collaborators > header { align-items: stretch; flex-direction: column; }

@@ -101,6 +101,7 @@ function zigurat_install_invoice_tables()
         tax_uid varchar(64) NOT NULL DEFAULT '',
         tax_tracking_code varchar(100) NOT NULL DEFAULT '',
         tax_submitted_at datetime NULL DEFAULT NULL,
+        tax_submission_quarter tinyint(1) unsigned NOT NULL DEFAULT 0,
         tax_subject varchar(20) NOT NULL DEFAULT 'original',
         reference_invoice_id bigint(20) unsigned NOT NULL DEFAULT 0,
         tax_note text NULL,
@@ -265,6 +266,22 @@ function zigurat_install_invoice_tables()
     }
 }
 add_action('init', 'zigurat_install_invoice_tables', 22);
+
+// Separate additive migration: do not rerun historical financial backfills.
+function zigurat_install_invoice_tax_submission_quarter()
+{
+    if (get_option('zigurat_invoice_tax_submission_schema_version') === '1') return;
+    global $wpdb;
+    $table = zigurat_invoices_table_name();
+    if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) !== $table) return;
+    if (!$wpdb->get_var("SHOW COLUMNS FROM {$table} LIKE 'tax_submission_quarter'")) {
+        $wpdb->query("ALTER TABLE {$table} ADD COLUMN tax_submission_quarter tinyint(1) unsigned NOT NULL DEFAULT 0");
+    }
+    if ($wpdb->get_var("SHOW COLUMNS FROM {$table} LIKE 'tax_submission_quarter'")) {
+        update_option('zigurat_invoice_tax_submission_schema_version', '1', false);
+    }
+}
+add_action('init', 'zigurat_install_invoice_tax_submission_quarter', 23);
 
 function zigurat_ensure_invoices_page()
 {

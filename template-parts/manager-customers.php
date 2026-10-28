@@ -30,6 +30,7 @@ $managers = zigurat_crm_managers();
         <button type="button" data-crm-quick-filter="active"><span>کل فعال</span><strong data-crm-count="active"><?php echo esc_html(number_format_i18n($summary['active'])); ?></strong></button>
     </div>
 
+    <nav class="manager-crm__views" aria-label="نمای مشتریان"><button type="button" data-crm-view="followups" aria-pressed="true">پیگیری‌های فعال</button><button type="button" data-crm-view="customers" aria-pressed="false">لیست مشتریان</button></nav>
     <div class="manager-crm__toolbar">
         <label><span>جستجو</span><input type="search" data-crm-search placeholder="نام، شرکت، شماره یا موضوع"></label>
         <label><span>وضعیت</span><select data-crm-status-filter><option value="">همه وضعیت‌ها</option><?php foreach ($statuses as $key => $label): ?><option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option><?php endforeach; ?></select></label>
@@ -37,7 +38,11 @@ $managers = zigurat_crm_managers();
     </div>
 
     <div class="manager-crm__list" data-crm-list></div>
+    <div class="manager-crm-directory" data-crm-directory hidden><table><thead><tr><th>مشتری / شرکت</th><th>شماره تماس</th><th>موضوع</th><th>نتیجه / وضعیت</th><th>مسئول پیگیری</th><th>پرونده</th></tr></thead><tbody data-crm-directory-body></tbody></table></div>
+    <nav class="manager-crm__views" data-crm-pages aria-label="صفحه‌بندی مشتریان" hidden><button type="button" data-crm-page-prev>قبلی</button><span data-crm-page-info aria-live="polite"></span><button type="button" data-crm-page-next>بعدی</button></nav>
     <p class="manager-crm__empty" data-crm-empty hidden>موردی با این فیلتر پیدا نشد.</p>
+
+    <dialog class="manager-crm-dialog" data-crm-profile><div class="manager-crm-form"><header><div><span>پرونده مشتری</span><h3 data-crm-profile-title></h3></div><button type="button" data-crm-profile-close aria-label="بستن"></button></header><div class="manager-crm-profile__body" data-crm-profile-body></div><footer><button type="button" data-crm-profile-close>بستن</button></footer></div></dialog>
 
     <dialog class="manager-crm-dialog" data-crm-editor>
         <form class="manager-crm-form" data-crm-form>
@@ -45,14 +50,15 @@ $managers = zigurat_crm_managers();
             <input type="hidden" name="customer_id" value="">
             <div class="manager-crm-form__grid">
                 <label><span>عنوان</span><select name="prefix"><option value="">بدون عنوان</option><option value="شرکت">شرکت</option><option value="جناب آقای">جناب آقای</option><option value="سرکار خانم">سرکار خانم</option></select></label>
-                <label><span>نام مخاطب</span><input type="text" name="name" autocomplete="name"></label>
-                <label><span>نام شرکت</span><input type="text" name="company" autocomplete="organization"></label>
+                <div class="manager-crm-lookup"><label><span>نام مخاطب</span><input type="text" name="name" autocomplete="off" data-crm-contact-search="name" aria-expanded="false"></label><div class="manager-crm-lookup__results" data-crm-contact-results="name" hidden></div></div>
+                <div class="manager-crm-lookup"><label><span>نام شرکت</span><input type="text" name="company" autocomplete="off" data-crm-contact-search="company" aria-expanded="false"></label><div class="manager-crm-lookup__results" data-crm-contact-results="company" hidden></div></div>
                 <label><span>شماره تماس</span><input type="tel" name="phone" autocomplete="tel" required></label>
                 <label class="is-wide"><span>موضوع مذاکره</span><input type="text" name="topic" placeholder="مثلاً تابلو شعبه جدید"></label>
                 <label><span>وضعیت</span><select name="status"><?php foreach ($statuses as $key => $label): ?><option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option><?php endforeach; ?></select></label>
                 <label><span>اولویت</span><select name="priority"><?php foreach ($priorities as $key => $label): ?><option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option><?php endforeach; ?></select></label>
                 <label><span>مسئول پیگیری</span><select name="owner_id"><option value="0">همه مدیران</option><?php foreach ($managers as $manager): ?><option value="<?php echo (int) $manager['id']; ?>"><?php echo esc_html($manager['name']); ?></option><?php endforeach; ?></select></label>
-                <label><span>زمان پیگیری بعدی (شمسی)</span><span class="manager-crm-datetime"><input type="text" name="next_at" dir="ltr" placeholder="انتخاب تاریخ و ساعت" pattern="[0-9۰-۹]{4}/[0-9۰-۹]{1,2}/[0-9۰-۹]{1,2}( [0-9۰-۹]{1,2}:[0-9۰-۹]{1,2})?" readonly data-crm-datetime aria-haspopup="dialog"><button type="button" data-crm-datetime-open aria-label="انتخاب تاریخ و ساعت">تقویم</button></span><small>برای انتخاب تاریخ و ساعت روی فیلد بزنید.</small></label>
+                <label><span>زمان پیگیری بعدی (شمسی)</span><span class="manager-crm-datetime"><input type="text" name="next_at" dir="ltr" placeholder="انتخاب تاریخ و ساعت" pattern="[0-9۰-۹]{4}/[0-9۰-۹]{1,2}/[0-9۰-۹]{1,2}( [0-9۰-۹]{1,2}:[0-9۰-۹]{1,2})?" readonly data-crm-datetime aria-haspopup="dialog"><button type="button" data-crm-datetime-open aria-label="انتخاب تاریخ و ساعت"><?php get_template_part('template-parts/followup-calendar-icon'); ?></button></span><small>برای انتخاب تاریخ و ساعت روی فیلد بزنید.</small></label>
+                <?php get_template_part('template-parts/followup-repeat-toggle'); ?>
                 <label class="is-wide"><span>توضیحات ثابت</span><textarea name="notes" rows="3" placeholder="اطلاعاتی که باید همیشه در پرونده مشتری بماند"></textarea></label>
             </div>
             <section class="manager-crm-history" data-crm-history-wrap hidden><h4>تاریخچه ارتباط</h4><ol data-crm-history></ol></section>
@@ -67,7 +73,8 @@ $managers = zigurat_crm_managers();
             <div class="manager-crm-form__grid">
                 <label class="is-wide"><span>نتیجه تماس یا مذاکره</span><textarea name="note" rows="5" required placeholder="چه صحبتی شد و اقدام بعدی چیست؟"></textarea></label>
                 <label><span>وضعیت جدید</span><select name="status"><?php foreach ($statuses as $key => $label): ?><option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option><?php endforeach; ?></select></label>
-                <label><span>پیگیری بعدی (شمسی)</span><span class="manager-crm-datetime"><input type="text" name="next_at" dir="ltr" placeholder="انتخاب تاریخ و ساعت" pattern="[0-9۰-۹]{4}/[0-9۰-۹]{1,2}/[0-9۰-۹]{1,2}( [0-9۰-۹]{1,2}:[0-9۰-۹]{1,2})?" readonly data-crm-datetime aria-haspopup="dialog"><button type="button" data-crm-datetime-open aria-label="انتخاب تاریخ و ساعت">تقویم</button></span><small>برای انتخاب تاریخ و ساعت روی فیلد بزنید.</small></label>
+                <label><span>پیگیری بعدی (شمسی)</span><span class="manager-crm-datetime"><input type="text" name="next_at" dir="ltr" placeholder="انتخاب تاریخ و ساعت" pattern="[0-9۰-۹]{4}/[0-9۰-۹]{1,2}/[0-9۰-۹]{1,2}( [0-9۰-۹]{1,2}:[0-9۰-۹]{1,2})?" readonly data-crm-datetime aria-haspopup="dialog"><button type="button" data-crm-datetime-open aria-label="انتخاب تاریخ و ساعت"><?php get_template_part('template-parts/followup-calendar-icon'); ?></button></span><small>برای انتخاب تاریخ و ساعت روی فیلد بزنید.</small></label>
+                <?php get_template_part('template-parts/followup-repeat-toggle'); ?>
             </div>
             <footer><button type="submit" class="manager-crm-form__save">ثبت نتیجه تماس</button><button type="button" data-crm-log-close>انصراف</button></footer>
         </form>
@@ -81,18 +88,9 @@ $managers = zigurat_crm_managers();
         <form method="dialog"><div aria-hidden="true">!</div><h3>ایجاد پروژه؟</h3><p>برای <strong data-crm-convert-name>این مشتری</strong> یک کارت در ستون «پیگیری اولیه» مدیریت پروژه ساخته می‌شود.</p><footer><button value="cancel">انصراف</button><button value="confirm">ایجاد پروژه</button></footer></form>
     </dialog>
 
-    <dialog class="manager-crm-date-picker" data-crm-date-picker aria-label="انتخاب تاریخ و ساعت پیگیری">
-        <div class="manager-crm-date-picker__panel">
-            <header><button type="button" data-crm-date-prev aria-label="ماه قبل">‹</button><strong data-crm-date-title></strong><button type="button" data-crm-date-next aria-label="ماه بعد">›</button></header>
-            <div class="manager-crm-date-picker__week"><span>ش</span><span>ی</span><span>د</span><span>س</span><span>چ</span><span>پ</span><span>ج</span></div>
-            <div class="manager-crm-date-picker__days" data-crm-date-days></div>
-            <div class="manager-crm-date-picker__time">
-                <span>زمان پیگیری</span>
-                <label>دقیقه<span class="manager-crm-time-wheel" data-crm-date-minute data-crm-time-wheel="minute"><button type="button" class="manager-crm-time-wheel__trigger" data-crm-time-wheel-toggle aria-label="انتخاب دقیقه" aria-haspopup="listbox" aria-expanded="false"><span data-crm-time-wheel-value>۰۰</span></button><span class="manager-crm-time-wheel__list" data-crm-time-wheel-list role="listbox" aria-label="دقیقه" hidden></span></span></label>
-                <b>:</b>
-                <label>ساعت<span class="manager-crm-time-wheel" data-crm-date-hour data-crm-time-wheel="hour"><button type="button" class="manager-crm-time-wheel__trigger" data-crm-time-wheel-toggle aria-label="انتخاب ساعت" aria-haspopup="listbox" aria-expanded="false"><span data-crm-time-wheel-value>۰۹</span></button><span class="manager-crm-time-wheel__list" data-crm-time-wheel-list role="listbox" aria-label="ساعت" hidden></span></span></label>
-            </div>
-            <footer><button type="button" data-crm-date-today>امروز</button><button type="button" data-crm-date-clear>پاک‌کردن</button><span></span><button type="button" data-crm-date-cancel>انصراف</button><button type="button" class="is-primary" data-crm-date-apply>تأیید زمان</button></footer>
-        </div>
+    <dialog class="manager-crm-confirm manager-crm-confirm--success" data-crm-project-created aria-labelledby="crm-project-created-title" aria-describedby="crm-project-created-message">
+        <form method="dialog"><div aria-hidden="true">✓</div><h3 id="crm-project-created-title">پروژه ایجاد شد</h3><p id="crm-project-created-message">این پیگیری به پروژه تبدیل شد. ادامهٔ پیگیری و ثبت مراحل کار را از بخش «مدیریت پروژه‌ها» انجام دهید.</p><footer><button value="confirm" autofocus>متوجه شدم</button></footer></form>
     </dialog>
+
+    <?php get_template_part('template-parts/manager-followup-picker'); ?>
 </section>

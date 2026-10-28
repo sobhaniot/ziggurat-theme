@@ -708,6 +708,8 @@ function zigurat_workflow_project_record($project)
         'client' => (string) get_post_meta($project->ID, '_zigurat_work_project_client', true),
         'phone' => (string) get_post_meta($project->ID, '_zigurat_work_project_phone', true),
         'followup' => (string) get_post_meta($project->ID, '_zigurat_work_project_followup', true),
+        'followup_due' => ($followup_time = zigurat_project_followup_timestamp(get_post_meta($project->ID, '_zigurat_work_project_followup', true))) && $followup_time <= time(),
+        'repeat_daily' => (bool)get_post_meta($project->ID, '_zigurat_work_project_repeat_daily', true),
         'work_items' => zigurat_workflow_project_work_items($project->ID),
         'notes' => (string) get_post_meta($project->ID, '_zigurat_work_project_notes', true),
         'proforma_ids' => array_values(array_map(static function ($document) { return (int) $document->id; }, $proformas)),
@@ -1003,6 +1005,9 @@ function zigurat_workflow_project_save_from_request($data)
     if ($title === '') {
         return new WP_Error('missing_title', 'نام پروژه را وارد کنید.');
     }
+    $followup_raw = trim((string)wp_unslash($data['followup'] ?? ''));
+    $followup_at = zigurat_project_followup_timestamp($followup_raw);
+    if ($followup_raw !== '' && !$followup_at) return new WP_Error('invalid_followup', 'تاریخ و ساعت پیگیری معتبر نیست؛ از تقویم شمسی انتخاب کنید.');
     $stages = zigurat_workflow_project_stages();
     $stage = sanitize_key(wp_unslash((string) ($data['stage'] ?? 'lead')));
     if (!isset($stages[$stage])) {
@@ -1036,7 +1041,8 @@ function zigurat_workflow_project_save_from_request($data)
     update_post_meta($result, '_zigurat_work_project_phone', sanitize_text_field(wp_unslash((string) ($data['phone'] ?? ''))));
     delete_post_meta($result, '_zigurat_work_project_source');
     delete_post_meta($result, '_zigurat_work_project_value');
-    update_post_meta($result, '_zigurat_work_project_followup', zigurat_workflow_project_normalize_date(wp_unslash((string) ($data['followup'] ?? ''))));
+    if (!$existing || isset($data['repeat_daily_present'])) update_post_meta($result, '_zigurat_work_project_repeat_daily', empty($data['repeat_daily']) ? 0 : 1);
+    update_post_meta($result, '_zigurat_work_project_followup', $followup_at ? zigurat_crm_datetime_input($followup_at) : '');
     $old_work_items = zigurat_workflow_project_work_items($result);
     $new_work_items = zigurat_workflow_project_sanitize_work_items($result, $data['work_items'] ?? array());
     update_post_meta($result, '_zigurat_work_project_work_items', $new_work_items);

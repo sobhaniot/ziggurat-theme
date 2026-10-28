@@ -22,15 +22,23 @@
         '<h2 id="invoice-action-title"></h2>' +
         '<p id="invoice-action-message"></p>' +
         '<div class="invoice-action-dialog__warning" data-action-warning></div>' +
+        '<label class="invoice-action-dialog__field" data-action-quarter-field hidden>فصل ثبت در سامانه مؤدیان<select data-action-quarter><option value="">انتخاب فصل</option><option value="1">بهار</option><option value="2">تابستان</option><option value="3">پاییز</option><option value="4">زمستان</option></select></label>' +
         '<div class="invoice-action-dialog__actions"><button type="button" data-action-cancel>نه، برگرد</button><button type="button" data-action-confirm></button></div>' +
       '</section>';
     document.body.appendChild(wrapper);
     wrapper.addEventListener('click', function (event) {
+      if (event.target.matches('.invoice-action-dialog-backdrop') && !wrapper.querySelector('[data-action-quarter-field]').hidden) return;
       if (event.target.closest('[data-action-confirm]')) closeActionConfirm(true);
       else if (event.target.closest('[data-action-cancel]')) closeActionConfirm(false);
     });
     wrapper.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') { event.preventDefault(); closeActionConfirm(false); }
+      if (event.key === 'Tab') {
+        var controls = Array.from(wrapper.querySelectorAll('button,select')).filter(function (control) { return !control.disabled && !control.closest('[hidden]'); });
+        var first = controls[0], last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
     });
     actionConfirmDialog = wrapper;
     return wrapper;
@@ -52,20 +60,28 @@
     var warning = dialog.querySelector('[data-action-warning]');
     warning.textContent = options.warning || '';
     warning.hidden = !options.warning;
+    var quarterField = dialog.querySelector('[data-action-quarter-field]');
+    var quarterSelect = dialog.querySelector('[data-action-quarter]');
+    quarterField.hidden = !options.requireTaxQuarter;
+    quarterSelect.required = !!options.requireTaxQuarter;
+    quarterSelect.value = options.taxQuarter ? String(options.taxQuarter) : '';
     dialog.hidden = false;
     document.body.classList.add('invoice-action-dialog-open');
-    dialog.querySelector('[data-action-cancel]').focus();
+    (options.requireTaxQuarter ? quarterSelect : dialog.querySelector('[data-action-cancel]')).focus();
   }
 
   function closeActionConfirm(confirmed) {
     if (!actionConfirmDialog || actionConfirmDialog.hidden) return;
+    var quarterSelect = actionConfirmDialog.querySelector('[data-action-quarter]');
+    if (confirmed && quarterSelect.required && !quarterSelect.reportValidity()) return;
+    var chosenQuarter = quarterSelect.required ? Number(quarterSelect.value) : 0;
     var callback = actionConfirmCallback;
     actionConfirmCallback = null;
     actionConfirmDialog.hidden = true;
     document.body.classList.remove('invoice-action-dialog-open');
     if (!confirmed && actionConfirmLastFocus && document.documentElement.contains(actionConfirmLastFocus)) actionConfirmLastFocus.focus({preventScroll:true});
     actionConfirmLastFocus = null;
-    if (confirmed && typeof callback === 'function') callback();
+    if (confirmed && typeof callback === 'function') callback(chosenQuarter);
   }
 
   function ensureLeaveDialog() {
@@ -127,7 +143,16 @@
   });
 
   function setupInvoiceListAutoFilters(root) {
-    (root || document).querySelectorAll('.invoice-list-filters select[name="filter_type"], .invoice-list-filters select[name="filter_status"], .invoice-list-filters select[name="filter_payment_status"], .invoice-list-filters select[name="filter_tax_status"], .invoice-list-filters select[name="tax_year"], .invoice-list-filters select[name="sort"]').forEach(function (select) {
+    function syncDocumentFilters(form) {
+      var type = form.querySelector('[name="filter_type"]');
+      var disabled = type && type.value === 'proforma';
+      form.querySelectorAll('[name="filter_payment_status"], [name="filter_tax_status"], [name="filter_tax_submission_quarter"]').forEach(function (field) {
+        field.disabled = !!disabled;
+        if (disabled) field.value = field.name === 'filter_tax_submission_quarter' ? '0' : '';
+      });
+    }
+    (root || document).querySelectorAll('.invoice-list-filters').forEach(syncDocumentFilters);
+    (root || document).querySelectorAll('.invoice-list-filters select[name="filter_type"], .invoice-list-filters select[name="filter_status"], .invoice-list-filters select[name="filter_payment_status"], .invoice-list-filters select[name="filter_tax_status"], .invoice-list-filters select[name="filter_tax_submission_quarter"], .invoice-list-filters select[name="tax_year"], .invoice-list-filters select[name="sort"]').forEach(function (select) {
       if (select.dataset.autoFilterReady === '1') return;
       select.dataset.autoFilterReady = '1';
       select.addEventListener('change', function () {
@@ -144,6 +169,7 @@
           if (select.value !== '0' && typeSelect) typeSelect.value = 'invoice';
           if (quarterInput) quarterInput.value = '0';
         }
+        syncDocumentFilters(form);
         if (typeof form.requestSubmit === 'function') {
           form.requestSubmit();
         } else {
@@ -259,7 +285,7 @@
           brand: wrapper.dataset.buyerBrand || '',
           term: term
         });
-        ['filter_type', 'tax_year', 'tax_quarter', 'filter_payment_status', 'filter_tax_status', 'invoice_search'].forEach(function (key) {
+        ['filter_type', 'tax_year', 'tax_quarter', 'filter_payment_status', 'filter_tax_status', 'filter_tax_submission_quarter', 'invoice_search'].forEach(function (key) {
           var field = form.elements.namedItem(key);
           if (field) params.set(key, field.value);
         });
@@ -398,15 +424,16 @@
               ? {title:'تسویه کامل فاکتور',message:'فاکتور شماره ' + invoiceNumber + ' تسویه کامل می‌شود. مطمئنی؟',confirmText:'بله، تسویه کامل شود',warning:'بعد از تأیید، ویرایش مستقیم این فاکتور غیرفعال می‌شود.'}
               : {title:'تغییر به پرداخت‌نشده',message:'وضعیت پرداخت فاکتور شماره ' + invoiceNumber + ' به پرداخت‌نشده برمی‌گردد. مطمئنی؟',confirmText:'بله، پرداخت‌نشده شود',warning:'بعد از تأیید، امکان اصلاح مستقیم فاکتور دوباره فعال می‌شود.'})
             : (target === 'submitted'
-              ? {title:'ثبت در سامانه مؤدیان',message:'وضعیت مؤدیان فاکتور شماره ' + invoiceNumber + ' ثبت‌شده می‌شود. مطمئنی؟',confirmText:'بله، ثبت‌شده شود'}
+              ? {title:'ثبت در سامانه مؤدیان',message:'فصل ثبت فاکتور شماره ' + invoiceNumber + ' را مشخص و تأیید کنید.',confirmText:'تأیید ثبت و فصل',requireTaxQuarter:true,taxQuarter:Number(control.dataset.submissionQuarter) || 0}
               : {title:'بازگشت وضعیت مؤدیان',message:'وضعیت فاکتور شماره ' + invoiceNumber + ' به ثبت‌نشده برمی‌گردد. مطمئنی؟',confirmText:'بله، ثبت‌نشده شود'});
-          showActionConfirm(prompt, function () {
+          showActionConfirm(prompt, function (chosenQuarter) {
             if (kind === 'payment') {
               form.querySelector('[name="payment_status_target"]').value = target;
               form.querySelector('[name="confirm_payment_status"]').value = '1';
             } else {
               form.querySelector('[name="tax_status_target"]').value = target;
               form.querySelector('[name="confirm_tax_submission"]').value = '1';
+              form.querySelector('[name="tax_submission_quarter"]').value = target === 'submitted' ? String(chosenQuarter) : '0';
             }
             if (typeof form.requestSubmit === 'function') form.requestSubmit();
             else form.submit();

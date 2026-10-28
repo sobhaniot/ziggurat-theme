@@ -292,6 +292,10 @@ function zigurat_invoice_buyer_filter_matches($term, $brand, $limit = 50, $filte
         $values[] = $wpdb->esc_like($term) . '%';
     }
     $type = $filters['filter_type'] ?? '';
+    if ($type === 'proforma') {
+        $filters['filter_payment_status'] = $filters['filter_tax_status'] = '';
+        $filters['filter_tax_submission_quarter'] = 0;
+    }
     if (in_array($type, array('invoice', 'proforma'), true)) {
         $where[] = 'document_type=%s';
         $values[] = $type;
@@ -303,9 +307,12 @@ function zigurat_invoice_buyer_filter_matches($term, $brand, $limit = 50, $filte
     $payment = $filters['filter_payment_status'] ?? '';
     if ($payment === 'unpaid') { $where[] = "payment_status IN ('unpaid','partial')"; }
     elseif ($payment === 'settled') { $where[] = "payment_status='settled'"; }
-    $tax_status = $filters['filter_tax_status'] ?? '';
+    $tax_filter = zigurat_invoice_tax_filter($filters['filter_tax_status'] ?? '', $filters['filter_tax_submission_quarter'] ?? 0);
+    $tax_status = $tax_filter['status'];
     if ($tax_status === 'not_submitted') { $where[] = "tax_status IN ('not_submitted','ready','rejected')"; }
     elseif ($tax_status === 'submitted') { $where[] = "tax_status IN ('submitted','confirmed','corrected','voided')"; }
+    $submission_quarter = $tax_filter['quarter'];
+    if ($submission_quarter) { $where[] = "brand='official' AND document_type='invoice' AND tax_submission_quarter=%d"; $values[] = $submission_quarter; }
     $invoice_search = $filters['invoice_search'] ?? '';
     if ($invoice_search !== '') {
         $like = '%' . $wpdb->esc_like($invoice_search) . '%';
@@ -334,7 +341,7 @@ function zigurat_invoice_ajax_buyer_filter_lookup()
     $term = isset($_GET['term']) ? sanitize_text_field(wp_unslash($_GET['term'])) : '';
     $brand = isset($_GET['brand']) ? sanitize_key(wp_unslash($_GET['brand'])) : '';
     $filters = array();
-    foreach (array('filter_type', 'tax_year', 'tax_quarter', 'filter_payment_status', 'filter_tax_status', 'invoice_search') as $key) {
+    foreach (array('filter_type', 'tax_year', 'tax_quarter', 'filter_payment_status', 'filter_tax_status', 'filter_tax_submission_quarter', 'invoice_search') as $key) {
         $filters[$key] = isset($_GET[$key]) ? sanitize_text_field(wp_unslash($_GET[$key])) : '';
     }
     $offset = absint($_GET['offset'] ?? 0);
@@ -396,6 +403,13 @@ function zigurat_invoice_xml_value($value)
 function zigurat_invoice_export_rows($args)
 {
     global $wpdb;
+    if (($args['type'] ?? '') === 'proforma') {
+        $args['payment_status'] = $args['tax_status'] = '';
+        $args['submission_quarter'] = 0;
+    }
+    $tax_filter = zigurat_invoice_tax_filter($args['tax_status'] ?? '', $args['submission_quarter'] ?? 0);
+    $args['tax_status'] = $tax_filter['status'];
+    $args['submission_quarter'] = $tax_filter['quarter'];
     $where = array('1=1');
     $values = array();
     if (in_array($args['brand'] ?? '', array('official', 'unofficial'), true)) {
@@ -426,6 +440,8 @@ function zigurat_invoice_export_rows($args)
     } elseif (($args['tax_status'] ?? '') === 'submitted') {
         $where[] = "tax_status IN ('submitted','confirmed','corrected','voided')";
     }
+    $submission_quarter = zigurat_invoice_submission_quarter($args['submission_quarter'] ?? 0);
+    if ($submission_quarter) { $where[] = "brand='official' AND document_type='invoice' AND tax_submission_quarter=%d"; $values[] = $submission_quarter; }
     $tax_year = absint($args['tax_year'] ?? 0);
     $tax_quarter = absint($args['tax_quarter'] ?? 0);
     if ($tax_year > 0) {

@@ -17,12 +17,18 @@
   modal.innerHTML = '<section class="invoice-pdf-dialog" role="dialog" aria-modal="true" aria-labelledby="invoice-pdf-title" tabindex="-1" dir="rtl">' +
     '<h2 id="invoice-pdf-title">چاپ و دریافت PDF</h2><p>اندازهٔ کاغذ A4 است. PDF با جهت انتخاب‌شده ساخته می‌شود و در صورت فعال‌بودن مهر، روی هر صفحه یک مهر قرار می‌گیرد.</p>' +
     '<fieldset class="invoice-pdf-choices"><legend>جهت صفحه</legend><label><input type="radio" name="pdf_orientation" value="landscape" checked>افقی (Landscape)</label><label><input type="radio" name="pdf_orientation" value="portrait">عمودی (Portrait)</label></fieldset>' +
-    '<div class="invoice-pdf-actions"><button type="button" data-pdf-generate>ساخت PDF</button><button type="button" data-pdf-close>بستن</button><a data-pdf-download hidden>دریافت PDF</a><a data-pdf-view target="_blank" rel="noopener" hidden>بازکردن PDF برای چاپ</a></div>' +
+    '<div class="invoice-pdf-actions"><button type="button" data-pdf-generate>ساخت PDF</button><button type="button" data-pdf-close>بستن</button><button type="button" data-pdf-print hidden>دریافت / چاپ PDF</button></div>' +
     '<output class="invoice-pdf-status" aria-live="polite"></output><div class="invoice-pdf-preview"></div></section>';
   document.body.appendChild(modal);
   var status = modal.querySelector('.invoice-pdf-status');
   var preview = modal.querySelector('.invoice-pdf-preview');
   var generateButton = modal.querySelector('[data-pdf-generate]');
+
+  function pdfFilename() {
+    return (document.body.dataset.printFilename || document.title)
+      .replace(/[\\/:*?"<>|\r\n]/g, '-')
+      .replace(/\.pdf$/i, '').trim() + '.pdf';
+  }
 
   function open() {
     if (!modal.hidden) return;
@@ -265,6 +271,29 @@
     } catch (error) { stage.remove(); throw error; }
   }
 
+  function measuredTextRuns(text, levels, measure) {
+    var runs = [], hasGeometry = false;
+    for (var offset = 0; offset < text.length; offset++) {
+      if (/[\r\n]/.test(text[offset])) continue;
+      var rect = measure(offset);
+      var visible = rect.width > 0 && rect.height > 0;
+      hasGeometry = hasGeometry || visible;
+      var last = runs[runs.length - 1];
+      // Firefox can report zero width for the LETTER before a ZWNJ, not only
+      // for the join control. Geometry must never decide whether text exists.
+      if (last && last.end === offset &&
+          (last.level === levels[offset] || (!visible && /[\u200c\u200d]/.test(text[offset]))) &&
+          (!visible || last.pending || Math.abs(last.top - rect.top) < 1)) {
+        last.end = offset + 1;
+        if (visible && last.pending) { last.top = rect.top; last.pending = false; }
+      } else {
+        runs.push({ start: offset, end: offset + 1, level: levels[offset], top: rect.top, pending: !visible });
+      }
+    }
+    // Entirely hidden DOM nodes must remain hidden in the PDF.
+    return hasGeometry ? runs : [];
+  }
+
   // Use the measured DOM only as layout geometry. The actual PDF consists of
   // embedded-font text, vector rules and fills, NOT a screenshot of the page.
   async function vectorPage(pdf, page, element, font, metrics, bidi, images) {
@@ -366,24 +395,13 @@
       var embedding = bidi.getEmbeddingLevels(text, style.direction === 'rtl' ? 'rtl' : 'ltr');
       var levels = embedding.levels;
       var mirrors = bidi.getMirroredCharactersMap(text, levels);
-      var runs = [];
       // Split only at real browser line wraps or bidi-run boundaries, never at
       // individual Arabic letters. Joining/ligatures stay shaped by fontkit.
-      for (var offset = 0; offset < text.length; offset++) {
+      var runs = measuredTextRuns(text, levels, function (offset) {
         range.setStart(node, offset);
         range.setEnd(node, offset + 1);
-        var charRect = range.getBoundingClientRect();
-        var last = runs[runs.length - 1];
-        // Zero-width join controls are part of the shaping context, not a
-        // break between text runs (e.g. پرداخت‌شده). Keep them in the run.
-        if (!charRect.width && /[\u200c\u200d]/.test(text[offset]) && last && last.end === offset) {
-          last.end = offset + 1;
-          continue;
-        }
-        if (!charRect.width || !charRect.height || /[\r\n]/.test(text[offset])) continue;
-        if (last && last.end === offset && last.level === levels[offset] && Math.abs(last.top - charRect.top) < 1) last.end++;
-        else runs.push({ start: offset, end: offset + 1, level: levels[offset], top: charRect.top });
-      }
+        return range.getBoundingClientRect();
+      });
       runs.forEach(function (run) {
         while (run.start < run.end && /\s/.test(text[run.start])) run.start++;
         while (run.end > run.start && /\s/.test(text[run.end - 1])) run.end--;
@@ -410,7 +428,14 @@
     var layout = await paginate(orientation, stamp);
     try {
       var pdf = await PDFLib.PDFDocument.create();
-      pdf.setTitle(document.body.dataset.printFilename || document.title);
+      // Let the PDF viewer open its own print dialog after loading this exact file.
+      // Named Print is supported by Firefox/PDF.js; it never silently prints.
+      pdf.catalog.set(PDFLib.PDFName.of('OpenAction'), pdf.context.obj({
+        S: PDFLib.PDFName.of('Named'), N: PDFLib.PDFName.of('Print')
+      }));
+      // Firefox combines a nonempty metadata title with the URL filename.
+      // Use the named URL fragment below as the single source of filename.
+      pdf.setTitle('');
       pdf.setCreator('Ziggurat');
       pdf.setLanguage('fa-IR');
       pdf.registerFontkit({ create: function (bytes) {
@@ -490,7 +515,7 @@
     var controls = modal.querySelectorAll('button,input');
     controls.forEach(function (control) { control.disabled = true; });
     modal.querySelector('.invoice-pdf-dialog').focus();
-    modal.querySelectorAll('[data-pdf-download],[data-pdf-view]').forEach(function (link) { link.hidden = true; });
+    modal.querySelectorAll('[data-pdf-print]').forEach(function (link) { link.hidden = true; });
     message('در حال آماده‌سازی PDF…');
     try {
       var orientation = modal.querySelector('input:checked').value;
@@ -498,14 +523,7 @@
       var url = URL.createObjectURL(new Blob([result.bytes], { type: 'application/pdf' }));
       if (resultUrl) URL.revokeObjectURL(resultUrl);
       resultUrl = url;
-      var filename = (document.body.dataset.printFilename || document.title).replace(/[\\/:*?"<>|]/g, '-') + '.pdf';
-      var download = modal.querySelector('[data-pdf-download]');
-      download.href = url;
-      download.download = filename;
-      download.hidden = false;
-      var view = modal.querySelector('[data-pdf-view]');
-      view.href = url;
-      view.hidden = false;
+      modal.querySelector('[data-pdf-print]').hidden = false;
       preview.replaceChildren();
       var thumbnails = [];
       try { thumbnails = await previewPdf(result.bytes); }
@@ -520,7 +538,7 @@
         figure.append(image, caption);
         preview.appendChild(figure);
       });
-      message('PDF آماده شد؛ ' + result.pageCount.toLocaleString('fa-IR') + ' صفحه، ' + (orientation === 'portrait' ? 'عمودی' : 'افقی') + '. برای چاپ، فایل PDF را باز کنید.');
+      message('PDF آماده شد؛ ' + result.pageCount.toLocaleString('fa-IR') + ' صفحه، ' + (orientation === 'portrait' ? 'عمودی' : 'افقی') + '. برای دریافت یا چاپ، دکمهٔ «دریافت / چاپ PDF» را بزنید.');
     } catch (error) {
       message(/[\u0600-\u06ff]/.test(error.message || '') ? error.message : 'ساخت PDF در این مرورگر انجام نشد. مرورگر را به‌روز کرده و دوباره تلاش کنید.', true);
       console.error('Invoice PDF generation failed', error);
@@ -529,12 +547,27 @@
       controls.forEach(function (control) { control.disabled = false; });
     }
   }
+  function printPdf() {
+    if (busy || !resultUrl || modal.querySelector('[data-pdf-print]').hidden) return;
+    // Open the exact PDF Blob produced by buildPdf. Never rebuild HTML here.
+    // PDF.js recognizes a .pdf filename in the fragment. This stays on the
+    // same local Blob: no upload, no rendering changes and no extra PDF copy.
+    var printWindow = window.open(resultUrl + '#filename=' + encodeURIComponent(pdfFilename()), '_blank');
+    if (!printWindow) {
+      message('مرورگر پنجرهٔ PDF را مسدود کرده است؛ اجازهٔ بازشدن پنجره را بدهید.', true);
+      return;
+    }
+    // Auto-print lives inside the PDF. A second window.print() here can race
+    // the viewer or open duplicate dialogs; do not render an HTML fallback.
+    message('PDF ساخته‌شده با درخواست بازشدن چاپ باز شد؛ اگر نمایشگر آن را مسدود کرد، دکمهٔ چاپ خود PDF را بزنید.');
+  }
   document.querySelectorAll('[data-invoice-pdf-open]').forEach(function (button) { button.addEventListener('click', open); });
   modal.querySelector('[data-pdf-close]').addEventListener('click', close);
   generateButton.addEventListener('click', generate);
+  modal.querySelector('[data-pdf-print]').addEventListener('click', printPdf);
   modal.querySelectorAll('input[name="pdf_orientation"]').forEach(function (radio) {
     radio.addEventListener('change', function () {
-      modal.querySelectorAll('[data-pdf-download],[data-pdf-view]').forEach(function (link) { link.hidden = true; });
+      modal.querySelectorAll('[data-pdf-print]').forEach(function (link) { link.hidden = true; });
       preview.replaceChildren();
       message('جهت صفحه تغییر کرد؛ برای ساخت خروجی جدید، «ساخت PDF» را بزنید.');
     });

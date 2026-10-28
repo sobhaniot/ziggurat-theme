@@ -159,6 +159,14 @@ function zigurat_seo_description()
         return zigurat_seo_trim_description($custom);
     }
 
+    // SEO Guardian: verified public-page description fallbacks.
+    if (is_page('services') || is_page_template('page-services.php')) {
+        return 'خدمات زیگورات؛ طراحی، ساخت و اجرای تابلوهای تبلیغاتی، حروف برجسته، لایت‌باکس و دکوراسیون تجاری؛ نمونه‌کارها و راه‌های درخواست مشاوره را ببینید.';
+    }
+    if (is_page('contact') || is_page_template('page-contact.php')) {
+        return 'برای مشاوره و استعلام طراحی و اجرای تابلو و دکوراسیون تجاری، راه‌های تماس با زیگورات و فرم ارسال درخواست را در این صفحه ببینید.';
+    }
+
     if (is_front_page()) {
         $front_id = (int) get_option('page_on_front');
         $front_excerpt = $front_id ? get_post_field('post_excerpt', $front_id) : '';

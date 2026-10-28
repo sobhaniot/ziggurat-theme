@@ -34,6 +34,10 @@ body.invoice-action-dialog-open { overflow: hidden; }
 .invoice-action-dialog h2 { margin: 0 0 7px; color: #1d2430; font-size: 24px; }
 .invoice-action-dialog p { margin: 0; color: #5d6674; font-size: 15px; line-height: 1.9; }
 .invoice-action-dialog__warning { margin-top: 14px; padding: 10px 12px; border-radius: 9px; background: #fff4d8; color: #795408; font-size: 12px; font-weight: 700; }
+.invoice-action-dialog__field { display: grid; gap: 7px; margin-top: 16px; text-align: start; font-weight: 700; }
+.invoice-action-dialog__field[hidden] { display: none; }
+.invoice-action-dialog__field select { width: 100%; min-height: 48px; padding: 9px 11px; border: 1px solid #d5d5d5; border-radius: 7px; background: #fff; color: #222; font: inherit; }
+.invoice-tax-quarter { display: block; margin-top: 4px; color: #6e624c; font-size: 11px; font-weight: 600; }
 .invoice-action-dialog__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
 .invoice-action-dialog__actions button { min-height: 48px; padding: 9px 13px; border: 0; border-radius: 9px; font: inherit; font-weight: 900; cursor: pointer; transition: transform .15s ease,filter .15s ease; }
 .invoice-action-dialog__actions button:hover { filter: brightness(.95); transform: translateY(-1px); }

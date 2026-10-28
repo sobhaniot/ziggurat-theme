@@ -1,0 +1,16 @@
+.manager-activity__list { list-style: none; padding: 0; margin: 18px 0; }
+.manager-activity__list li { padding: 12px 0; border-bottom: 1px solid #ddd6c8; line-height: 1.9; overflow-wrap: anywhere; }
+.manager-activity__list time { color: #75674e; font-size: .9em; white-space: nowrap; }
+.manager-activity__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.manager-activity__export { display: inline-flex; min-height: 42px; align-items: center; padding: 8px 14px; border: 1px solid #267348; border-radius: 8px; background: #267348; color: #fff; text-decoration: none; font-weight: 700; box-sizing: border-box; }
+.manager-activity nav { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.manager-activity nav .page-numbers { display: inline-flex; min-width: 38px; min-height: 38px; align-items: center; justify-content: center; padding: 0 9px; border: 1px solid #d9cba9; border-radius: 7px; text-decoration: none; box-sizing: border-box; }
+.manager-activity nav .current { background: #c89b3c; color: #211a0c; border-color: #c89b3c; }
+.manager-activity__page-info { color: #75674e; font-size: 12px; }
+.manager-activity__export-form { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; padding: 14px; border: 1px solid #e4dccd; border-radius: 10px; background: #faf8f3; }
+.manager-activity__export-form label { display: grid; gap: 6px; min-width: 0; width: 220px; font-weight: 700; font-size: 13px; }
+.manager-activity__export-form input:not([type="hidden"]) { width: 100%; min-width: 0; height: 44px; box-sizing: border-box; border: 1px solid #d8d1c4; border-radius: 8px; background: #fff; font: inherit; }
+.manager-activity__export-form button { font: inherit; cursor: pointer; }
+.manager-activity__clear { min-height: 42px; padding: 8px 12px; border: 1px solid #d8d1c4; border-radius: 8px; background: #fff; color: #655b49; }
+.manager-activity__range-error { padding: 10px; color: #8f2626; background: #fff0f0; border-radius: 8px; }
+@media(max-width:650px) { .manager-activity__export-form label { width: 100%; } }

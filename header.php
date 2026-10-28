@@ -5,6 +5,20 @@
     <meta charset="<?php bloginfo('charset'); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <?php wp_head(); ?>
+    <?php if (wp_parse_url(home_url('/'), PHP_URL_HOST) === 'ziggurat.eleknow.com' && !(function_exists('zigurat_is_private_management_page') && zigurat_is_private_management_page()) && !is_page_template('page-login.php')) : ?>
+    <!-- Google Analytics 4: public production pages only. -->
+    <script id="ziggurat-ga4" async src="https://www.googletagmanager.com/gtag/js?id=G-G7ZDZQPP9J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'G-G7ZDZQPP9J', {
+            page_location: window.location.origin + window.location.pathname,
+            allow_google_signals: false,
+            allow_ad_personalization_signals: false
+        });
+    </script>
+    <?php endif; ?>
 </head>
 
 <body <?php body_class(); ?>>

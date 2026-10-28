@@ -551,6 +551,7 @@ function zigurat_invoice_restore_from_trash($trash_id, $use_new_number = false)
     }
     $wpdb->query('COMMIT');
     $restored = zigurat_invoice_get($restored_id);
+    if (function_exists('zigurat_activity_invoice_event')) zigurat_activity_invoice_event($restored, 'از سطل زباله بازیابی شد');
     if ($restored) {
         $restored->_restored_with_new_number = $restored_with_new_number;
     }
@@ -570,6 +571,7 @@ function zigurat_invoice_delete_from_trash($trash_id)
     if ($wpdb->delete(zigurat_invoice_trash_table_name(), array('id'=>absint($trash_id)), array('%d')) !== 1) {
         return new WP_Error('database', 'حذف دائمی فاکتور انجام نشد.');
     }
+    if (function_exists('zigurat_activity_log')) zigurat_activity_log('نسخهٔ سطل زبالهٔ سند با شناسهٔ '.$trash_id.' حذف دائمی شد.');
     return $record;
 }
 
@@ -690,6 +692,7 @@ function zigurat_invoice_delete($invoice_id)
 
     $wpdb->query('COMMIT');
     $invoice = (object) $invoice_row;
+    if (function_exists('zigurat_activity_invoice_event')) zigurat_activity_invoice_event($invoice, 'به سطل زباله منتقل شد');
     return $invoice;
 }
 
@@ -707,14 +710,42 @@ function zigurat_invoice_set_payment_status($invoice_id, $status)
     return new WP_Error('automatic_payment_status', 'وضعیت پرداخت از مبلغ خالص پس از کسورات و مبلغ پرداختی به‌صورت خودکار تعیین می‌شود.');
 }
 
-function zigurat_invoice_set_tax_status($invoice_id, $status)
+function zigurat_invoice_submission_quarter($value)
+{
+    if (!is_scalar($value)) return 0;
+    $value = zigurat_invoice_normalize_digits((string) $value);
+    return in_array($value, array('1','2','3','4'), true) ? (int) $value : 0;
+}
+
+function zigurat_invoice_tax_filter($value, $legacy_quarter = 0)
+{
+    $quarter = 0;
+    $status = '';
+    if (is_string($value) && preg_match('/^quarter_([1-4])$/', $value, $match)) {
+        $quarter = (int) $match[1];
+        $status = 'submitted';
+    } else {
+        $status = in_array($value, array('not_submitted','submitted'), true) ? $value : '';
+        // Preserve old bookmarked season links, but never combine a season
+        // with the contradictory "not submitted" selection.
+        if ($status !== 'not_submitted') $quarter = zigurat_invoice_submission_quarter($legacy_quarter);
+        if ($quarter) $status = 'submitted';
+    }
+    return array('status'=>$status, 'quarter'=>$quarter, 'value'=>$quarter ? 'quarter_'.$quarter : $status);
+}
+
+function zigurat_invoice_set_tax_status($invoice_id, $status, $submission_quarter = 0)
 {
     if (!zigurat_is_manager()) {
         return new WP_Error('forbidden', 'دسترسی به وضعیت مؤدیان مجاز نیست.');
     }
-    $status = sanitize_key($status);
+    $status = is_string($status) ? sanitize_key($status) : '';
     if (!in_array($status, array('not_submitted','submitted'), true)) {
         return new WP_Error('invalid_status', 'وضعیت مؤدیان معتبر نیست.');
+    }
+    $submission_quarter = zigurat_invoice_submission_quarter($submission_quarter);
+    if ($status === 'submitted' && !$submission_quarter) {
+        return new WP_Error('quarter_required', 'فصل ثبت فاکتور در سامانه مؤدیان را انتخاب کنید.');
     }
     $invoice = zigurat_invoice_get($invoice_id);
     if (!$invoice || $invoice->brand !== 'official' || $invoice->document_type !== 'invoice') {
@@ -737,9 +768,16 @@ function zigurat_invoice_set_tax_status($invoice_id, $status)
         $wpdb->query('ROLLBACK');
         return new WP_Error('not_found', 'فاکتور پیدا نشد.');
     }
+    if ($locked_invoice->brand !== 'official' || $locked_invoice->document_type !== 'invoice'
+        || $locked_invoice->status !== 'issued'
+        || in_array(($locked_invoice->tax_status ?? ''), array('confirmed','corrected','voided'), true)) {
+        $wpdb->query('ROLLBACK');
+        return new WP_Error('stale_invoice', 'وضعیت فاکتور تغییر کرده است؛ لیست را تازه‌سازی کنید.');
+    }
     $update = array(
         'tax_status'=>$status,
-        'tax_submitted_at'=>$status === 'submitted' ? $now : null,
+        'tax_submitted_at'=>$status === 'submitted' ? (($locked_invoice->tax_submitted_at ?? null) ?: $now) : null,
+        'tax_submission_quarter'=>$status === 'submitted' ? $submission_quarter : 0,
         'updated_by'=>get_current_user_id(),
         'updated_at'=>$now,
     );
@@ -766,6 +804,7 @@ function zigurat_invoice_set_tax_status($invoice_id, $status)
         }
     }
     $wpdb->query('COMMIT');
+    if (function_exists('zigurat_activity_invoice_event')) zigurat_activity_invoice_event(zigurat_invoice_get($invoice_id), 'وضعیت سامانهٔ مؤدیان آن به «'.$status.'» تغییر کرد');
     return zigurat_invoice_get($invoice_id);
 }
 
@@ -1310,7 +1349,14 @@ function zigurat_invoice_sort_sql($sort, $qualified = false)
 function zigurat_invoice_list($args = array())
 {
     global $wpdb;
-    $args = wp_parse_args($args, array('brand'=>'','type'=>'','status'=>'','payment_status'=>'','tax_status'=>'','customer_names'=>array(),'search'=>'','tax_year'=>0,'tax_quarter'=>0,'page'=>1,'per_page'=>30,'sort'=>'default'));
+    $args = wp_parse_args($args, array('brand'=>'','type'=>'','status'=>'','payment_status'=>'','tax_status'=>'','customer_names'=>array(),'search'=>'','tax_year'=>0,'tax_quarter'=>0,'submission_quarter'=>0,'page'=>1,'per_page'=>30,'sort'=>'default'));
+    if ($args['type'] === 'proforma') {
+        $args['payment_status'] = $args['tax_status'] = '';
+        $args['submission_quarter'] = 0;
+    }
+    $tax_filter = zigurat_invoice_tax_filter($args['tax_status'], $args['submission_quarter']);
+    $args['tax_status'] = $tax_filter['status'];
+    $args['submission_quarter'] = $tax_filter['quarter'];
     $where = array('1=1');
     $values = array();
     if (in_array($args['brand'], array('official','unofficial'), true)) { $where[]='brand=%s'; $values[]=$args['brand']; }
@@ -1325,6 +1371,8 @@ function zigurat_invoice_list($args = array())
     elseif ($args['payment_status'] === 'settled') { $where[]='payment_status=%s'; $values[]='settled'; }
     if ($args['tax_status'] === 'not_submitted') { $where[]="tax_status IN ('not_submitted','ready','rejected')"; }
     elseif ($args['tax_status'] === 'submitted') { $where[]="tax_status IN ('submitted','confirmed','corrected','voided')"; }
+    $submission_quarter = zigurat_invoice_submission_quarter($args['submission_quarter']);
+    if ($submission_quarter) { $where[]="brand='official' AND document_type='invoice' AND tax_submission_quarter=%d"; $values[]=$submission_quarter; }
     if (absint($args['tax_year'])) { $where[]='tax_year=%d'; $values[]=absint($args['tax_year']); }
     if (absint($args['tax_quarter']) >= 1 && absint($args['tax_quarter']) <= 4) { $where[]='tax_quarter=%d'; $values[]=absint($args['tax_quarter']); }
     if ($args['search'] !== '') {

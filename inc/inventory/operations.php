@@ -89,6 +89,7 @@ function zigurat_inventory_create_category($name)
         return new WP_Error('duplicate_category', 'این دسته قبلاً تعریف شده است.');
     }
     $inserted = $wpdb->insert($table, array('name' => $name, 'created_at' => current_time('mysql', true)), array('%s', '%s'));
+    if ($inserted && function_exists('zigurat_activity_log')) zigurat_activity_log('دستهٔ جدید انبار ثبت شد.');
     return $inserted ? (int) $wpdb->insert_id : new WP_Error('database', 'ثبت دسته انجام نشد.');
 }
 
@@ -131,6 +132,7 @@ function zigurat_inventory_create_product($category_id, $name)
         return new WP_Error('database', 'ثبت موجودی اولیه کالا انجام نشد.');
     }
     $wpdb->query('COMMIT');
+    if (function_exists('zigurat_activity_log')) zigurat_activity_log('کالای جدید انبار با شناسهٔ '.$product_id.' ثبت شد.');
     return $product_id;
 }
 
@@ -268,6 +270,10 @@ function zigurat_inventory_adjust_stock($action, $data)
     }
     $transaction_id = (int) $wpdb->insert_id;
     $wpdb->query('COMMIT');
+    if (function_exists('zigurat_activity_log')) {
+        $activity_action = array('in'=>'ورود', 'out'=>'خروج', 'add'=>'ورود', 'remove'=>'خروج')[$action] ?? 'تغییر موجودی';
+        zigurat_activity_log('گردش انبار «'.$item_name.'»: '.$activity_action.' به مقدار '.$quantity.' ثبت شد.');
+    }
     return array('transaction_id' => $transaction_id, 'quantity_before' => $before, 'quantity_after' => $after);
 }
 
@@ -375,6 +381,7 @@ function zigurat_inventory_reverse_transaction($transaction_id, $reason)
         return new WP_Error('database', 'اتصال سند ابطال به تراکنش اصلی انجام نشد.');
     }
     $wpdb->query('COMMIT');
+    if (function_exists('zigurat_activity_log')) zigurat_activity_log('گردش انبار شمارهٔ '.$transaction_id.' ابطال شد.');
     return array('reversal_id' => $reversal_id, 'quantity_before' => $before, 'quantity_after' => $after);
 }
 

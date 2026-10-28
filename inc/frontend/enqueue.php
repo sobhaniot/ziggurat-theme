@@ -105,6 +105,12 @@ function zigurat_enqueue_assets()
         zigurat_enqueue_theme_style('manager');
         zigurat_enqueue_theme_script('manager-login');
         $manager_section = isset($_GET['manager-section']) ? sanitize_key(wp_unslash($_GET['manager-section'])) : '';
+        if ($manager_section === 'activity' && current_user_can('manage_options')) {
+            zigurat_enqueue_theme_style('manager-followup-controls');
+            zigurat_enqueue_theme_script('manager-followup-controls');
+            zigurat_enqueue_theme_script('manager-activity', array('zigurat-manager-followup-controls'));
+            zigurat_enqueue_theme_style('manager-activity');
+        }
         if ($manager_section === 'pricing') {
             zigurat_enqueue_theme_style('invoice');
             zigurat_enqueue_theme_script('pricing-calculator');
@@ -135,16 +141,25 @@ function zigurat_enqueue_assets()
             ));
         }
         if ($manager_section === 'projects' && zigurat_is_manager()) {
+            zigurat_enqueue_theme_style('manager-followup-controls');
+            zigurat_enqueue_theme_script('manager-followup-controls');
             zigurat_enqueue_theme_style('manager-projects');
-            zigurat_enqueue_theme_script('manager-projects');
+            zigurat_enqueue_theme_script('manager-projects', array('zigurat-manager-followup-controls'));
+            $project_vapid = zigurat_crm_vapid_keys();
             wp_localize_script('zigurat-manager-projects', 'ziguratWorkflowProjects', array(
                 'ajaxUrl' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('zigurat_workflow_projects'),
+                'pushNonce' => wp_create_nonce('zigurat_crm'),
+                'vapidPublicKey' => (string) ($project_vapid['public'] ?? ''),
+                'serviceWorkerUrl' => add_query_arg('zigurat_manager_sw', '1', home_url('/')),
+                'serviceWorkerScope' => trailingslashit((string) (wp_parse_url(home_url('/'), PHP_URL_PATH) ?: '/')),
             ));
         }
         if ($manager_section === 'customers' && zigurat_is_manager()) {
+            zigurat_enqueue_theme_style('manager-followup-controls');
+            zigurat_enqueue_theme_script('manager-followup-controls');
             zigurat_enqueue_theme_style('manager-customers');
-            zigurat_enqueue_theme_script('manager-customers');
+            zigurat_enqueue_theme_script('manager-customers', array('zigurat-manager-followup-controls'));
             $vapid_keys = zigurat_crm_vapid_keys();
             wp_localize_script('zigurat-manager-customers', 'ziguratCrmConfig', array(
                 'ajaxUrl' => admin_url('admin-ajax.php'),

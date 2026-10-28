@@ -15,7 +15,7 @@ $due_count = 0;
 $ready_invoice_count = 0;
 foreach ($records as $record) {
     $grouped[$record['stage']][] = $record;
-    if ($record['stage'] !== 'delivery' && $record['followup'] !== '' && $today !== '' && strcmp($record['followup'], $today) <= 0) {
+    if ($record['stage'] !== 'delivery' && !empty($record['followup_due'])) {
         $due_count++;
     }
     if ($record['stage'] === 'delivery' && !$record['invoice_ids']) {
@@ -35,6 +35,11 @@ $stage_classes = array(
 );
 ?>
 <section class="manager-projects" data-project-board>
+    <?php get_template_part('template-parts/manager-followup-picker'); ?>
+    <div class="manager-project-history-controls" aria-label="Project history" dir="ltr">
+        <button type="button" data-project-undo disabled aria-label="Undo" title="Undo"><span aria-hidden="true">↶</span><small>Undo</small></button>
+        <button type="button" data-project-redo disabled aria-label="Redo" title="Redo"><span aria-hidden="true">↷</span><small>Redo</small></button>
+    </div>
     <header class="manager-projects__heading">
         <div>
             <span>مدیریت یکپارچه فروش و اجرا</span>
@@ -42,12 +47,10 @@ $stage_classes = array(
             <p>مسیر هر مشتری را از اولین پیگیری تا تحویل و صدور فاکتور نهایی مدیریت کنید.</p>
         </div>
         <div class="manager-projects__heading-actions">
-            <div class="manager-project-history-controls" aria-label="واگرد و ازنوِ جابه‌جایی کارت‌ها">
-                <button type="button" data-project-undo disabled aria-label="واگرد آخرین جابه‌جایی" title="واگرد آخرین جابه‌جایی">↶ واگرد</button>
-                <button type="button" data-project-redo disabled aria-label="ازنو آخرین جابه‌جایی" title="ازنو آخرین جابه‌جایی">↷ ازنو</button>
+            <div class="manager-projects__primary-actions">
+                <button type="button" class="manager-projects__new" data-project-new><span aria-hidden="true">＋</span> پروژه جدید</button>
             </div>
-            <button type="button" class="manager-projects__new" data-project-new><span aria-hidden="true">＋</span> پروژه جدید</button>
-            <button type="button" class="manager-projects__archive-jump" data-project-archive-jump>دیدن آرشیو</button>
+            <div class="manager-projects__notification-tools"><button type="button" data-crm-push><span aria-hidden="true">🔔</span><b>فعال‌کردن اعلان این دستگاه</b></button></div>
         </div>
     </header>
 
@@ -70,10 +73,7 @@ $stage_classes = array(
                 <div class="manager-project-column__cards" data-project-card-list>
                     <?php foreach ($grouped[$stage_key] as $record): ?>
                         <?php
-                        $is_due = $record['stage'] !== 'delivery'
-                            && $record['followup'] !== ''
-                            && $today !== ''
-                            && strcmp($record['followup'], $today) <= 0;
+                        $is_due = $record['stage'] !== 'delivery' && !empty($record['followup_due']);
                         ?>
                         <article class="manager-project-card" draggable="true" data-project-card data-project-id="<?php echo (int) $record['id']; ?>" data-project-current-stage="<?php echo esc_attr($record['stage']); ?>" data-project-proforma-id="<?php echo (int) $record['proforma_id']; ?>" data-project-proforma-ids="<?php echo esc_attr(implode(',', $record['proforma_ids'])); ?>" data-project-invoice-id="<?php echo (int) $record['invoice_id']; ?>" data-project-invoice-ids="<?php echo esc_attr(implode(',', $record['invoice_ids'])); ?>" data-project-conversion-url="<?php echo esc_url($record['conversion_url']); ?>">
                             <div class="manager-project-card__top">
@@ -112,6 +112,7 @@ $stage_classes = array(
 
     <p class="manager-projects__guide"><span aria-hidden="true">↔</span> کارت را بکشید و در ستون جدید رها کنید؛ انتقال به «تحویل و فاکتور» فاکتور را خودکار می‌سازد و پس از تسویه، پروژه بایگانی می‌شود. در موبایل با سوایپ روی صفحه یا کارت، مرحله را عوض کنید؛ برای انتقال کارت، انگشت را روی آن نگه دارید تا بلند شود و سپس به چپ یا راست ببرید.</p>
 
+    <button type="button" class="manager-projects__archive-jump" data-project-archive-jump aria-controls="manager-project-archive" aria-expanded="false">دیدن آرشیو</button>
     <section id="manager-project-archive" class="manager-project-archive" aria-labelledby="manager-project-archive-title" data-project-archive hidden>
         <header class="manager-project-archive__heading">
             <div><span>سوابق تکمیل‌شده</span><h3 id="manager-project-archive-title">آرشیو زمانی پروژه‌ها</h3></div>
@@ -178,7 +179,8 @@ $stage_classes = array(
                     <label>نام مشتری (شرکت / سرکارخانم / جناب آقای)<input type="text" name="client" maxlength="180" placeholder="مثلاً شرکت زیگورات یا جناب آقای احمدی"></label>
                     <label>شماره تماس<input type="tel" name="phone" maxlength="50" dir="ltr"></label>
                     <label>مرحله پروژه<select name="stage"><?php foreach ($stages as $key => $label): ?><option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option><?php endforeach; ?></select></label>
-                    <label>تاریخ پیگیری بعدی<input type="text" name="followup" inputmode="numeric" dir="ltr" placeholder="1405/07/20" pattern="[0-9۰-۹]{4}/[0-9۰-۹]{1,2}/[0-9۰-۹]{1,2}"></label>
+                    <label>پیگیری بعدی (شمسی)<span class="manager-crm-datetime"><input type="text" name="followup" inputmode="none" dir="ltr" placeholder="انتخاب تاریخ و ساعت" data-crm-datetime readonly autocomplete="off"><button type="button" data-crm-datetime-open aria-label="انتخاب تاریخ و ساعت پیگیری"><?php get_template_part('template-parts/followup-calendar-icon'); ?></button></span></label>
+                <?php get_template_part('template-parts/followup-repeat-toggle'); ?>
                     <label class="is-wide manager-project-document-picker">اتصال به پیش‌فاکتورها<span class="manager-project-document-picker__selected" data-document-selected="proforma" aria-live="polite"></span><select size="5" data-document-picker="proforma"><?php foreach ($proformas as $document): ?><option value="<?php echo (int) $document->id; ?>" data-document-number="<?php echo esc_attr(zigurat_invoice_object_number($document)); ?>"><?php echo esc_html(zigurat_workflow_project_document_label($document)); ?></option><?php endforeach; ?></select><small>برای افزودن، روی پیش‌فاکتور دوبار کلیک کنید. کارت تکراری خودکار در همین پروژه ادغام می‌شود.</small></label>
                     <label class="is-wide manager-project-document-picker">اتصال به فاکتورهای نهایی<span class="manager-project-document-picker__selected" data-document-selected="invoice" aria-live="polite"></span><select size="5" data-document-picker="invoice"><?php foreach ($invoices as $document): ?><option value="<?php echo (int) $document->id; ?>" data-document-number="<?php echo esc_attr(zigurat_invoice_object_number($document)); ?>"><?php echo esc_html(zigurat_workflow_project_document_label($document)); ?></option><?php endforeach; ?></select><small>برای افزودن، روی فاکتور دوبار کلیک کنید؛ انتخاب‌ها از بالای کادر قابل حذف هستند.</small></label>
                     <label class="is-wide">یادداشت‌ها<textarea name="notes" rows="4" maxlength="3000" placeholder="نتیجه تماس‌ها، توافق‌ها و نکات اجرایی پروژه"></textarea></label>

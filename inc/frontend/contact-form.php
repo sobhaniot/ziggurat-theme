@@ -75,6 +75,9 @@ function zigurat_handle_contact_form()
         ? $contact_details['email']
         : get_option('admin_email');
     $status = wp_mail($recipient, $subject, $body, $headers) ? 'sent' : 'error';
+    if ($status === 'sent' && function_exists('zigurat_guardian_issue_lead_receipt')) {
+        zigurat_guardian_issue_lead_receipt();
+    }
     set_transient($rate_key, $attempts + 1, HOUR_IN_SECONDS);
     $redirect_with_status($status);
 }

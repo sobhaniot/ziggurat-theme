@@ -15,14 +15,76 @@
   var logForm = root.querySelector('[data-crm-log-form]');
   var confirmDialog = root.querySelector('[data-crm-confirm]');
   var convertConfirmDialog = root.querySelector('[data-crm-convert-confirm]');
-  var datePicker = root.querySelector('[data-crm-date-picker]');
-  var datePickerTitle = root.querySelector('[data-crm-date-title]');
-  var datePickerDays = root.querySelector('[data-crm-date-days]');
-  var datePickerHour = root.querySelector('[data-crm-date-hour]');
-  var datePickerMinute = root.querySelector('[data-crm-date-minute]');
+  var projectCreatedDialog = root.querySelector('[data-crm-project-created]');
   var search = root.querySelector('[data-crm-search]');
   var statusFilter = root.querySelector('[data-crm-status-filter]');
   var dueFilter = root.querySelector('[data-crm-due-filter]');
+  var currentView = 'followups';
+  var directoryRecords = [];
+  var directoryPage = 1;
+  var directoryPages = 1;
+  var directoryRequest = 0;
+  var directoryTimer;
+  var pagination = root.querySelector('[data-crm-pages]');
+  var restartingCustomer = false;
+  var directory = root.querySelector('[data-crm-directory]');
+  var directoryBody = root.querySelector('[data-crm-directory-body]');
+  var profile = root.querySelector('[data-crm-profile]');
+
+  function openProfile(record) {
+    if (!record || !profile) return;
+    root.querySelector('[data-crm-profile-title]').textContent = record.company || record.name || 'بدون نام';
+    var body = root.querySelector('[data-crm-profile-body]');
+    body.replaceChildren();
+    var details = make('dl', 'manager-crm-profile__details');
+    [['نام مخاطب', (record.prefix ? record.prefix + ' ' : '') + (record.name || '—')], ['شرکت', record.company], ['شماره تماس', record.phone], ['موضوع', record.topic], ['وضعیت', record.status_label], ['اولویت', record.priority_label], ['مسئول پیگیری', record.owner_name], ['پیگیری بعدی', record.next_label]].forEach(function (pair) {
+      details.appendChild(make('dt', '', pair[0]));
+      details.appendChild(make('dd', '', pair[1] || '—'));
+    });
+    body.appendChild(details);
+    body.appendChild(make('h4', '', 'توضیحات ثابت'));
+    body.appendChild(make('p', 'manager-crm-profile__notes', record.notes || 'توضیحی ثبت نشده است.'));
+    if (record.project_id) {
+      var project = make('a', 'manager-crm-profile__project', 'مشاهده پروژه مرتبط');
+      var url = new URL(window.location.href);
+      url.search = '';
+      url.searchParams.set('manager-section', 'projects');
+      url.searchParams.set('project', String(record.project_id));
+      project.href = url.href;
+      body.appendChild(project);
+    }
+    body.appendChild(make('h4', '', 'تاریخچه ارتباط و اقدامات'));
+    var history = make('ol', 'manager-crm-profile__history');
+    (record.history || []).forEach(function (entry) {
+      var item = make('li');
+      item.appendChild(make('p', '', entry.note || 'بدون توضیح'));
+      item.appendChild(make('small', '', [entry.time, entry.user].filter(Boolean).join(' · ')));
+      history.appendChild(item);
+    });
+    if (!history.children.length) body.appendChild(make('p', '', 'هنوز اقدامی ثبت نشده است.'));
+    else body.appendChild(history);
+    profile.showModal();
+    lockEditorBackground(true);
+  }
+  if (profile) profile.addEventListener('close', function () { lockEditorBackground(false); });
+
+  function renderCustomerRow(record) {
+    var row = make('tr');
+    [record.company || record.name || 'بدون نام', record.phone, record.topic, record.status_label, record.owner_name].forEach(function (value) { row.appendChild(make('td', '', value || '—')); });
+    var cell = make('td');
+    var button = make('button', '', 'مشاهده پرونده');
+    button.type = 'button';
+    button.dataset.crmProfile = String(record.id);
+    cell.appendChild(button);
+    if (['won', 'lost'].indexOf(record.status) !== -1) {
+      var restart = make('button', '', 'شروع مجدد پیگیری');
+      restart.type = 'button';
+      restart.dataset.crmRestart = String(record.id);
+      cell.appendChild(restart);
+    }
+    row.appendChild(cell);
+    return row;
+  }
 
   function request(action, data) {
     var body = data instanceof FormData ? data : new FormData();
@@ -45,7 +107,7 @@
 
   function recordById(id) {
     id = Number(id || 0);
-    return records.find(function (record) { return Number(record.id) === id; }) || null;
+    return directoryRecords.concat(records).find(function (record) { return Number(record.id) === id; }) || null;
   }
 
   function make(tag, className, text) {
@@ -72,210 +134,6 @@
       if (match[4]) value += ' ' + match[4].padStart(2, '0') + ':' + match[5].padStart(2, '0');
     }
     field.value = value;
-  }
-
-  var jalaliMonths = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
-  var activeDateField = null;
-  var pickerValue = { year: 1405, month: 1, day: 1, hour: 9, minute: 0 };
-
-  function integerDivide(first, second) { return Math.trunc(first / second); }
-  function integerMod(first, second) { return first - Math.trunc(first / second) * second; }
-
-  function jalaliCalculation(year, withoutLeap) {
-    var breaks = [-61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181, 1210, 1635, 2060, 2097, 2192, 2262, 2324, 2394, 2456, 3178];
-    var gregorianYear = year + 621;
-    var leapJ = -14;
-    var previous = breaks[0];
-    var jump = 0;
-    var current;
-    var index;
-    if (year < previous || year >= breaks[breaks.length - 1]) throw new Error('سال شمسی خارج از محدوده است.');
-    for (index = 1; index < breaks.length; index++) {
-      current = breaks[index];
-      jump = current - previous;
-      if (year < current) break;
-      leapJ += integerDivide(jump, 33) * 8 + integerDivide(integerMod(jump, 33), 4);
-      previous = current;
-    }
-    var distance = year - previous;
-    leapJ += integerDivide(distance, 33) * 8 + integerDivide(integerMod(distance, 33) + 3, 4);
-    if (integerMod(jump, 33) === 4 && jump - distance === 4) leapJ++;
-    var leapG = integerDivide(gregorianYear, 4) - integerDivide((integerDivide(gregorianYear, 100) + 1) * 3, 4) - 150;
-    var march = 20 + leapJ - leapG;
-    if (withoutLeap) return { gregorianYear: gregorianYear, march: march };
-    if (jump - distance < 6) distance = distance - jump + integerDivide(jump + 4, 33) * 33;
-    var leap = integerMod(integerMod(distance + 1, 33) - 1, 4);
-    if (leap === -1) leap = 4;
-    return { leap: leap, gregorianYear: gregorianYear, march: march };
-  }
-
-  function gregorianToDay(year, month, day) {
-    var value = integerDivide((year + integerDivide(month - 8, 6) + 100100) * 1461, 4)
-      + integerDivide(153 * integerMod(month + 9, 12) + 2, 5) + day - 34840408;
-    return value - integerDivide(integerDivide(year + 100100 + integerDivide(month - 8, 6), 100) * 3, 4) + 752;
-  }
-
-  function dayToGregorian(dayNumber) {
-    var value = 4 * dayNumber + 139361631;
-    value = value + integerDivide(integerDivide(4 * dayNumber + 183187720, 146097) * 3, 4) * 4 - 3908;
-    var offset = integerDivide(integerMod(value, 1461), 4) * 5 + 308;
-    var day = integerDivide(integerMod(offset, 153), 5) + 1;
-    var month = integerMod(integerDivide(offset, 153), 12) + 1;
-    var year = integerDivide(value, 1461) - 100100 + integerDivide(8 - month, 6);
-    return { year: year, month: month, day: day };
-  }
-
-  function jalaliToDay(year, month, day) {
-    var calculation = jalaliCalculation(year, true);
-    return gregorianToDay(calculation.gregorianYear, 3, calculation.march) + (month - 1) * 31 - integerDivide(month, 7) * (month - 7) + day - 1;
-  }
-
-  function dayToJalali(dayNumber) {
-    var gregorian = dayToGregorian(dayNumber);
-    var year = gregorian.year - 621;
-    var calculation = jalaliCalculation(year, false);
-    var firstFarvardin = gregorianToDay(gregorian.year, 3, calculation.march);
-    var passed = dayNumber - firstFarvardin;
-    if (passed >= 0) {
-      if (passed <= 185) return { year: year, month: 1 + integerDivide(passed, 31), day: integerMod(passed, 31) + 1 };
-      passed -= 186;
-    } else {
-      year--;
-      passed += 179;
-      if (calculation.leap === 1) passed++;
-    }
-    return { year: year, month: 7 + integerDivide(passed, 30), day: integerMod(passed, 30) + 1 };
-  }
-
-  function todayJalali() {
-    var today = new Date();
-    return dayToJalali(gregorianToDay(today.getFullYear(), today.getMonth() + 1, today.getDate()));
-  }
-
-  function jalaliMonthLength(year, month) {
-    if (month <= 6) return 31;
-    if (month <= 11) return 30;
-    return jalaliCalculation(year, false).leap === 0 ? 30 : 29;
-  }
-
-  function persianNumber(value) {
-    return String(value).replace(/\d/g, function (digit) { return '۰۱۲۳۴۵۶۷۸۹'[Number(digit)]; });
-  }
-
-  function parsePickerValue(value) {
-    var normalized = String(value || '').replace(/[۰-۹٠-٩]/g, function (digit) {
-      var persian = '۰۱۲۳۴۵۶۷۸۹'.indexOf(digit);
-      return String(persian >= 0 ? persian : '٠١٢٣٤٥٦٧٨٩'.indexOf(digit));
-    });
-    var match = normalized.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2}))?$/);
-    if (!match) return null;
-    var parsed = { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]), hour: Number(match[4] || 9), minute: Number(match[5] || 0) };
-    if (parsed.month < 1 || parsed.month > 12 || parsed.day < 1 || parsed.day > jalaliMonthLength(parsed.year, parsed.month) || parsed.hour > 23 || parsed.minute > 59) return null;
-    return parsed;
-  }
-
-  function timeWheelValue(type) {
-    return type === 'hour' ? pickerValue.hour : pickerValue.minute;
-  }
-
-  function wrapTimeWheelValue(value, limit) {
-    return ((value % limit) + limit) % limit;
-  }
-
-  function normalizeMinuteToFive(value) {
-    return Math.min(55, Math.max(0, Math.round(Number(value || 0) / 5) * 5));
-  }
-
-  function renderTimeWheel(wheel) {
-    if (!wheel) return;
-    var type = wheel.dataset.crmTimeWheel;
-    var current = timeWheelValue(type);
-    if (type === 'minute') {
-      current = normalizeMinuteToFive(current);
-      pickerValue.minute = current;
-    }
-    var limit = type === 'hour' ? 24 : 60;
-    var step = type === 'hour' ? 1 : 5;
-    var valueTarget = wheel.querySelector('[data-crm-time-wheel-value]');
-    var list = wheel.querySelector('[data-crm-time-wheel-list]');
-    if (valueTarget) valueTarget.textContent = persianNumber(String(current).padStart(2, '0'));
-    if (!list) return;
-    list.innerHTML = '';
-    for (var offset = -2; offset <= 2; offset++) {
-      var value = wrapTimeWheelValue(current + (offset * step), limit);
-      var option = make('button', 'manager-crm-time-wheel__option distance-' + Math.abs(offset), persianNumber(String(value).padStart(2, '0')));
-      option.type = 'button';
-      option.dataset.crmTimeOption = String(value);
-      option.dataset.crmTimeType = type;
-      option.setAttribute('role', 'option');
-      option.setAttribute('aria-selected', offset === 0 ? 'true' : 'false');
-      option.tabIndex = offset === 0 ? 0 : -1;
-      list.appendChild(option);
-    }
-  }
-
-  function fillTimeOptions() {
-    renderTimeWheel(datePickerHour);
-    renderTimeWheel(datePickerMinute);
-  }
-
-  function closeTimeWheels(except) {
-    if (!datePicker) return;
-    datePicker.querySelectorAll('[data-crm-time-wheel]').forEach(function (wheel) {
-      if (wheel === except) return;
-      var list = wheel.querySelector('[data-crm-time-wheel-list]');
-      var toggle = wheel.querySelector('[data-crm-time-wheel-toggle]');
-      if (list) list.hidden = true;
-      if (toggle) toggle.setAttribute('aria-expanded', 'false');
-    });
-  }
-
-  function setTimeWheelValue(type, value) {
-    if (type === 'hour') pickerValue.hour = wrapTimeWheelValue(Number(value), 24);
-    if (type === 'minute') pickerValue.minute = normalizeMinuteToFive(wrapTimeWheelValue(Number(value), 60));
-    renderTimeWheel(type === 'hour' ? datePickerHour : datePickerMinute);
-  }
-
-  function renderDatePicker() {
-    var today = todayJalali();
-    datePickerTitle.textContent = jalaliMonths[pickerValue.month - 1] + ' ' + persianNumber(pickerValue.year);
-    datePickerDays.innerHTML = '';
-    var gregorianFirst = dayToGregorian(jalaliToDay(pickerValue.year, pickerValue.month, 1));
-    var firstWeekday = (new Date(gregorianFirst.year, gregorianFirst.month - 1, gregorianFirst.day).getDay() + 1) % 7;
-    for (var blank = 0; blank < firstWeekday; blank++) datePickerDays.appendChild(make('span', 'is-empty'));
-    var monthLength = jalaliMonthLength(pickerValue.year, pickerValue.month);
-    for (var day = 1; day <= monthLength; day++) {
-      var dayButton = make('button', '', persianNumber(day));
-      dayButton.type = 'button';
-      dayButton.dataset.crmDateDay = String(day);
-      if (day === pickerValue.day) dayButton.classList.add('is-selected');
-      if (pickerValue.year === today.year && pickerValue.month === today.month && day === today.day) dayButton.classList.add('is-today');
-      datePickerDays.appendChild(dayButton);
-    }
-    fillTimeOptions();
-  }
-
-  function openDatePicker(field) {
-    if (!datePicker || !field) return;
-    activeDateField = field;
-    var parsed = parsePickerValue(field.value);
-    if (parsed) {
-      pickerValue = parsed;
-    } else {
-      var now = new Date();
-      now.setSeconds(0, 0);
-      now.setMinutes(Math.ceil(now.getMinutes() / 5) * 5);
-      var roundedDate = dayToJalali(gregorianToDay(now.getFullYear(), now.getMonth() + 1, now.getDate()));
-      pickerValue = { year: roundedDate.year, month: roundedDate.month, day: roundedDate.day, hour: now.getHours(), minute: now.getMinutes() };
-    }
-    renderDatePicker();
-    datePicker.showModal();
-    document.documentElement.classList.add('has-crm-picker-open');
-    document.body.classList.add('has-crm-picker-open');
-  }
-
-  function closeDatePicker() {
-    if (datePicker && datePicker.open) datePicker.close();
   }
 
   function renderCard(record) {
@@ -348,10 +206,21 @@
   }
 
   function render() {
+    if (pagination) pagination.hidden = currentView !== 'customers';
+    if (currentView === 'customers' && pagination) {
+      list.hidden = true;
+      directory.hidden = false;
+      loadDirectory();
+      return;
+    }
+    directoryRequest++;
     var term = (search.value || '').trim().toLowerCase();
     var status = statusFilter.value;
     var due = dueFilter.value;
     list.innerHTML = '';
+    if (directoryBody) directoryBody.replaceChildren();
+    list.hidden = currentView === 'customers';
+    if (directory) directory.hidden = currentView !== 'customers';
     var visible = records.filter(function (record) {
       var haystack = [record.name, record.company, record.phone, record.topic].join(' ').toLowerCase();
       if (term && haystack.indexOf(term) === -1) return false;
@@ -360,8 +229,45 @@
       if (due !== 'all' && due !== 'active' && record.due_state !== due) return false;
       return true;
     });
-    visible.forEach(function (record) { list.appendChild(renderCard(record)); });
+    if (currentView === 'customers') visible.sort(function (a, b) {
+      return (Number(b.last_activity) || 0) - (Number(a.last_activity) || 0) || Number(b.id) - Number(a.id);
+    });
+    visible.forEach(function (record) {
+      if (currentView === 'customers' && directoryBody) directoryBody.appendChild(renderCustomerRow(record));
+      else list.appendChild(renderCard(record));
+    });
     empty.hidden = visible.length > 0;
+  }
+
+  function loadDirectory() {
+    var sequence = ++directoryRequest;
+    var data = new FormData();
+    data.set('page', String(directoryPage));
+    data.set('search', search.value.trim());
+    data.set('status', statusFilter.value);
+    data.set('due', dueFilter.value);
+    directory.setAttribute('aria-busy', 'true');
+    directoryBody.replaceChildren();
+    empty.hidden = true;
+    root.querySelector('[data-crm-page-info]').textContent = 'در حال دریافت…';
+    root.querySelector('[data-crm-page-prev]').disabled = true;
+    root.querySelector('[data-crm-page-next]').disabled = true;
+    return request('zigurat_crm_directory', data).then(function (result) {
+      if (sequence !== directoryRequest || currentView !== 'customers') return;
+      directoryRecords = result.records || [];
+      directoryPage = result.page;
+      directoryPages = result.pages;
+      directoryRecords.forEach(function (record) { directoryBody.appendChild(renderCustomerRow(record)); });
+      empty.hidden = directoryRecords.length > 0;
+      root.querySelector('[data-crm-page-info]').textContent = 'صفحه ' + Number(directoryPage).toLocaleString('fa-IR') + ' از ' + Number(directoryPages).toLocaleString('fa-IR') + ' · ' + Number(result.total).toLocaleString('fa-IR') + ' مشتری';
+      root.querySelector('[data-crm-page-prev]').disabled = directoryPage <= 1;
+      root.querySelector('[data-crm-page-next]').disabled = directoryPage >= directoryPages;
+    }).catch(function (error) {
+      if (sequence === directoryRequest && currentView === 'customers') {
+        root.querySelector('[data-crm-page-info]').textContent = 'دریافت لیست انجام نشد؛ دوباره جستجو کنید.';
+        showNotice(error.message, 'error');
+      }
+    }).finally(function () { if (sequence === directoryRequest) directory.removeAttribute('aria-busy'); });
   }
 
   function updateSummary(summary) {
@@ -375,6 +281,7 @@
   function reloadRecords(message) {
     return request('zigurat_crm_list').then(function (data) {
       records = data.records || [];
+      directoryRecords = [];
       updateSummary(data.summary);
       render();
       if (message) showNotice(message, 'success');
@@ -386,12 +293,71 @@
     if (field) field.value = value == null ? '' : value;
   }
 
+  var contactSequence = 0;
+  var contactTimer;
+  function closeContactSuggestions() {
+    contactSequence++;
+    clearTimeout(contactTimer);
+    root.querySelectorAll('[data-crm-contact-results]').forEach(function (panel) { panel.hidden = true; });
+    root.querySelectorAll('[data-crm-contact-search]').forEach(function (input) { input.setAttribute('aria-expanded', 'false'); });
+  }
+  function applyContact(contact) {
+    // Copy identity only: never reuse customer/project IDs or another job's data.
+    ['prefix', 'name', 'company', 'phone'].forEach(function (key) { setFormValue(key, contact[key] || ''); });
+    closeContactSuggestions();
+  }
+  root.querySelectorAll('[data-crm-contact-search]').forEach(function (input) {
+    var panel = root.querySelector('[data-crm-contact-results="' + input.dataset.crmContactSearch + '"]');
+    input.addEventListener('input', function () {
+      closeContactSuggestions();
+      if (form.elements.customer_id.value || input.value.trim().length < 2) return;
+      var sequence = contactSequence;
+      var term = input.value.trim();
+      contactTimer = window.setTimeout(function () {
+        var data = new FormData();
+        data.set('term', term);
+        data.set('field', input.dataset.crmContactSearch);
+        request('zigurat_crm_contacts', data).then(function (result) {
+          if (sequence !== contactSequence || !editor.open || input.value.trim() !== term) return;
+          panel.replaceChildren();
+          (result.contacts || []).forEach(function (contact) {
+            var button = make('button');
+            button.type = 'button';
+            button.appendChild(make('strong', '', [contact.company, contact.name].filter(Boolean).join(' · ')));
+            button.appendChild(make('small', '', contact.phone || 'بدون شماره'));
+            button.addEventListener('click', function () { applyContact(contact); });
+            panel.appendChild(button);
+          });
+          if (!panel.children.length) panel.appendChild(make('p', '', 'مخاطب قبلی پیدا نشد؛ مشخصات جدید را وارد کنید.'));
+          panel.hidden = false;
+          input.setAttribute('aria-expanded', 'true');
+        }).catch(function () {
+          if (sequence !== contactSequence || !editor.open) return;
+          panel.replaceChildren(make('p', '', 'دریافت پیشنهادها ممکن نشد؛ می‌توانید مشخصات را دستی وارد کنید.'));
+          panel.hidden = false;
+          input.setAttribute('aria-expanded', 'true');
+        });
+      }, 300);
+    });
+    input.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !panel.hidden) { event.preventDefault(); event.stopPropagation(); closeContactSuggestions(); }
+      if (event.key === 'ArrowDown' && !panel.hidden) {
+        var first = panel.querySelector('button');
+        if (first) { event.preventDefault(); first.focus(); }
+      }
+    });
+  });
+  document.addEventListener('click', function (event) { if (!event.target.closest('.manager-crm-lookup')) closeContactSuggestions(); });
+  editor.addEventListener('close', closeContactSuggestions);
+
   function lockEditorBackground(locked) {
     document.documentElement.classList.toggle('has-crm-editor-open', locked);
     document.body.classList.toggle('has-crm-editor-open', locked);
   }
 
-  function openEditor(record) {
+  function openEditor(record, restart) {
+    closeContactSuggestions();
+    restartingCustomer = !!restart;
     form.reset();
     root.querySelector('[data-crm-form-title]').textContent = record ? 'ویرایش مشتری' : 'مشتری جدید';
     root.querySelector('[data-crm-delete]').hidden = !record;
@@ -408,6 +374,16 @@
       setFormValue('status', 'new');
       setFormValue('priority', 'normal');
       setFormValue('owner_id', String(config.currentUserId || 0));
+    }
+    if (form.elements.repeat_daily) form.elements.repeat_daily.checked = !!(record && record.repeat_daily);
+    Array.from(form.elements.status.options).forEach(function (option) {
+      option.disabled = !!restart && ['new', 'contacting', 'waiting'].indexOf(option.value) === -1;
+    });
+    if (restart) {
+      setFormValue('status', 'new');
+      setFormValue('next_at', '');
+      if (form.elements.repeat_daily) form.elements.repeat_daily.checked = false;
+      root.querySelector('[data-crm-form-title]').textContent = 'شروع مجدد پیگیری مشتری';
     }
     var historyWrap = root.querySelector('[data-crm-history-wrap]');
     var history = root.querySelector('[data-crm-history]');
@@ -427,13 +403,14 @@
     lockEditorBackground(true);
   }
 
-  editor.addEventListener('close', function () { lockEditorBackground(false); });
+  editor.addEventListener('close', function () { lockEditorBackground(!!(projectCreatedDialog && projectCreatedDialog.open)); });
 
   function openLog(record) {
     logForm.reset();
     logForm.elements.customer_id.value = record.id;
     logForm.elements.status.value = record.status;
     logForm.elements.next_at.value = record.next_input || '';
+    if (logForm.elements.repeat_daily) logForm.elements.repeat_daily.checked = !!record.repeat_daily;
     root.querySelector('[data-crm-log-title]').textContent = 'پیگیری ' + (record.company || record.name);
     logDialog.showModal();
   }
@@ -464,133 +441,53 @@
     });
   }
 
-  root.querySelectorAll('[data-crm-datetime]').forEach(function (field) {
-    field.addEventListener('click', function () { openDatePicker(field); });
-    field.addEventListener('keydown', function (event) {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        openDatePicker(field);
-      }
-    });
-  });
-
-  if (datePicker) {
-    datePicker.addEventListener('click', function (event) {
-      var wheelToggle = event.target.closest('[data-crm-time-wheel-toggle]');
-      if (wheelToggle) {
-        var wheel = wheelToggle.closest('[data-crm-time-wheel]');
-        var wheelList = wheel.querySelector('[data-crm-time-wheel-list]');
-        var opening = wheelList.hidden;
-        closeTimeWheels(opening ? wheel : null);
-        wheelList.hidden = !opening;
-        wheelToggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
-        if (opening) {
-          renderTimeWheel(wheel);
-          window.requestAnimationFrame(function () {
-            var selected = wheelList.querySelector('[aria-selected="true"]');
-            if (selected) selected.focus({ preventScroll: true });
-          });
-        }
-        return;
-      }
-      var timeOption = event.target.closest('[data-crm-time-option]');
-      if (timeOption) {
-        var optionWheel = timeOption.closest('[data-crm-time-wheel]');
-        setTimeWheelValue(timeOption.dataset.crmTimeType, timeOption.dataset.crmTimeOption);
-        window.requestAnimationFrame(function () {
-          var selected = optionWheel.querySelector('[aria-selected="true"]');
-          if (selected) selected.focus({ preventScroll: true });
-        });
-        return;
-      }
-      if (!event.target.closest('[data-crm-time-wheel]')) closeTimeWheels();
-      var button = event.target.closest('button');
-      if (!button) return;
-      if (button.matches('[data-crm-date-prev],[data-crm-date-next]')) {
-        var change = button.matches('[data-crm-date-prev]') ? -1 : 1;
-        pickerValue.month += change;
-        if (pickerValue.month < 1) { pickerValue.month = 12; pickerValue.year--; }
-        if (pickerValue.month > 12) { pickerValue.month = 1; pickerValue.year++; }
-        pickerValue.day = Math.min(pickerValue.day, jalaliMonthLength(pickerValue.year, pickerValue.month));
-        renderDatePicker();
-      }
-      if (button.matches('[data-crm-date-day]')) {
-        pickerValue.day = Number(button.dataset.crmDateDay);
-        renderDatePicker();
-      }
-      if (button.matches('[data-crm-date-today]')) {
-        var today = todayJalali();
-        pickerValue.year = today.year;
-        pickerValue.month = today.month;
-        pickerValue.day = today.day;
-        renderDatePicker();
-      }
-      if (button.matches('[data-crm-date-clear]')) {
-        if (activeDateField) {
-          activeDateField.value = '';
-          activeDateField.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-        closeDatePicker();
-      }
-      if (button.matches('[data-crm-date-cancel]')) closeDatePicker();
-      if (button.matches('[data-crm-date-apply]')) {
-        if (activeDateField) {
-          activeDateField.value = String(pickerValue.year).padStart(4, '0') + '/' + String(pickerValue.month).padStart(2, '0') + '/' + String(pickerValue.day).padStart(2, '0') + ' ' + String(pickerValue.hour).padStart(2, '0') + ':' + String(pickerValue.minute).padStart(2, '0');
-          activeDateField.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-        closeDatePicker();
-      }
-    });
-    datePicker.addEventListener('keydown', function (event) {
-      var wheel = event.target.closest('[data-crm-time-wheel]');
-      if (!wheel) return;
-      var type = wheel.dataset.crmTimeWheel;
-      var step = type === 'hour' ? 1 : 5;
-      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-        event.preventDefault();
-        setTimeWheelValue(type, timeWheelValue(type) + (event.key === 'ArrowUp' ? -step : step));
-        window.requestAnimationFrame(function () {
-          var selected = wheel.querySelector('[aria-selected="true"]');
-          if (selected) selected.focus({ preventScroll: true });
-        });
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        closeTimeWheels();
-        var toggle = wheel.querySelector('[data-crm-time-wheel-toggle]');
-        if (toggle) toggle.focus({ preventScroll: true });
-      }
-    });
-    datePicker.querySelectorAll('[data-crm-time-wheel-list]').forEach(function (wheelList) {
-      wheelList.addEventListener('wheel', function (event) {
-        event.preventDefault();
-        var wheel = wheelList.closest('[data-crm-time-wheel]');
-        var type = wheel.dataset.crmTimeWheel;
-        var step = type === 'hour' ? 1 : 5;
-        setTimeWheelValue(type, timeWheelValue(type) + (event.deltaY > 0 ? step : -step));
-      }, { passive: false });
-    });
-    datePicker.addEventListener('close', function () {
-      closeTimeWheels();
-      document.documentElement.classList.remove('has-crm-picker-open');
-      document.body.classList.remove('has-crm-picker-open');
-      activeDateField = null;
-    });
+  function showProjectCreated(data) {
+    // Never announce creation when the server failed or did not return a project.
+    if (!data || !Number(data.project_id) || !projectCreatedDialog || projectCreatedDialog.open) return;
+    try {
+      window.localStorage.setItem('zigurat_workflow_event', JSON.stringify({type:'project-created', projectId:Number(data.project_id), timestamp:Date.now()}));
+    } catch (error) { /* The project is saved even when browser storage is unavailable. */ }
+    projectCreatedDialog.showModal();
+    lockEditorBackground(true);
   }
+  if (projectCreatedDialog) {
+    projectCreatedDialog.addEventListener('close', function () { lockEditorBackground(false); });
+  }
+
+  window.ziguratFollowupPicker(root);
 
   root.addEventListener('click', function (event) {
     var button = event.target.closest('button');
     if (!button) return;
-    if (button.matches('[data-crm-datetime-open]')) {
-      openDatePicker(button.parentElement.querySelector('[data-crm-datetime]'));
-      return;
+    if (button.matches('[data-crm-page-prev],[data-crm-page-next]')) {
+      directoryPage = Math.max(1, Math.min(directoryPages, directoryPage + (button.matches('[data-crm-page-next]') ? 1 : -1)));
+      render();
     }
+    if (button.matches('[data-crm-view]')) {
+      currentView = button.dataset.crmView;
+      directoryPage = 1;
+      statusFilter.value = '';
+      dueFilter.value = currentView === 'customers' ? 'all' : 'active';
+      root.querySelectorAll('[data-crm-view]').forEach(function (tab) { tab.setAttribute('aria-pressed', String(tab.dataset.crmView === currentView)); });
+      render();
+    }
+    if (button.matches('[data-crm-profile]')) {
+      var profileData = new FormData();
+      profileData.set('customer_id', button.dataset.crmProfile);
+      button.disabled = true;
+      request('zigurat_crm_profile', profileData).then(function (data) { openProfile(data.record); })
+        .catch(function (error) { showNotice(error.message, 'error'); })
+        .finally(function () { button.disabled = false; });
+    }
+    if (button.matches('[data-crm-profile-close]')) profile.close();
     if (button.matches('[data-crm-new]')) openEditor(null);
+    if (button.matches('[data-crm-restart]')) openEditor(recordById(button.dataset.crmRestart), true);
     if (button.matches('[data-crm-close]')) editor.close();
     if (button.matches('[data-crm-log-close]')) logDialog.close();
     if (button.matches('[data-crm-edit]')) openEditor(recordById(button.dataset.crmEdit));
     if (button.matches('[data-crm-log]')) openLog(recordById(button.dataset.crmLog));
     if (button.matches('[data-crm-quick-filter]')) {
+      directoryPage = 1;
       dueFilter.value = button.dataset.crmQuickFilter;
       render();
     }
@@ -602,6 +499,7 @@
         convertData.set('customer_id', customerId);
         button.disabled = true;
         return request('zigurat_crm_convert_project', convertData).then(function (data) {
+          showProjectCreated(data);
           return reloadRecords(data.message);
         }).catch(function (error) {
           showNotice(error.message, 'error');
@@ -623,13 +521,26 @@
     }
   });
 
-  form.addEventListener('submit', function (event) {
+  form.addEventListener('submit', async function (event) {
     event.preventDefault();
     normalizeJalaliDateTime(form.elements.next_at);
     var saveButton = form.querySelector('[type="submit"]');
+    if (form.elements.status.value === 'won' && !(recordById(form.elements.customer_id.value) || {}).project_id) {
+      var accepted = await askConvert({name: form.elements.name.value, company: form.elements.company.value});
+      if (!accepted) return;
+    }
     saveButton.disabled = true;
     request('zigurat_crm_save', new FormData(form)).then(function (data) {
       editor.close();
+      if (restartingCustomer) {
+        currentView = 'followups';
+        dueFilter.value = 'active';
+        statusFilter.value = '';
+        search.value = '';
+        root.querySelectorAll('[data-crm-view]').forEach(function (tab) { tab.setAttribute('aria-pressed', String(tab.dataset.crmView === currentView)); });
+        restartingCustomer = false;
+      }
+      showProjectCreated(data);
       return reloadRecords(data.message);
     }).catch(function (error) { showNotice(error.message, 'error'); }).finally(function () { saveButton.disabled = false; });
   });
@@ -646,65 +557,21 @@
   });
 
   [search, statusFilter, dueFilter].forEach(function (control) {
-    control.addEventListener(control === search ? 'input' : 'change', render);
+    control.addEventListener(control === search ? 'input' : 'change', function () {
+      directoryPage = 1;
+      clearTimeout(directoryTimer);
+      if (control === search && currentView === 'customers') {
+        directoryRequest++;
+        directoryTimer = window.setTimeout(render, 300);
+      } else render();
+    });
   });
 
   root.querySelectorAll('input[name="next_at"]').forEach(function (field) {
     field.addEventListener('blur', function () { normalizeJalaliDateTime(field); });
   });
 
-  function applicationServerKey(value) {
-    if (!value || typeof value !== 'string') throw new Error('کلید اعلان سایت ساخته نشده است؛ تنظیمات OpenSSL سرور را بررسی کنید.');
-    var padding = '='.repeat((4 - value.length % 4) % 4);
-    var raw = atob((value + padding).replace(/-/g, '+').replace(/_/g, '/'));
-    var key = Uint8Array.from(raw, function (char) { return char.charCodeAt(0); });
-    if (key.length !== 65 || key[0] !== 4) throw new Error('کلید اعلان سایت معتبر نیست؛ کلید VAPID باید دوباره ساخته شود.');
-    return key;
-  }
-
-  function enablePush(button) {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
-      showNotice('مرورگر این دستگاه از اعلان تحت وب پشتیبانی نمی‌کند.', 'error');
-      return;
-    }
-    if (!window.isSecureContext) {
-      showNotice('برای اعلان این دستگاه باید سایت با HTTPS باز شود.', 'error');
-      return;
-    }
-    button.disabled = true;
-    Notification.requestPermission().then(function (permission) {
-      if (permission !== 'granted') throw new Error('اجازه اعلان داده نشد. آن را از تنظیمات مرورگر فعال کنید.');
-      return navigator.serviceWorker.register(config.serviceWorkerUrl, { scope: config.serviceWorkerScope || '/' });
-    }).then(function (registration) {
-      return registration.pushManager.getSubscription().then(function (subscription) {
-        return subscription || registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: applicationServerKey(config.vapidPublicKey) });
-      });
-    }).then(function (subscription) {
-      var data = new FormData();
-      data.set('subscription', JSON.stringify(subscription.toJSON()));
-      return request('zigurat_crm_push_subscribe', data);
-    }).then(function (data) {
-      button.classList.add('is-enabled');
-      button.querySelector('b').textContent = 'اعلان این دستگاه فعال است';
-      showNotice(data.message, 'success');
-    }).catch(function (error) {
-      showNotice(error.message || 'فعال‌سازی اعلان انجام نشد.', 'error');
-    }).finally(function () { button.disabled = false; });
-  }
-
-  var pushButton = root.querySelector('[data-crm-push]');
-  if (pushButton) pushButton.addEventListener('click', function () { enablePush(pushButton); });
-  if (pushButton && 'serviceWorker' in navigator && 'PushManager' in window && Notification.permission === 'granted') {
-    navigator.serviceWorker.getRegistration(config.serviceWorkerScope || '/').then(function (registration) {
-      if (!registration) return null;
-      return registration.pushManager.getSubscription();
-    }).then(function (subscription) {
-      if (!subscription) return;
-      pushButton.classList.add('is-enabled');
-      pushButton.querySelector('b').textContent = 'اعلان این دستگاه فعال است';
-    }).catch(function () {});
-  }
-
+  window.ziguratFollowupPush(root, config, showNotice);
   render();
   var requestedCustomer = new URLSearchParams(window.location.search).get('customer');
   if (requestedCustomer && recordById(requestedCustomer)) openEditor(recordById(requestedCustomer));

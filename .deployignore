@@ -13,7 +13,12 @@
 /.codex/
 /.agents/
 /AGENTS.md
+/*-AGENT-LOCATION.md
+/*-MANAGER-LOCATION.md
+/ZigguratAgents/
+/.secrets/
 /tests/
+/tools/
 /docs/
 /content/
 /hosting/

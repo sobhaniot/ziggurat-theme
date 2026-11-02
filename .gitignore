@@ -13,6 +13,13 @@
 /.idea/
 /.codex/
 /.agents/
+/AGENTS.md
+/*-AGENT-LOCATION.md
+/*-MANAGER-LOCATION.md
+/ZigguratAgents/
+/seo-agent/
+/ziggurat-manager/
+/.secrets/
 /node_modules/
 /.venv/
 /venv/
@@ -52,6 +59,10 @@ Desktop.ini
 /*.sql
 /*.sqlite
 /*.sqlite3
+
+# Generated updater packages and test fixtures.
+/tools/*/dist/
+/tools/*/tests/fixture-run-*/
 
 /assets/images/*
 !/assets/images/zigurat-logo.svg

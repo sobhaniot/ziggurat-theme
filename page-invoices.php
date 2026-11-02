@@ -541,6 +541,7 @@ get_header();
                     <button type="submit">اعمال فیلتر</button>
                     <?php if($list_type||$list_buyers||$list_status||$list_payment_status||$list_tax_status||$list_search||$list_tax_year||$list_tax_quarter||$list_submission_quarter): ?><a href="<?php echo esc_url(zigurat_invoice_page_url(array('brand'=>$brand,'view'=>'list','filter_type'=>'','tax_year'=>0,'sort'=>$list_sort))); ?>">حذف فیلتر</a><?php endif; ?>
                 </form>
+                    <div class="invoice-filter-totals"><span>جمع کل نتایج لیست: <strong><?php echo esc_html(zigurat_invoice_format_money($invoice_list['totals']['grand_total'])); ?></strong></span><span>جمع پس از کسورات: <strong><?php echo esc_html(zigurat_invoice_format_money($invoice_list['totals']['net_total'])); ?></strong></span><span>ماندهٔ خالص فاکتورها: <strong><?php echo esc_html(zigurat_invoice_format_money($invoice_list['totals']['net_balance'])); ?></strong></span></div>
                 <?php if ($tax_summary): ?>
                     <section class="invoice-tax-period no-print" aria-labelledby="invoice-tax-period-title">
                         <div class="invoice-tax-period__heading">

@@ -3,8 +3,9 @@ if (!defined('ABSPATH') || !zigurat_is_manager()) {
     exit;
 }
 
+$trash_view = isset($_GET['project_view']) && $_GET['project_view'] === 'trash' && current_user_can('manage_options');
 $stages = zigurat_workflow_project_stages();
-$records = zigurat_workflow_project_records();
+$records = $trash_view ? array() : zigurat_workflow_project_records();
 // The archive is loaded on demand after the board is visible. Loading every
 // trashed project (and its complete history) here made the initial page slow.
 $archived_records = array();
@@ -34,7 +35,7 @@ $stage_classes = array(
     'payment' => 'is-payment',
 );
 ?>
-<section class="manager-projects" data-project-board>
+<section class="manager-projects <?php echo $trash_view ? 'is-trash-view' : ''; ?>" data-project-board <?php if ($trash_view): ?>data-project-trash-view<?php endif; ?>>
     <?php get_template_part('template-parts/manager-followup-picker'); ?>
     <div class="manager-project-history-controls" aria-label="Project history" dir="ltr">
         <button type="button" data-project-undo disabled aria-label="Undo" title="Undo"><span aria-hidden="true">↶</span><small>Undo</small></button>
@@ -47,12 +48,23 @@ $stage_classes = array(
             <p>مسیر هر مشتری را از اولین پیگیری تا تحویل و صدور فاکتور نهایی مدیریت کنید.</p>
         </div>
         <div class="manager-projects__heading-actions">
-            <div class="manager-projects__primary-actions">
+            <div class="manager-projects__primary-actions <?php echo current_user_can('manage_options') ? 'has-project-trash' : ''; ?>">
                 <button type="button" class="manager-projects__new" data-project-new><span aria-hidden="true">＋</span> پروژه جدید</button>
+                <?php if (current_user_can('manage_options')): ?><a class="manager-projects__trash-jump" href="<?php echo esc_url(zigurat_workflow_project_url($trash_view ? array() : array('project_view' => 'trash'))); ?>"><?php echo $trash_view ? 'بازگشت به مدیریت پروژه‌ها' : 'سطل زباله'; ?></a><?php endif; ?>
             </div>
             <div class="manager-projects__notification-tools"><button type="button" data-crm-push><span aria-hidden="true">🔔</span><b>فعال‌کردن اعلان این دستگاه</b></button></div>
         </div>
     </header>
+
+    <?php if (current_user_can('manage_options')): ?>
+        <section id="manager-project-trash" class="manager-project-trash" aria-labelledby="manager-project-trash-title" data-project-trash hidden>
+            <header class="manager-project-trash__heading">
+                <div><span>فقط مدیرکل</span><h3 id="manager-project-trash-title">سطل زبالهٔ پروژه‌ها</h3></div>
+                <strong data-project-trash-count>۰ کارت</strong>
+            </header>
+            <div data-project-trash-content><p class="manager-project-trash__loading">برای نمایش کارت‌ها، کمی صبر کنید…</p></div>
+        </section>
+    <?php endif; ?>
 
     <div class="manager-projects__notice" data-project-notice role="status" aria-live="polite" hidden></div>
 
@@ -205,7 +217,7 @@ $stage_classes = array(
                     <button type="button" class="manager-project-form__cancel" data-project-close>انصراف</button>
                     <div class="manager-project-form__destructive-actions" data-project-destructive-actions hidden>
                         <button type="button" class="manager-project-form__archive" data-project-archive-action>انتقال به بایگانی</button>
-                        <button type="button" class="manager-project-form__delete" data-project-delete-action>حذف دائمی کارت</button>
+                        <button type="button" class="manager-project-form__delete" data-project-delete-action>انتقال به سطل زباله</button>
                     </div>
                 </div>
             </footer>

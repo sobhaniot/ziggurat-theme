@@ -289,7 +289,11 @@
         ? 'پروژه در مرحله «' + entry.to_label + '» ایجاد شد.'
         : (entry.action === 'merged'
           ? 'کارت تکراری و اسناد آن در این پروژه ادغام شد.'
-          : 'مرحله از «' + entry.from_label + '» به «' + entry.to_label + '» تغییر کرد.');
+          : (entry.action === 'delete'
+            ? 'کارت به سطل زباله منتقل شد.'
+            : (entry.action === 'restore'
+              ? 'کارت از سطل زباله بازیابی شد.'
+              : 'مرحله از «' + entry.from_label + '» به «' + entry.to_label + '» تغییر کرد.')));
       var text = document.createElement('span');
       var meta = document.createElement('small');
       text.textContent = description;
@@ -766,6 +770,9 @@
     var removeDocumentButton = event.target.closest('[data-document-remove]');
     var newButton = event.target.closest('[data-project-new]');
     var archiveJump = event.target.closest('[data-project-archive-jump]');
+    var trashJump = event.target.closest('[data-project-trash-jump]');
+    var trashRestore = event.target.closest('[data-project-trash-restore]');
+    var trashDelete = event.target.closest('[data-project-trash-delete]');
     var closeButton = event.target.closest('[data-project-close]');
     var editButton = event.target.closest('[data-project-edit]');
     var closeAssignmentButton = event.target.closest('[data-close-active-assignment]');
@@ -787,6 +794,68 @@
           loadArchiveRecords();
         }
       }
+      return;
+    }
+    if (trashJump) {
+      var trash = board.querySelector('[data-project-trash]');
+      if (trash) {
+        var openingTrash = trash.hidden;
+        trash.hidden = !openingTrash;
+        trashJump.setAttribute('aria-expanded', openingTrash ? 'true' : 'false');
+        if (openingTrash) {
+          trashJump.textContent = 'پنهان کردن سطل زباله';
+          loadTrashRecords();
+        } else {
+          trashJump.textContent = 'سطل زباله';
+        }
+      }
+      return;
+    }
+    var trashPageButton = event.target.closest('[data-project-trash-page]');
+    if (trashPageButton) {
+      if (!trashPageButton.disabled) loadTrashRecords(trashPageButton.getAttribute('data-project-trash-page'), true);
+      return;
+    }
+    if (trashRestore || trashDelete) {
+      var trashRow = event.target.closest('[data-project-trash-row]');
+      var trashProjectId = trashRow && trashRow.getAttribute('data-project-id');
+      if (!trashProjectId) return;
+      var restoring = Boolean(trashRestore);
+      showProjectConfirm({
+        variant: restoring ? 'archive' : 'delete',
+        icon: restoring ? '↶' : '×',
+        title: restoring ? 'بازیابی کارت پروژه' : 'حذف دائمی کارت پروژه',
+        message: restoring
+          ? 'کارت به همان مرحلهٔ قبلی در مدیریت پروژه بازمی‌گردد.'
+          : 'این کارت و تاریخچه‌اش برای همیشه حذف می‌شود و قابل‌بازگردانی نیست.',
+        confirmText: restoring ? 'بازیابی کارت' : 'حذف دائمی'
+      }).then(function (confirmed) {
+        if (!confirmed) return;
+        var actionButton = restoring ? trashRestore : trashDelete;
+        actionButton.disabled = true;
+        request(restoring ? 'zigurat_restore_workflow_project' : 'zigurat_permanently_delete_workflow_project', { project_id: trashProjectId })
+          .then(function (data) {
+            if (restoring) {
+              return request('zigurat_get_workflow_project', { project_id: trashProjectId }).then(function (projectData) {
+                if (projectData.project && !projectData.project.archived) appendProjectCard(projectData.project);
+                trashRow.remove();
+                trashLoaded = false;
+                loadTrashRecords(trashPage, true);
+                refreshColumnState();
+                refreshActiveCollaborators();
+                showNotice(data.message, 'success');
+              });
+            }
+            trashRow.remove();
+            trashLoaded = false;
+            loadTrashRecords(trashPage, true);
+            showNotice(data.message, 'success');
+          })
+          .catch(function (error) {
+            actionButton.disabled = false;
+            showNotice(error.message, 'error');
+          });
+      });
       return;
     }
     if (closeAssignmentButton) {
@@ -956,15 +1025,20 @@
     showProjectConfirm({
       variant: 'delete',
       icon: '×',
-      title: 'حذف دائمی کارت پروژه',
-      message: 'این کارت و تمام اطلاعات مدیریتی آن برای همیشه حذف می‌شود و امکان بازگردانی وجود ندارد.',
-      confirmText: 'حذف دائمی'
+      title: 'انتقال کارت به سطل زباله',
+      message: 'کارت از ستون‌های فعال خارج می‌شود. مدیرکل می‌تواند آن را بازیابی کند یا برای همیشه حذف کند.',
+      confirmText: 'انتقال به سطل زباله'
     }).then(function (confirmed) {
       if (!confirmed) return;
       setBusy(true);
       request('zigurat_delete_workflow_project', { project_id: projectId })
         .then(function (data) {
           removeProjectFromBoard(projectId);
+          var trashPanel = board.querySelector('[data-project-trash]');
+          if (trashPanel && !trashPanel.hidden) {
+            trashLoaded = false;
+            loadTrashRecords(trashPage, true);
+          }
           showNotice(data.message, 'success');
         })
         .catch(function (error) {
@@ -1250,6 +1324,10 @@
   board.addEventListener('pointercancel', cancelTouch);
   var archiveLoaded = false;
   var archiveLoading = false;
+  var trashLoaded = false;
+  var trashLoading = false;
+  var trashPage = 1;
+  var trashPages = 1;
 
   function renderArchiveRecords(records) {
     var archive = board.querySelector('[data-project-archive]');
@@ -1313,6 +1391,94 @@
     }).catch(function (error) {
       if (content) content.textContent = error.message;
     }).finally(function () { archiveLoading = false; });
+  }
+
+  function renderTrashRecords(records, pagination) {
+    var trash = board.querySelector('[data-project-trash]');
+    var content = trash && trash.querySelector('[data-project-trash-content]');
+    if (!trash || !content) return;
+    pagination = pagination || {};
+    trashPage = Math.max(1, Number(pagination.page) || 1);
+    trashPages = Math.max(1, Number(pagination.pages) || 1);
+    content.replaceChildren();
+    var count = trash.querySelector('[data-project-trash-count]');
+    if (count) count.textContent = Number(pagination.total || 0).toLocaleString('fa-IR') + ' کارت';
+    if (!records.length) {
+      var empty = document.createElement('p');
+      empty.className = 'manager-project-trash__empty';
+      empty.textContent = 'سطل زبالهٔ پروژه‌ها خالی است.';
+      content.appendChild(empty);
+      return;
+    }
+    var list = document.createElement('div');
+    list.className = 'manager-project-trash__list';
+    records.forEach(function (record) {
+      var row = document.createElement('article');
+      row.className = 'manager-project-trash__row';
+      row.setAttribute('data-project-trash-row', '');
+      row.setAttribute('data-project-id', record.id);
+      var info = document.createElement('div');
+      info.className = 'manager-project-trash__info';
+      var title = document.createElement('strong');
+      title.textContent = record.title || 'پروژه بدون عنوان';
+      var details = document.createElement('span');
+      details.textContent = [record.trash_type_label || 'حذف‌شده', record.client || 'بدون نام مشتری', record.stage_label || '', record.deleted_by ? 'حذف توسط ' + record.deleted_by : '', record.deleted_at || ''].filter(Boolean).join(' · ');
+      info.appendChild(title);
+      info.appendChild(details);
+      var actions = document.createElement('div');
+      actions.className = 'manager-project-trash__actions';
+      var restore = document.createElement('button');
+      restore.type = 'button';
+      restore.setAttribute('data-project-trash-restore', '');
+      restore.textContent = 'بازیابی';
+      var remove = document.createElement('button');
+      remove.type = 'button';
+      remove.setAttribute('data-project-trash-delete', '');
+      remove.textContent = 'حذف دائمی';
+      actions.appendChild(restore);
+      actions.appendChild(remove);
+      row.appendChild(info);
+      row.appendChild(actions);
+      list.appendChild(row);
+    });
+    content.appendChild(list);
+    if (trashPages > 1) {
+      var pager = document.createElement('nav');
+      pager.className = 'manager-project-trash__pagination';
+      pager.setAttribute('aria-label', 'صفحه‌بندی سطل زباله');
+      var previous = document.createElement('button');
+      previous.type = 'button';
+      previous.setAttribute('data-project-trash-page', String(trashPage - 1));
+      previous.disabled = trashPage <= 1;
+      previous.textContent = 'صفحهٔ قبل';
+      var position = document.createElement('span');
+      position.textContent = 'صفحه ' + trashPage.toLocaleString('fa-IR') + ' از ' + trashPages.toLocaleString('fa-IR') + ' · ' + Number(pagination.total || 0).toLocaleString('fa-IR') + ' کارت';
+      var next = document.createElement('button');
+      next.type = 'button';
+      next.setAttribute('data-project-trash-page', String(trashPage + 1));
+      next.disabled = trashPage >= trashPages;
+      next.textContent = 'صفحهٔ بعد';
+      pager.appendChild(previous);
+      pager.appendChild(position);
+      pager.appendChild(next);
+      content.appendChild(pager);
+    }
+  }
+
+  function loadTrashRecords(page, force) {
+    var trash = board.querySelector('[data-project-trash]');
+    var content = trash && trash.querySelector('[data-project-trash-content]');
+    if (!trash || !content) return;
+    if (trashLoading) return;
+    if (page) trashPage = Math.max(1, Number(page) || 1);
+    if (trashLoaded && !force) return;
+    trashLoading = true;
+    request('zigurat_load_workflow_trash', { page: trashPage }).then(function (data) {
+      renderTrashRecords(data && Array.isArray(data.records) ? data.records : [], data || {});
+      trashLoaded = true;
+    }).catch(function (error) {
+      content.textContent = error.message;
+    }).finally(function () { trashLoading = false; });
   }
 
   function renderArchiveTimeline() {
@@ -1392,6 +1558,11 @@
     if (event.persisted) window.location.reload();
   });
   initMobileProjectBoard();
+  if (board.hasAttribute('data-project-trash-view')) {
+    var trashViewPanel = board.querySelector('[data-project-trash]');
+    if (trashViewPanel) trashViewPanel.hidden = false;
+    loadTrashRecords(1, true);
+  }
   refreshColumnState();
   refreshActiveCollaborators();
   var requestedProject = Number(new URLSearchParams(window.location.search).get('project'));

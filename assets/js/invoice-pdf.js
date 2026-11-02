@@ -549,6 +549,19 @@
   }
   function printPdf() {
     if (busy || !resultUrl || modal.querySelector('[data-pdf-print]').hidden) return;
+    if (/\b(?:Chrome|Chromium|Edg|OPR)\//.test(navigator.userAgent) && !/Firefox\//.test(navigator.userAgent)) {
+      // Chromium ignores the filename fragment when printing a Blob URL.
+      // Download the SAME ready PDF with an explicit filename instead.
+      var download = document.createElement('a');
+      download.href = resultUrl;
+      download.download = pdfFilename();
+      download.hidden = true;
+      document.body.appendChild(download);
+      download.click();
+      download.remove();
+      message('درخواست دانلود PDF با نام فاکتور ارسال شد؛ برای چاپ، فایل دانلودشده را باز کنید.');
+      return;
+    }
     // Open the exact PDF Blob produced by buildPdf. Never rebuild HTML here.
     // PDF.js recognizes a .pdf filename in the fragment. This stays on the
     // same local Blob: no upload, no rendering changes and no extra PDF copy.

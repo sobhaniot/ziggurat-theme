@@ -64,6 +64,8 @@ add_action('wp_after_insert_post', 'zigurat_activity_post_saved', 10, 3);
 add_action('transition_post_status', function ($new, $old, $post) {
     $types = zigurat_activity_posts();
     if (!isset($types[$post->post_type]) || $new === $old || ($new !== 'trash' && $old !== 'trash')) return;
+    // Project deletion/restoration is already recorded by its explicit workflow history event.
+    if ($post->post_type === 'zig_work_project' && get_post_meta($post->ID, '_zigurat_work_project_deleted_at', true)) return;
     unset($GLOBALS['zigurat_activity_pending']['post-'.$post->ID], $GLOBALS['zigurat_activity_pending']['meta-'.$post->ID]);
     zigurat_activity_log($types[$post->post_type].' «'.$post->post_title.'» '.($new === 'trash' ? 'بایگانی شد.' : 'از بایگانی خارج شد.'), 'status-'.$post->ID);
 }, 10, 3);
@@ -82,7 +84,7 @@ function zigurat_activity_meta($meta_id, $id, $key, $value) {
     if ($key === '_zigurat_work_project_history' && is_array($value) && $value) {
         $event = end($value);
         $stages = zigurat_workflow_project_stages();
-        $actions = array('created'=>'ایجاد شد', 'archive'=>'بایگانی شد', 'restore'=>'از بایگانی خارج شد', 'merged'=>'ادغام شد');
+        $actions = array('created'=>'ایجاد شد', 'archive'=>'بایگانی شد', 'delete'=>'به سطل زباله منتقل شد', 'restore'=>'بازیابی شد', 'merged'=>'ادغام شد');
         $description = $actions[$event['action'] ?? ''] ?? 'تغییر کرد';
         if (($event['from'] ?? '') !== ($event['to'] ?? '') && isset($stages[$event['to'] ?? ''])) {
             $description = 'از «' . ($stages[$event['from'] ?? ''] ?? 'شروع') . '» به «'.$stages[$event['to']].'» منتقل شد';

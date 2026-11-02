@@ -1388,6 +1388,14 @@ function zigurat_invoice_list($args = array())
     $page = max(1, absint($args['page']));
     $offset = ($page - 1) * $per_page;
     $order_by = zigurat_invoice_sort_sql($args['sort'], true);
+    // Aggregate BEFORE pagination with exactly the same filter predicates.
+    $totals_sql = "SELECT COALESCE(SUM(grand_total),0) AS grand_total,
+        COALESCE(SUM(grand_total - LEAST(COALESCE(deduction_amount,0),grand_total)),0) AS net_total,
+        COALESCE(SUM(CASE WHEN document_type='invoice' THEN
+            GREATEST(0,grand_total - LEAST(GREATEST(COALESCE(deduction_amount,0),0),grand_total) - GREATEST(COALESCE(paid_amount,0),0))
+            ELSE 0 END),0) AS net_balance
+        FROM {$table} WHERE {$where_sql}";
+    $totals = $wpdb->get_row($values ? $wpdb->prepare($totals_sql, $values) : $totals_sql);
     $sql = "SELECT current_invoice.*,
             EXISTS(
                 SELECT 1 FROM {$table} related_invoice
@@ -1402,6 +1410,7 @@ function zigurat_invoice_list($args = array())
     return array(
         'items'=>$wpdb->get_results($wpdb->prepare($sql, array_merge($values, array($per_page,$offset)))),
         'total'=>$total, 'pages'=>max(1,(int)ceil($total/$per_page)), 'page'=>$page,
+        'totals'=>array('grand_total'=>(int)($totals->grand_total ?? 0), 'net_total'=>(int)($totals->net_total ?? 0), 'net_balance'=>(int)($totals->net_balance ?? 0)),
     );
 }
 

@@ -344,6 +344,8 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
 .invoice-trash-heading p { margin: 0; }
 .invoice-trash-heading p { margin-top: 5px; color: #777; }
 .invoice-list-heading__actions { display: flex; align-items: center; gap: 10px; }
+.invoice-filter-totals { display: flex; flex-wrap: wrap; gap: 10px 24px; padding: 12px 16px; margin-block: 14px; border: 1px solid #ddd4c3; border-radius: 8px; background: #faf7ef; color: #51432b; font-size: 13px; }
+.invoice-filter-totals strong { white-space: nowrap; color: #211e18; }
 .invoice-excel-button { display: inline-flex; min-height: 40px; align-items: center; padding: 7px 14px; border-radius: 7px; background: #237447; color: #fff; font-weight: 800; }
 .invoice-list-filters { display: grid; grid-template-columns: repeat(4,minmax(140px,1fr)) auto auto; gap: 10px; align-items: end; margin-bottom: 20px; padding: 16px; border-radius: 10px; background: #f5f5f5; }
 .invoice-list-filters label { display: grid; gap: 5px; font-weight: 700; }

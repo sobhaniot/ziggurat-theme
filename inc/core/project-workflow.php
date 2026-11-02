@@ -259,6 +259,9 @@ function zigurat_workflow_sync_saved_invoice($invoice)
     if (!$invoice || empty($invoice->id) || !in_array($invoice->document_type, array('proforma', 'invoice'), true)) {
         return;
     }
+    // Validation may have cached the document before its payment was updated.
+    // Settlement decisions must use the canonical post-save value.
+    $GLOBALS['zigurat_workflow_document_cache'][(int)$invoice->id] = $invoice;
 
     if ($invoice->document_type === 'proforma') {
         $project_id = zigurat_workflow_project_find_by_document('_zigurat_work_project_proforma', $invoice->id);
@@ -295,20 +298,17 @@ function zigurat_workflow_sync_saved_invoice($invoice)
     }
 
     $source_proforma_id = absint($invoice->source_proforma_id ?? 0);
-    $project_id = $source_proforma_id
-        ? zigurat_workflow_project_find_by_document('_zigurat_work_project_proforma', $source_proforma_id)
-        : zigurat_workflow_project_find_by_document('_zigurat_work_project_invoice', $invoice->id);
+    $project_id = zigurat_workflow_project_find_by_document('_zigurat_work_project_invoice', $invoice->id);
+    if (!$project_id && $source_proforma_id) {
+        $project_id = zigurat_workflow_project_find_by_document('_zigurat_work_project_proforma', $source_proforma_id);
+    }
     if (!$project_id) {
         return;
     }
     $old_stage = sanitize_key((string) get_post_meta($project_id, '_zigurat_work_project_stage', true));
     zigurat_workflow_project_add_document($project_id, 'invoice', $invoice->id);
     $project_invoices = zigurat_workflow_project_documents($project_id, 'invoice');
-    $all_invoices_settled = $project_invoices && !array_filter($project_invoices, static function ($project_invoice) {
-        return ($project_invoice->payment_status ?? '') !== 'settled';
-    });
-    if ($all_invoices_settled) {
-        zigurat_workflow_archive_project($project_id);
+    if (zigurat_workflow_archive_if_settled($project_id)) {
         return;
     }
     $has_settled_invoice = (bool) array_filter($project_invoices, static function ($project_invoice) {
@@ -806,7 +806,12 @@ function zigurat_workflow_project_records()
         );
     }
     zigurat_workflow_prime_documents($document_ids);
-    return array_values(array_filter(array_map('zigurat_workflow_project_record', $query->posts)));
+    $active_projects = array();
+    foreach ($query->posts as $project) {
+        // Recover missed payment events and links made after settlement.
+        if (!zigurat_workflow_archive_if_settled($project->ID)) $active_projects[] = $project;
+    }
+    return array_values(array_filter(array_map('zigurat_workflow_project_record', $active_projects)));
 }
 
 function zigurat_workflow_archived_records()
@@ -817,6 +822,7 @@ function zigurat_workflow_archived_records()
     $query = new WP_Query(array(
         'post_type' => 'zig_work_project',
         'post_status' => 'trash',
+        'meta_query' => array(array('key' => '_zigurat_work_project_deleted_at', 'compare' => 'NOT EXISTS')),
         'posts_per_page' => -1,
         'orderby' => 'modified',
         'order' => 'DESC',
@@ -873,6 +879,61 @@ function zigurat_ajax_load_workflow_archive()
 }
 add_action('wp_ajax_zigurat_load_workflow_archive', 'zigurat_ajax_load_workflow_archive');
 
+function zigurat_workflow_trash_records($page = 1)
+{
+    $page = max(1, absint($page));
+    if (!current_user_can('manage_options')) return array('records' => array(), 'total' => 0, 'page' => 1, 'pages' => 1, 'per_page' => 50);
+    $query = new WP_Query(array(
+        'post_type' => 'zig_work_project',
+        'post_status' => 'trash',
+        'posts_per_page' => 50,
+        'paged' => $page,
+        'orderby' => 'modified',
+        'order' => 'DESC',
+    ));
+    $total = (int) $query->found_posts;
+    $pages = max(1, (int) $query->max_num_pages);
+    if ($page > $pages) return zigurat_workflow_trash_records($pages);
+    $document_ids = array();
+    foreach ($query->posts as $project) {
+        $document_ids = array_merge(
+            $document_ids,
+            zigurat_workflow_project_document_ids($project->ID, 'proforma'),
+            zigurat_workflow_project_document_ids($project->ID, 'invoice')
+        );
+    }
+    zigurat_workflow_prime_documents($document_ids);
+    $records = array();
+    foreach ($query->posts as $project) {
+        $record = zigurat_workflow_project_record($project);
+        if (!$record) continue;
+        $deleted_at = (string) get_post_meta($project->ID, '_zigurat_work_project_deleted_at', true);
+        $is_deleted = $deleted_at !== '';
+        $timestamp = $is_deleted ? $deleted_at : (string) get_post_meta($project->ID, '_zigurat_work_project_archived_at', true);
+        if ($timestamp === '') $timestamp = $project->post_modified;
+        $actor_id = $is_deleted ? absint(get_post_meta($project->ID, '_zigurat_work_project_deleted_by', true)) : 0;
+        $actor = $actor_id ? get_userdata($actor_id) : null;
+        $record['trash_type'] = $is_deleted ? 'deleted' : 'archived';
+        $record['trash_type_label'] = $is_deleted ? 'حذف‌شده' : 'بایگانی‌شده';
+        $record['deleted_at'] = function_exists('zigurat_inventory_format_jalali_datetime')
+            ? zigurat_inventory_format_jalali_datetime($timestamp)
+            : $timestamp;
+        $record['deleted_by'] = $is_deleted ? ($actor ? ($actor->display_name ?: $actor->user_login) : 'کاربر حذف‌شده') : '';
+        $records[] = $record;
+    }
+    return array('records' => $records, 'total' => $total, 'page' => $page, 'pages' => $pages, 'per_page' => 50);
+}
+
+function zigurat_ajax_load_workflow_trash()
+{
+    check_ajax_referer('zigurat_workflow_projects', 'nonce');
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'فقط مدیرکل به سطل زبالهٔ پروژه‌ها دسترسی دارد.'), 403);
+    }
+    wp_send_json_success(zigurat_workflow_trash_records(absint($_POST['page'] ?? 1)));
+}
+add_action('wp_ajax_zigurat_load_workflow_trash', 'zigurat_ajax_load_workflow_trash');
+
 function zigurat_ajax_get_workflow_project_by_document()
 {
     check_ajax_referer('zigurat_workflow_projects', 'nonce');
@@ -891,12 +952,32 @@ function zigurat_ajax_get_workflow_project_by_document()
 }
 add_action('wp_ajax_zigurat_get_workflow_project_by_document', 'zigurat_ajax_get_workflow_project_by_document');
 
+function zigurat_workflow_archive_if_settled($project_id)
+{
+    $post = get_post($project_id);
+    if (!$post || $post->post_type !== 'zig_work_project' || $post->post_status !== 'private') return false;
+    $ids = zigurat_workflow_project_document_ids($project_id, 'invoice');
+    if (!$ids) return false;
+    $documents = zigurat_workflow_project_documents($project_id, 'invoice');
+    // Missing or partially linked documents must never produce a false settlement.
+    if (count($documents) !== count($ids)) return false;
+    foreach ($documents as $document) {
+        if (($document->payment_status ?? '') !== 'settled') {
+            delete_post_meta($project_id, '_zigurat_work_project_reopened_from_archive');
+            return false;
+        }
+    }
+    if (get_post_meta($project_id, '_zigurat_work_project_reopened_from_archive', true)) return false;
+    return zigurat_workflow_archive_project($project_id);
+}
+
 function zigurat_workflow_archive_project($project_id)
 {
     $project_id = absint($project_id);
     if (!$project_id) {
         return false;
     }
+    delete_post_meta($project_id, '_zigurat_work_project_reopened_from_archive');
     update_post_meta($project_id, '_zigurat_work_project_archived_at', current_time('mysql'));
     return (bool) wp_trash_post($project_id);
 }
@@ -1085,6 +1166,7 @@ function zigurat_workflow_project_save_from_request($data)
     if (!$existing || $old_stage !== $stage) {
         zigurat_workflow_project_add_history($result, $old_stage, $stage, $existing ? 'stage' : 'created');
     }
+    zigurat_workflow_archive_if_settled($result);
     return zigurat_workflow_project_record($result);
 }
 
@@ -1208,12 +1290,76 @@ function zigurat_ajax_delete_workflow_project()
     if (!$project || $project->post_type !== 'zig_work_project' || $project->post_status !== 'private') {
         wp_send_json_error(array('message' => 'پروژه پیدا نشد.'), 404);
     }
+    update_post_meta($project_id, '_zigurat_work_project_deleted_at', current_time('mysql'));
+    update_post_meta($project_id, '_zigurat_work_project_deleted_by', get_current_user_id());
+    $stage = sanitize_key((string) get_post_meta($project_id, '_zigurat_work_project_stage', true));
+    $history_before = get_post_meta($project_id, '_zigurat_work_project_history', true);
+    zigurat_workflow_project_add_history($project_id, $stage, $stage, 'delete');
+    if (!wp_trash_post($project_id)) {
+        delete_post_meta($project_id, '_zigurat_work_project_deleted_at');
+        delete_post_meta($project_id, '_zigurat_work_project_deleted_by');
+        if (is_array($history_before)) update_post_meta($project_id, '_zigurat_work_project_history', $history_before);
+        else delete_post_meta($project_id, '_zigurat_work_project_history');
+        wp_send_json_error(array('message' => 'انتقال کارت به سطل زباله انجام نشد.'), 500);
+    }
+    wp_send_json_success(array('message' => 'کارت پروژه به سطل زباله منتقل شد؛ مدیرکل می‌تواند آن را بازیابی یا برای همیشه حذف کند.'));
+}
+add_action('wp_ajax_zigurat_delete_workflow_project', 'zigurat_ajax_delete_workflow_project');
+
+function zigurat_ajax_restore_workflow_project()
+{
+    check_ajax_referer('zigurat_workflow_projects', 'nonce');
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'فقط مدیرکل می‌تواند کارت‌های حذف‌شده را بازیابی کند.'), 403);
+    }
+    $project_id = absint($_POST['project_id'] ?? 0);
+    $project = get_post($project_id);
+    $deleted_at = $project_id ? get_post_meta($project_id, '_zigurat_work_project_deleted_at', true) : '';
+    $archived_at = $project_id ? get_post_meta($project_id, '_zigurat_work_project_archived_at', true) : '';
+    if (!$project || $project->post_type !== 'zig_work_project' || $project->post_status !== 'trash' || (!$deleted_at && !$archived_at)) {
+        wp_send_json_error(array('message' => 'کارت حذف‌شده پیدا نشد.'), 404);
+    }
+    if (!wp_untrash_post($project_id)) {
+        wp_send_json_error(array('message' => 'بازیابی کارت انجام نشد.'), 500);
+    }
+    // WordPress restores custom posts as drafts by default; manager cards are private.
+    $restored = wp_update_post(array('ID' => $project_id, 'post_status' => 'private'), true);
+    if (is_wp_error($restored) || !$restored) {
+        wp_send_json_error(array('message' => 'بازگرداندن کارت به پروژه‌های فعال انجام نشد.'), 500);
+    }
+    if ($deleted_at) {
+        delete_post_meta($project_id, '_zigurat_work_project_deleted_at');
+        delete_post_meta($project_id, '_zigurat_work_project_deleted_by');
+    } else {
+        // An already-settled project would otherwise be re-archived on the next board read.
+        update_post_meta($project_id, '_zigurat_work_project_reopened_from_archive', 1);
+        delete_post_meta($project_id, '_zigurat_work_project_archived_at');
+    }
+    $stage = sanitize_key((string) get_post_meta($project_id, '_zigurat_work_project_stage', true));
+    zigurat_workflow_project_add_history($project_id, $stage, $stage, 'restore');
+    wp_send_json_success(array('message' => 'کارت پروژه بازیابی شد.'));
+}
+add_action('wp_ajax_zigurat_restore_workflow_project', 'zigurat_ajax_restore_workflow_project');
+
+function zigurat_ajax_permanently_delete_workflow_project()
+{
+    check_ajax_referer('zigurat_workflow_projects', 'nonce');
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'فقط مدیرکل می‌تواند کارت‌ها را برای همیشه حذف کند.'), 403);
+    }
+    $project_id = absint($_POST['project_id'] ?? 0);
+    $project = get_post($project_id);
+    $deleted_at = $project_id ? get_post_meta($project_id, '_zigurat_work_project_deleted_at', true) : '';
+    $archived_at = $project_id ? get_post_meta($project_id, '_zigurat_work_project_archived_at', true) : '';
+    if (!$project || $project->post_type !== 'zig_work_project' || $project->post_status !== 'trash' || (!$deleted_at && !$archived_at)) {
+        wp_send_json_error(array('message' => 'کارت حذف‌شده پیدا نشد.'), 404);
+    }
     if (!wp_delete_post($project_id, true)) {
-        wp_send_json_error(array('message' => 'حذف کارت انجام نشد.'), 500);
+        wp_send_json_error(array('message' => 'حذف دائمی کارت انجام نشد.'), 500);
     }
     wp_send_json_success(array('message' => 'کارت پروژه برای همیشه حذف شد.'));
 }
-add_action('wp_ajax_zigurat_delete_workflow_project', 'zigurat_ajax_delete_workflow_project');
+add_action('wp_ajax_zigurat_permanently_delete_workflow_project', 'zigurat_ajax_permanently_delete_workflow_project');
 
 function zigurat_ajax_close_workflow_partner_assignment()
 {

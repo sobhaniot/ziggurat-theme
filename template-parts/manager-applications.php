@@ -72,6 +72,7 @@ $unread_application_ids = function_exists('zigurat_application_unread_ids')
 
 ?>
 <div class="manager-applications">
+    <?php get_template_part('template-parts/manager-application-delete-dialog'); ?>
     <div class="manager-applications__toolbar no-print">
         <a href="<?php echo esc_url(home_url('/login/')); ?>">بازگشت به پنل</a>
         <button type="button" onclick="window.print()">چاپ فهرست</button>
@@ -98,9 +99,8 @@ $unread_application_ids = function_exists('zigurat_application_unread_ids')
     <?php endif; ?>
 
     <section class="manager-partner-map-loader no-print" data-partner-map-loader>
-        <div><strong>نقشه همکاران</strong><span>اطلاعات نقشه فقط هنگام درخواست شما بارگذاری می‌شود.</span></div>
-        <button type="button" data-partner-map-load>نمایش نقشه</button>
-        <p data-partner-map-load-status hidden></p>
+        <div><strong>نقشه همکاران</strong><span data-partner-map-load-status role="status">در حال بارگذاری نقشه…</span></div>
+        <button type="button" data-partner-map-load hidden>تلاش دوباره</button>
     </section>
 
     <form class="manager-application-filters no-print" method="get" action="<?php echo esc_url(home_url('/login/')); ?>">
@@ -170,12 +170,12 @@ $unread_application_ids = function_exists('zigurat_application_unread_ids')
                                 <div class="manager-application-actions">
                                     <a class="manager-application-view" href="<?php echo esc_url(zigurat_application_resume_url($application_id)); ?>" target="_blank" rel="noopener">مشاهده رزومه</a>
                                     <?php if (current_user_can('manage_options')): ?>
-                                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('این رزومه به زباله‌دان منتقل شود؟');">
+                                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                                             <input type="hidden" name="action" value="zigurat_delete_partner_application">
                                             <input type="hidden" name="application_id" value="<?php echo esc_attr($application_id); ?>">
                                             <input type="hidden" name="redirect_to" value="<?php echo esc_url($current_list_url); ?>">
                                             <?php wp_nonce_field('zigurat_delete_partner_application_' . $application_id); ?>
-                                            <button class="manager-application-delete" type="submit">حذف</button>
+                                            <button class="manager-application-delete" type="button" data-application-delete>حذف</button>
                                         </form>
                                     <?php endif; ?>
                                 </div>

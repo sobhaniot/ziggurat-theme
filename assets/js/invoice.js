@@ -1142,12 +1142,12 @@
     var baseAmount = subtotal + shipping;
     var overhead = Math.round(baseAmount * overheadRate / 100);
     var amountWithOverhead = baseAmount + overhead;
-    var insurance = Math.round(amountWithOverhead * insuranceRate / 100);
-    var taxable = amountWithOverhead + insurance;
+    var discount = Math.min(amountWithOverhead, requestedDiscount);
+    var amountAfterDiscount = Math.max(0, amountWithOverhead - discount);
+    var insurance = Math.round(amountAfterDiscount * insuranceRate / 100);
+    var taxable = amountAfterDiscount + insurance;
     var tax = Math.round(taxable * taxRate / 100);
-    var grossTotal = taxable + tax;
-    var discount = Math.min(grossTotal, requestedDiscount);
-    var grand = Math.max(0, grossTotal - discount);
+    var grand = taxable + tax;
     var deduction = Math.min(grand, money(editor.querySelector('[name="deduction_amount"]')));
     var paidAmount = money(editor.querySelector('[name="paid_amount"]'));
     var balance = Math.max(0, grand - paidAmount);

@@ -3,26 +3,25 @@
   var PX = 96 / 25.4;
   var PT = 72 / 25.4;
   var source = document.querySelector('.invoice-print-sheet .invoice-document');
-  if (!source) return;
+  var controls = document.querySelector('.invoice-pdf-controls');
+  if (!source || !controls) return;
   var config = window.ziguratInvoicePdfConfig || {};
   var busy = false;
-  var resultUrl = null;
-  var previousFocus;
-  var previousOverflow;
+  var resultBlob = null;
   var loadedLibraries;
   var imageCache = new Map();
-  var modal = document.createElement('div');
-  modal.className = 'invoice-pdf-modal no-print';
-  modal.hidden = true;
-  modal.innerHTML = '<section class="invoice-pdf-dialog" role="dialog" aria-modal="true" aria-labelledby="invoice-pdf-title" tabindex="-1" dir="rtl">' +
-    '<h2 id="invoice-pdf-title">چاپ و دریافت PDF</h2><p>اندازهٔ کاغذ A4 است. PDF با جهت انتخاب‌شده ساخته می‌شود و در صورت فعال‌بودن مهر، روی هر صفحه یک مهر قرار می‌گیرد.</p>' +
-    '<fieldset class="invoice-pdf-choices"><legend>جهت صفحه</legend><label><input type="radio" name="pdf_orientation" value="landscape" checked>افقی (Landscape)</label><label><input type="radio" name="pdf_orientation" value="portrait">عمودی (Portrait)</label></fieldset>' +
-    '<div class="invoice-pdf-actions"><button type="button" data-pdf-generate>ساخت PDF</button><button type="button" data-pdf-close>بستن</button><button type="button" data-pdf-print hidden>دریافت / چاپ PDF</button></div>' +
-    '<output class="invoice-pdf-status" aria-live="polite"></output><div class="invoice-pdf-preview"></div></section>';
-  document.body.appendChild(modal);
-  var status = modal.querySelector('.invoice-pdf-status');
-  var preview = modal.querySelector('.invoice-pdf-preview');
-  var generateButton = modal.querySelector('[data-pdf-generate]');
+  var status = controls.querySelector('.invoice-pdf-status');
+  var generateButton = controls.querySelector('[data-pdf-generate]');
+  var downloadButton = controls.querySelector('[data-pdf-print]');
+  var preview = document.querySelector('[data-pdf-preview]');
+  var previewCanvas = preview && preview.querySelector('[data-pdf-canvas]');
+  var previewPageLabel = preview && preview.querySelector('[data-pdf-page]');
+  var previewPrevious = preview && preview.querySelector('[data-pdf-prev]');
+  var previewNext = preview && preview.querySelector('[data-pdf-next]');
+  var previewDocument = null;
+  var previewLoadingTask = null;
+  var previewPageNumber = 1;
+  var pdfjsLibrary = null;
 
   function pdfFilename() {
     return (document.body.dataset.printFilename || document.title)
@@ -30,24 +29,53 @@
       .replace(/\.pdf$/i, '').trim() + '.pdf';
   }
 
-  function open() {
-    if (!modal.hidden) return;
-    previousFocus = document.activeElement;
-    previousOverflow = [document.documentElement.style.overflow, document.body.style.overflow];
-    document.documentElement.style.overflow = document.body.style.overflow = 'hidden';
-    modal.hidden = false;
-    modal.querySelector('input:checked').focus();
-  }
-  function close() {
-    if (busy) return;
-    modal.hidden = true;
-    document.documentElement.style.overflow = previousOverflow[0];
-    document.body.style.overflow = previousOverflow[1];
-    if (previousFocus && previousFocus.isConnected) previousFocus.focus({ preventScroll: true });
-  }
   function message(text, error) {
     status.textContent = text;
     status.classList.toggle('is-error', !!error);
+  }
+  async function clearPreview() {
+    var previousTask = previewLoadingTask;
+    previewLoadingTask = null;
+    previewDocument = null;
+    if (preview) preview.hidden = true;
+    if (previewCanvas) previewCanvas.width = previewCanvas.height = 0;
+    if (previousTask) {
+      try {
+        await previousTask.destroy();
+      } catch (error) {
+        console.warn('Invoice PDF preview cleanup failed', error);
+      }
+    }
+  }
+  async function renderPreviewPage() {
+    if (!previewDocument || !previewCanvas) return;
+    var page = await previewDocument.getPage(previewPageNumber);
+    var base = page.getViewport({ scale: 1 });
+    var maxWidth = Math.min(1000, Math.max(280, preview.querySelector('.invoice-pdf-preview__canvas-wrap').clientWidth - 24));
+    var ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+    var viewport = page.getViewport({ scale: Math.min(maxWidth, 1000) * ratio / base.width });
+    previewCanvas.width = Math.round(viewport.width);
+    previewCanvas.height = Math.round(viewport.height);
+    previewCanvas.style.width = Math.round(viewport.width / ratio) + 'px';
+    previewCanvas.style.height = Math.round(viewport.height / ratio) + 'px';
+    await page.render({ canvasContext: previewCanvas.getContext('2d', { alpha: false }), viewport: viewport }).promise;
+    previewPageLabel.textContent = 'صفحهٔ ' + previewPageNumber.toLocaleString('fa-IR') + ' از ' + previewDocument.numPages.toLocaleString('fa-IR');
+    previewPrevious.disabled = previewPageNumber <= 1;
+    previewNext.disabled = previewPageNumber >= previewDocument.numPages;
+  }
+  async function showPreview(bytes) {
+    if (!preview || !previewCanvas || !config.pdfModuleUrl || !config.workerUrl) {
+      throw new Error('پیش‌نمایش PDF در دسترس نیست. فایل‌های قالب را کامل به‌روز کنید.');
+    }
+    await clearPreview();
+    if (!pdfjsLibrary) pdfjsLibrary = import(config.pdfModuleUrl);
+    var pdfjs = await pdfjsLibrary;
+    pdfjs.GlobalWorkerOptions.workerSrc = config.workerUrl;
+    previewLoadingTask = pdfjs.getDocument({ data: bytes.slice(), isEvalSupported: false, disableFontFace: true });
+    previewDocument = await previewLoadingTask.promise;
+    previewPageNumber = 1;
+    preview.hidden = false;
+    await renderPreviewPage();
   }
   function loadScript(url, ready) {
     if (ready()) return Promise.resolve();
@@ -486,117 +514,70 @@
     } finally { layout.stage.remove(); }
   }
 
-  async function previewPdf(bytes) {
-    var viewer = await import(config.previewUrl);
-    viewer.GlobalWorkerOptions.workerSrc = config.workerUrl;
-    var loadingTask = viewer.getDocument({ data: bytes.slice(), isEvalSupported: false });
-    var documentPdf = await loadingTask.promise;
-    try {
-      var thumbnails = [];
-      for (var index = 1; index <= documentPdf.numPages; index++) {
-        var page = await documentPdf.getPage(index);
-        var viewport = page.getViewport({ scale: 1 });
-        viewport = page.getViewport({ scale: 840 / viewport.width });
-        var canvas = document.createElement('canvas');
-        canvas.width = Math.ceil(viewport.width);
-        canvas.height = Math.ceil(viewport.height);
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
-        thumbnails.push(canvas.toDataURL('image/jpeg', .9));
-        canvas.width = canvas.height = 1;
-        page.cleanup();
-      }
-      return thumbnails;
-    } finally { await loadingTask.destroy(); }
-  }
-
   async function generate() {
     if (busy) return;
     busy = true;
-    var controls = modal.querySelectorAll('button,input');
-    controls.forEach(function (control) { control.disabled = true; });
-    modal.querySelector('.invoice-pdf-dialog').focus();
-    modal.querySelectorAll('[data-pdf-print]').forEach(function (link) { link.hidden = true; });
+    var inputsAndButtons = controls.querySelectorAll('button,input');
+    inputsAndButtons.forEach(function (control) { control.disabled = true; });
+    var generateLabel = generateButton.textContent;
+    generateButton.textContent = 'در حال ساخت PDF…';
+    downloadButton.hidden = true;
+    resultBlob = null;
     message('در حال آماده‌سازی PDF…');
     try {
-      var orientation = modal.querySelector('input:checked').value;
+      // Let the disabled state appear before starting PDF work.
+      await new Promise(function (resolve) { setTimeout(resolve, 0); });
+      var orientation = controls.querySelector('input[name="pdf_orientation"]:checked').value;
       var result = await buildPdf(orientation);
-      var url = URL.createObjectURL(new Blob([result.bytes], { type: 'application/pdf' }));
-      if (resultUrl) URL.revokeObjectURL(resultUrl);
-      resultUrl = url;
-      modal.querySelector('[data-pdf-print]').hidden = false;
-      preview.replaceChildren();
-      var thumbnails = [];
-      try { thumbnails = await previewPdf(result.bytes); }
-      catch (previewError) { console.warn('PDF ready; thumbnail preview unavailable', previewError); }
-      thumbnails.forEach(function (thumbnail, index) {
-        var figure = document.createElement('figure');
-        var image = document.createElement('img');
-        image.src = thumbnail;
-        image.alt = 'پیش‌نمایش صفحهٔ ' + (index + 1).toLocaleString('fa-IR');
-        var caption = document.createElement('figcaption');
-        caption.textContent = 'صفحهٔ ' + (index + 1).toLocaleString('fa-IR') + ' از ' + result.pageCount.toLocaleString('fa-IR');
-        figure.append(image, caption);
-        preview.appendChild(figure);
-      });
-      message('PDF آماده شد؛ ' + result.pageCount.toLocaleString('fa-IR') + ' صفحه، ' + (orientation === 'portrait' ? 'عمودی' : 'افقی') + '. برای دریافت یا چاپ، دکمهٔ «دریافت / چاپ PDF» را بزنید.');
+      resultBlob = new Blob([result.bytes], { type: 'application/pdf' });
+      await showPreview(result.bytes);
+      downloadButton.hidden = false;
+      message('PDF آماده است؛ ' + result.pageCount.toLocaleString('fa-IR') + ' صفحه، ' + (orientation === 'portrait' ? 'عمودی' : 'افقی') + '. «چاپ / دریافت PDF» صفحهٔ چاپ را باز می‌کند.');
     } catch (error) {
       message(/[\u0600-\u06ff]/.test(error.message || '') ? error.message : 'ساخت PDF در این مرورگر انجام نشد. مرورگر را به‌روز کرده و دوباره تلاش کنید.', true);
       console.error('Invoice PDF generation failed', error);
     } finally {
+      generateButton.textContent = generateLabel;
       busy = false;
-      controls.forEach(function (control) { control.disabled = false; });
+      inputsAndButtons.forEach(function (control) { control.disabled = false; });
     }
   }
   function printPdf() {
-    if (busy || !resultUrl || modal.querySelector('[data-pdf-print]').hidden) return;
-    if (/\b(?:Chrome|Chromium|Edg|OPR)\//.test(navigator.userAgent) && !/Firefox\//.test(navigator.userAgent)) {
-      // Chromium ignores the filename fragment when printing a Blob URL.
-      // Download the SAME ready PDF with an explicit filename instead.
-      var download = document.createElement('a');
-      download.href = resultUrl;
-      download.download = pdfFilename();
-      download.hidden = true;
-      document.body.appendChild(download);
-      download.click();
-      download.remove();
-      message('درخواست دانلود PDF با نام فاکتور ارسال شد؛ برای چاپ، فایل دانلودشده را باز کنید.');
+    if (busy || !resultBlob || downloadButton.hidden) return;
+    if (!config.pdfViewUrl || !config.pdfViewNonce || typeof DataTransfer === 'undefined') {
+      message('بازکردن صفحهٔ چاپ با نام فایل درست در این مرورگر در دسترس نیست.', true);
       return;
     }
-    // Open the exact PDF Blob produced by buildPdf. Never rebuild HTML here.
-    // PDF.js recognizes a .pdf filename in the fragment. This stays on the
-    // same local Blob: no upload, no rendering changes and no extra PDF copy.
-    var printWindow = window.open(resultUrl + '#filename=' + encodeURIComponent(pdfFilename()), '_blank');
-    if (!printWindow) {
-      message('مرورگر پنجرهٔ PDF را مسدود کرده است؛ اجازهٔ بازشدن پنجره را بدهید.', true);
-      return;
-    }
-    // Auto-print lives inside the PDF. A second window.print() here can race
-    // the viewer or open duplicate dialogs; do not render an HTML fallback.
-    message('PDF ساخته‌شده با درخواست بازشدن چاپ باز شد؛ اگر نمایشگر آن را مسدود کرد، دکمهٔ چاپ خود PDF را بزنید.');
+    var form = document.createElement('form');
+    form.method = 'post';
+    form.action = config.pdfViewUrl;
+    form.enctype = 'multipart/form-data';
+    form.hidden = true;
+    var nonce = document.createElement('input');
+    nonce.type = 'hidden';
+    nonce.name = 'zigurat_pdf_nonce';
+    nonce.value = config.pdfViewNonce;
+    var fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.name = 'zigurat_invoice_pdf';
+    var transfer = new DataTransfer();
+    transfer.items.add(new File([resultBlob], pdfFilename(), { type: 'application/pdf' }));
+    fileInput.files = transfer.files;
+    form.append(nonce, fileInput);
+    document.body.appendChild(form);
+    form.submit();
   }
-  document.querySelectorAll('[data-invoice-pdf-open]').forEach(function (button) { button.addEventListener('click', open); });
-  modal.querySelector('[data-pdf-close]').addEventListener('click', close);
   generateButton.addEventListener('click', generate);
-  modal.querySelector('[data-pdf-print]').addEventListener('click', printPdf);
-  modal.querySelectorAll('input[name="pdf_orientation"]').forEach(function (radio) {
+  downloadButton.addEventListener('click', printPdf);
+  if (previewPrevious) previewPrevious.addEventListener('click', async function () { if (previewPageNumber > 1) { previewPageNumber--; await renderPreviewPage(); } });
+  if (previewNext) previewNext.addEventListener('click', async function () { if (previewDocument && previewPageNumber < previewDocument.numPages) { previewPageNumber++; await renderPreviewPage(); } });
+  controls.querySelectorAll('input[name="pdf_orientation"]').forEach(function (radio) {
     radio.addEventListener('change', function () {
-      modal.querySelectorAll('[data-pdf-print]').forEach(function (link) { link.hidden = true; });
-      preview.replaceChildren();
+      downloadButton.hidden = true;
+      clearPreview();
+      resultBlob = null;
       message('جهت صفحه تغییر کرد؛ برای ساخت خروجی جدید، «ساخت PDF» را بزنید.');
     });
   });
-  modal.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape') { event.preventDefault(); close(); }
-    if (event.key === 'Tab') {
-      var focusable = Array.from(modal.querySelectorAll('button:not(:disabled),input:not(:disabled),a[href]')).filter(function (el) { return !el.hidden; });
-      var first = focusable[0], last = focusable[focusable.length - 1];
-      if (!first) { event.preventDefault(); return; }
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    }
-  });
-  document.addEventListener('keydown', function (event) {
-    if ((event.ctrlKey || event.metaKey) && event.code === 'KeyP') { event.preventDefault(); open(); }
-  });
-  window.addEventListener('pagehide', function () { if (resultUrl) URL.revokeObjectURL(resultUrl); });
+  window.addEventListener('pagehide', function () { clearPreview(); });
 }());

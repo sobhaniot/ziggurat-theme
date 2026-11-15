@@ -119,7 +119,7 @@
             }
           });
           showStatus('نرخ‌ها ذخیره شدند.', 'saved');
-          if (typeof options.afterSave === 'function') options.afterSave();
+          if (typeof options.afterSave === 'function') options.afterSave(payload.data);
         });
       }).catch(function () {
         showStatus('ذخیره نرخ‌ها انجام نشد؛ دوباره تلاش کنید.', 'error');
@@ -157,8 +157,91 @@
     if (!form) return;
     function field(name) { return form.elements.namedItem(name); }
     function setText(selector, value) { var node = form.querySelector(selector); if (node) node.textContent = value; }
-    var costNames = ['installation', 'travel', 'supplies', 'transformer'];
+    var rates = {};
+    try { rates = JSON.parse(form.dataset.rates || '{}'); } catch (error) { rates = {}; }
+    var costNames = ['installation', 'travel', 'smd_spacing_cm', 'back_material', 'profit_percent'];
     var saveTimer = null;
+
+    function getRate(key) { return rates[key] === undefined ? 0 : Number(rates[key]) || 0; }
+
+    function planTransformers(requiredWatts) {
+      var target = Math.max(0, Math.ceil(requiredWatts));
+      var types = [400, 300, 200, 120, 100, 60].map(function (watts) {
+        return {watts: watts, capacity: watts, rate: money(getRate('transformer_' + watts + '_rate'))};
+      });
+      if (!target) return {items: [], count: 0, cost: 0, capacity: 0};
+      var maxCapacity = Math.max.apply(null, types.map(function (item) { return item.capacity; }));
+      var limit = target + maxCapacity - 1;
+      var plans = new Array(limit + 1);
+      plans[0] = {count: 0, quantities: types.map(function () { return 0; })};
+      function prefers(candidate, current) {
+        for (var quantityIndex = 0; quantityIndex < candidate.length; quantityIndex += 1) {
+          if (candidate[quantityIndex] !== current[quantityIndex]) return candidate[quantityIndex] > current[quantityIndex];
+        }
+        return false;
+      }
+      for (var capacity = 0; capacity <= limit; capacity += 1) {
+        var plan = plans[capacity];
+        if (!plan) continue;
+        types.forEach(function (type, index) {
+          var nextCapacity = capacity + type.capacity;
+          if (nextCapacity > limit) return;
+          var current = plans[nextCapacity];
+          var candidate = {count: plan.count + 1, quantities: plan.quantities.slice()};
+          candidate.quantities[index] += 1;
+          if (!current || candidate.count < current.count || (candidate.count === current.count && prefers(candidate.quantities, current.quantities))) plans[nextCapacity] = candidate;
+        });
+      }
+      var selected = null;
+      for (var index = target; index <= limit; index += 1) {
+        var possible = plans[index];
+        if (!possible) continue;
+        if (!selected || possible.count < selected.count || (possible.count === selected.count && index < selected.capacityUnits) || (possible.count === selected.count && index === selected.capacityUnits && prefers(possible.quantities, selected.quantities))) {
+          selected = {count: possible.count, quantities: possible.quantities, capacityUnits: index};
+        }
+      }
+      if (!selected) return {items: [], count: 0, cost: 0, capacity: 0};
+      var items = [];
+      var totalCost = 0;
+      selected.quantities.forEach(function (quantity, typeIndex) {
+        if (!quantity) return;
+        var type = types[typeIndex];
+        var cost = quantity * type.rate;
+        totalCost += cost;
+        items.push({watts: type.watts, count: quantity, capacity: type.capacity, rate: type.rate, cost: cost});
+      });
+      return {items: items, count: selected.count, cost: totalCost, capacity: selected.capacityUnits, requiredWatts: target};
+    }
+
+    function transformerLabel(plan) {
+      if (!plan.count) return 'بدون ترانس';
+      return plan.items.map(function (item) { return item.count.toLocaleString('fa-IR') + ' عدد ' + item.watts.toLocaleString('fa-IR') + ' وات'; }).join(' + ')
+        + '؛ توان ' + formatMeasure(plan.requiredWatts) + ' از ' + formatMeasure(plan.capacity) + ' وات — ' + formatMoney(plan.cost);
+    }
+
+    function planFramelessBars(length, width, barLength) {
+      var cuts = [];
+      [length, length, width, width].forEach(function (side) {
+        while (side > barLength + 0.000001) {
+          cuts.push(barLength);
+          side -= barLength;
+        }
+        if (side > 0.000001) cuts.push(side);
+      });
+      cuts.sort(function (a, b) { return b - a; });
+      var remaining = [];
+      cuts.forEach(function (cut) {
+        var placed = false;
+        for (var index = 0; index < remaining.length; index += 1) {
+          if (remaining[index] + 0.000001 < cut) continue;
+          remaining[index] = Math.max(0, remaining[index] - cut);
+          placed = true;
+          break;
+        }
+        if (!placed) remaining.push(Math.max(0, barLength - cut));
+      });
+      return {count: remaining.length, waste: remaining.reduce(function (total, value) { return total + value; }, 0)};
+    }
 
     function saveLastCosts() {
       window.clearTimeout(saveTimer);
@@ -168,8 +251,10 @@
         nonce: form.dataset.costsNonce,
         installation: money(field('installation').value),
         travel: money(field('travel').value),
-        supplies: money(field('supplies').value),
-        transformer: money(field('transformer').value)
+        installation_mode: field('installation_mode').value,
+        smd_spacing_cm: decimal(field('smd_spacing_cm').value),
+        back_material: field('back_material').value,
+        profit_percent: decimal(field('profit_percent').value)
       });
       fetch(form.dataset.ajaxUrl, {
         method: 'POST',
@@ -196,24 +281,54 @@
         return false;
       }
       error.hidden = true;
-      var usePerimeter = length < 1.5 || width < 1.5;
-      var measure = usePerimeter ? 2 * (length + width) : length * width;
-      var rate = money(usePerimeter ? form.dataset.perimeterRate : form.dataset.squareRate);
-      var base = Math.round(measure * rate);
-      var usePVC = field('use_pvc').checked;
-      var pvcRate = usePVC ? money(form.dataset.pvcRate) : 0;
-      var pvcCost = Math.round(measure * pvcRate);
-      var extras = money(field('installation').value) + money(field('travel').value) + money(field('supplies').value) + money(field('transformer').value);
-      var subtotal = base + pvcCost + extras;
+      var area = length * width;
+      var perimeter = 2 * (length + width);
+      var backMaterial = field('back_material').value === 'pvc' ? 'pvc' : 'mdf';
+      var textile = Math.round(area * money(getRate('textile_sqm_rate')));
+      var stitching = Math.round(perimeter * money(getRate('stitching_perimeter_rate')));
+      var mdf = backMaterial === 'mdf' ? Math.round(area * money(getRate('mdf_sqm_rate'))) : 0;
+      var pvc = backMaterial === 'pvc' ? Math.round(area * money(getRate('pvc_sqm_rate'))) : 0;
+      var frameLength = Math.max(.1, getRate('frameless_bar_length') || 6);
+      var framePlan = planFramelessBars(length, width, frameLength);
+      var frameBars = framePlan.count;
+      var frameWaste = framePlan.waste;
+      var frameCost = frameBars * money(getRate('frameless_bar_rate'));
+      var spacing = Math.max(1, decimal(field('smd_spacing_cm').value));
+      var smdRows = Math.ceil((width * 100) / spacing);
+      var smdMeters = smdRows * length;
+      var smdBarLength = 1;
+      var smdBars = Math.ceil(smdMeters);
+      var smdCost = smdBars * money(getRate('smd_bar_rate'));
+      var smdCurrentPerBar = Math.max(.1, getRate('smd_current_per_bar') || 1);
+      var smdVoltage = Number(getRate('smd_voltage')) === 24 ? 24 : 12;
+      var transformerReserve = Math.min(100, Math.max(0, getRate('transformer_reserve_percent')));
+      var smdCurrentTotal = smdBars * smdCurrentPerBar;
+      var transformerRequiredWatts = smdCurrentTotal * smdVoltage * (1 + transformerReserve / 100);
+      var transformerPlan = planTransformers(transformerRequiredWatts);
+      var wireMeters = length + width;
+      var wireCost = Math.round(wireMeters * money(getRate('wire_rate')));
+      var angleCost = Math.round(perimeter * money(getRate('angle_perimeter_rate')));
+      var installationMode = field('installation_mode').value === 'perimeter' ? 'perimeter' : 'fixed';
+      var installationInput = money(field('installation').value);
+      var installation = installationMode === 'perimeter' ? Math.round(perimeter * installationInput) : installationInput;
+      var travel = money(field('travel').value);
+      var subtotal = textile + stitching + mdf + pvc + frameCost + smdCost + transformerPlan.cost + wireCost + angleCost + installation + travel;
       var profitPercent = Math.min(1000, decimal(field('profit_percent').value));
       var profit = Math.round(subtotal * profitPercent / 100);
       var finalPrice = subtotal + profit;
-      setText('[data-price-method]', usePerimeter ? 'متر محیط' : 'مترمربع');
-      setText('[data-price-measure]', formatMeasure(measure) + (usePerimeter ? ' متر محیط' : ' مترمربع'));
-      setText('[data-price-rate]', formatMoney(rate));
-      setText('[data-price-base]', formatMoney(base));
-      setText('[data-price-pvc]', formatMoney(pvcCost) + (usePVC ? ' (' + formatMoney(pvcRate) + ' × مبنا)' : ' (استفاده نشده)'));
-      setText('[data-price-extras]', formatMoney(extras));
+      setText('[data-price-area]', formatMeasure(area) + ' مترمربع');
+      setText('[data-price-perimeter]', formatMeasure(perimeter) + ' متر');
+      setText('[data-price-textile]', formatMeasure(area) + ' مترمربع × ' + formatMoney(money(getRate('textile_sqm_rate'))) + ' = ' + formatMoney(textile));
+      setText('[data-price-stitching]', formatMeasure(perimeter) + ' متر × ' + formatMoney(money(getRate('stitching_perimeter_rate'))) + ' = ' + formatMoney(stitching));
+      setText('[data-price-pvc]', backMaterial === 'pvc' ? formatMeasure(area) + ' مترمربع × ' + formatMoney(money(getRate('pvc_sqm_rate'))) + ' = ' + formatMoney(pvc) : 'محاسبه نمی‌شود');
+      setText('[data-price-mdf]', backMaterial === 'mdf' ? formatMeasure(area) + ' مترمربع × ' + formatMoney(money(getRate('mdf_sqm_rate'))) + ' = ' + formatMoney(mdf) : 'محاسبه نمی‌شود');
+      setText('[data-price-frameless]', frameBars.toLocaleString('fa-IR') + ' شاخهٔ ' + formatMeasure(frameLength) + ' متری؛ پرت برش ' + formatMeasure(frameWaste) + ' متر = ' + formatMoney(frameCost));
+      setText('[data-price-smd]', smdRows.toLocaleString('fa-IR') + ' ردیف × ' + formatMeasure(length) + ' متر؛ ' + smdBars.toLocaleString('fa-IR') + ' شاخهٔ یک‌متری؛ جریان ' + formatMeasure(smdCurrentTotal) + ' آمپر در ' + smdVoltage.toLocaleString('fa-IR') + ' ولت = ' + formatMoney(smdCost));
+      setText('[data-price-transformer]', transformerLabel(transformerPlan));
+      setText('[data-price-wire]', formatMeasure(wireMeters) + ' متر (یک طول + یک عرض) = ' + formatMoney(wireCost));
+      setText('[data-price-angle]', formatMeasure(perimeter) + ' متر محیط = ' + formatMoney(angleCost));
+      setText('[data-price-installation]', formatMoney(installation) + (installationMode === 'perimeter' ? ' (' + formatMeasure(perimeter) + ' × ' + formatMoney(installationInput) + ')' : ' (کلی)'));
+      setText('[data-price-travel]', formatMoney(travel));
       setText('[data-price-subtotal]', formatMoney(subtotal));
       setText('[data-price-profit]', formatMoney(profit) + ' (' + profitPercent.toLocaleString('fa-IR') + '٪)');
       setText('[data-price-final]', formatMoney(finalPrice));
@@ -228,10 +343,13 @@
     setupRatesAutosave({
       kind: 'lightbox',
       action: 'zigurat_save_lightbox_rates',
-      fields: ['perimeter_rate', 'square_rate', 'pvc_rate'],
+      fields: ['textile_sqm_rate','stitching_perimeter_rate','mdf_sqm_rate','pvc_sqm_rate','frameless_bar_rate','frameless_bar_length','smd_bar_rate','smd_current_per_bar','smd_voltage','transformer_reserve_percent','wire_rate','angle_perimeter_rate','transformer_60_rate','transformer_100_rate','transformer_120_rate','transformer_200_rate','transformer_300_rate','transformer_400_rate'],
       calculator: form,
-      datasetMap: { perimeter_rate: 'perimeterRate', square_rate: 'squareRate', pvc_rate: 'pvcRate' },
-      afterSave: function () { calculate(false); }
+      datasetMap: {},
+      normalizers: {
+        frameless_bar_length: decimal, smd_current_per_bar: decimal, transformer_reserve_percent: decimal
+      },
+      afterSave: function (savedRates) { rates = savedRates; form.dataset.rates = JSON.stringify(rates); calculate(false); }
     });
     form.addEventListener('submit', function (event) {
       event.preventDefault();
@@ -248,6 +366,17 @@
           if (input.value.trim() !== '') saveLastCosts();
         });
       }
+    });
+    field('installation_mode').addEventListener('change', function () {
+      setText('[data-lightbox-installation-label]', field('installation_mode').value === 'perimeter' ? 'نرخ نصب هر متر محیط (ریال)' : 'هزینه نصب کلی (ریال)');
+      calculate(false);
+      saveLastCosts();
+    });
+    form.querySelectorAll('select').forEach(function (select) {
+      select.addEventListener('change', function () {
+        calculate(false);
+        if (costNames.indexOf(select.name) !== -1) saveLastCosts();
+      });
     });
   }
 

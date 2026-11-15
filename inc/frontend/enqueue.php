@@ -27,18 +27,21 @@ function zigurat_enqueue_assets()
     if ((is_page('invoices') || is_page_template('page-invoices.php')) && in_array($invoice_print_view, array('print', 'trash_print'), true)) {
         zigurat_enqueue_theme_style('main', array());
         zigurat_enqueue_theme_style('invoice');
-        zigurat_enqueue_theme_style('invoice-pdf', array('zigurat-invoice'));
-        zigurat_enqueue_theme_script('invoice-pdf');
-        $pdf_vendor = get_template_directory_uri() . '/assets/vendor/invoice-pdf/';
-        wp_localize_script('zigurat-invoice-pdf', 'ziguratInvoicePdfConfig', array(
-            'pdfUrl' => $pdf_vendor . 'pdf-lib-1.17.1.min.js',
-            'fontkitUrl' => $pdf_vendor . 'fontkit-1.1.1.min.js',
-            'bidiUrl' => $pdf_vendor . 'bidi-1.0.3.min.js',
-            'fontUrl' => get_template_directory_uri() . '/assets/fonts/Tanha-FD.woff2',
-            'pdfFontUrl' => get_template_directory_uri() . '/assets/fonts/Tanha-FD.ttf',
-            'previewUrl' => get_template_directory_uri() . '/assets/vendor/pdfjs/pdf.min.mjs',
-            'workerUrl' => get_template_directory_uri() . '/assets/vendor/pdfjs/pdf.worker.min.mjs',
-        ));
+        if ($invoice_print_view === 'print') {
+            zigurat_enqueue_theme_style('invoice-pdf', array('zigurat-main'));
+            zigurat_enqueue_theme_script('invoice-pdf');
+            wp_localize_script('zigurat-invoice-pdf', 'ziguratInvoicePdfConfig', array(
+                'pdfUrl' => get_template_directory_uri() . '/assets/vendor/invoice-pdf/pdf-lib-1.17.1.min.js',
+                'fontkitUrl' => get_template_directory_uri() . '/assets/vendor/invoice-pdf/fontkit-1.1.1.min.js',
+                'bidiUrl' => get_template_directory_uri() . '/assets/vendor/invoice-pdf/bidi-1.0.3.min.js',
+                'pdfModuleUrl' => wp_make_link_relative(get_template_directory_uri() . '/assets/vendor/pdfjs/pdf.min.mjs'),
+                'workerUrl' => wp_make_link_relative(get_template_directory_uri() . '/assets/vendor/pdfjs/pdf.worker.min.mjs'),
+                'pdfViewUrl' => admin_url('admin-post.php?action=zigurat_invoice_pdf_inline'),
+                'pdfViewNonce' => wp_create_nonce('zigurat_invoice_pdf_inline'),
+                'fontUrl' => get_template_directory_uri() . '/assets/fonts/Tanha-FD.woff2',
+                'pdfFontUrl' => get_template_directory_uri() . '/assets/fonts/Tanha-FD.ttf',
+            ));
+        }
         return;
     }
     if (is_front_page()) {
@@ -120,6 +123,9 @@ function zigurat_enqueue_assets()
             zigurat_enqueue_theme_script('pricing-calculator');
             zigurat_enqueue_theme_script('letter-calculator', array('zigurat-pricing-calculator'));
         }
+        if (in_array($manager_section, array('applications', 'application-detail'), true) && current_user_can('manage_options')) {
+            zigurat_enqueue_theme_script('manager-application-delete');
+        }
         if ($manager_section === 'applications' && zigurat_is_manager()) {
             zigurat_enqueue_theme_script('manager-partner-map');
             wp_localize_script('zigurat-manager-partner-map', 'ziguratPartnerMapConfig', array(
@@ -145,6 +151,14 @@ function zigurat_enqueue_assets()
             zigurat_enqueue_theme_script('manager-followup-controls');
             zigurat_enqueue_theme_style('manager-projects');
             zigurat_enqueue_theme_script('manager-projects', array('zigurat-manager-followup-controls'));
+            zigurat_enqueue_theme_style('project-handoff', array('zigurat-manager-projects'));
+            zigurat_enqueue_theme_script('project-handoff', array('zigurat-manager-projects'));
+            wp_localize_script('zigurat-project-handoff', 'ziguratProjectHandoff', array(
+                'logo' => get_template_directory_uri() . '/assets/images/zigurat-logo.svg',
+                'font' => get_template_directory_uri() . '/assets/fonts/Tanha-FD.woff2',
+                'fontFallback' => get_template_directory_uri() . '/assets/fonts/Tanha-FD.ttf',
+                'pdfLib' => get_template_directory_uri() . '/assets/vendor/invoice-pdf/pdf-lib-1.17.1.min.js',
+            ));
             $project_vapid = zigurat_crm_vapid_keys();
             wp_localize_script('zigurat-manager-projects', 'ziguratWorkflowProjects', array(
                 'ajaxUrl' => admin_url('admin-ajax.php'),

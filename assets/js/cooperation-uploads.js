@@ -1,6 +1,20 @@
 (function () {
   'use strict';
 
+  document.querySelectorAll('[data-statement-upload]').forEach(function (form) {
+    var input = form.elements.statement_pdf;
+    var filename = form.querySelector('[data-statement-filename]');
+    var submit = form.querySelector('button[type="submit"]');
+    function refreshSelection() {
+      var file = input.files[0];
+      filename.textContent = file ? file.name : '';
+      submit.hidden = !file;
+    }
+    input.addEventListener('change', refreshSelection);
+    window.addEventListener('pageshow', refreshSelection);
+    refreshSelection();
+  });
+
   function fileKey(file) {
     return [file.name, file.size, file.lastModified].join('::');
   }

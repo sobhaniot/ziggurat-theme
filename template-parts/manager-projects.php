@@ -9,7 +9,7 @@ $records = $trash_view ? array() : zigurat_workflow_project_records();
 // The archive is loaded on demand after the board is visible. Loading every
 // trashed project (and its complete history) here made the initial page slow.
 $archived_records = array();
-$active_collaborators = zigurat_workflow_active_collaborators($records);
+$active_collaborators = $trash_view ? array() : zigurat_workflow_active_collaborators($records);
 $grouped = array_fill_keys(array_keys($stages), array());
 $today = function_exists('zigurat_invoice_today_jalali') ? zigurat_invoice_today_jalali() : '';
 $due_count = 0;
@@ -50,11 +50,34 @@ $stage_classes = array(
         <div class="manager-projects__heading-actions">
             <div class="manager-projects__primary-actions <?php echo current_user_can('manage_options') ? 'has-project-trash' : ''; ?>">
                 <button type="button" class="manager-projects__new" data-project-new><span aria-hidden="true">＋</span> پروژه جدید</button>
+                <?php if (!$trash_view): ?><button type="button" class="manager-project-handoff-trigger" data-project-handoff-bulk>خروجی کارت‌های همکار</button><?php endif; ?>
                 <?php if (current_user_can('manage_options')): ?><a class="manager-projects__trash-jump" href="<?php echo esc_url(zigurat_workflow_project_url($trash_view ? array() : array('project_view' => 'trash'))); ?>"><?php echo $trash_view ? 'بازگشت به مدیریت پروژه‌ها' : 'سطل زباله'; ?></a><?php endif; ?>
             </div>
             <div class="manager-projects__notification-tools"><button type="button" data-crm-push><span aria-hidden="true">🔔</span><b>فعال‌کردن اعلان این دستگاه</b></button></div>
         </div>
     </header>
+
+    <dialog class="manager-project-handoff-dialog" data-project-handoff-dialog aria-labelledby="project-handoff-title">
+        <div class="manager-project-handoff-header">
+            <h3 id="project-handoff-title">برگه اجرای پروژه</h3>
+            <button type="button" data-handoff-close aria-label="بستن">×</button>
+        </div>
+        <label data-handoff-partner-field hidden>انتخاب همکار
+            <select data-handoff-partner>
+                <option value="">انتخاب کنید</option>
+                <?php foreach ($partners as $partner): ?>
+                    <option value="<?php echo (int) $partner['id']; ?>"><?php echo esc_html($partner['name']); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <p data-handoff-status role="status" aria-live="polite"></p>
+        <div class="manager-project-handoff-preview" data-handoff-preview></div>
+        <div class="manager-project-handoff-actions">
+            <button type="button" data-handoff-download="png" disabled>دریافت عکس</button>
+            <button type="button" data-handoff-download="pdf" disabled>دریافت PDF</button>
+            <a data-handoff-result hidden></a>
+        </div>
+    </dialog>
 
     <?php if (current_user_can('manage_options')): ?>
         <section id="manager-project-trash" class="manager-project-trash" aria-labelledby="manager-project-trash-title" data-project-trash hidden>
@@ -93,6 +116,7 @@ $stage_classes = array(
                                 <button type="button" class="manager-project-card__edit" data-project-edit aria-label="ویرایش <?php echo esc_attr($record['title']); ?>">
                                     <strong><?php echo esc_html($record['title']); ?></strong>
                                 </button>
+                                <button type="button" class="manager-project-handoff-trigger" data-project-handoff>برگه اجرا</button>
                             </div>
                             <?php if ($record['client']): ?>
                                 <div class="manager-project-card__client"><b><?php echo esc_html($record['client']); ?></b></div>
@@ -193,9 +217,17 @@ $stage_classes = array(
                     <label>مرحله پروژه<select name="stage"><?php foreach ($stages as $key => $label): ?><option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></option><?php endforeach; ?></select></label>
                     <label>پیگیری بعدی (شمسی)<span class="manager-crm-datetime"><input type="text" name="followup" inputmode="none" dir="ltr" placeholder="انتخاب تاریخ و ساعت" data-crm-datetime readonly autocomplete="off"><button type="button" data-crm-datetime-open aria-label="انتخاب تاریخ و ساعت پیگیری"><?php get_template_part('template-parts/followup-calendar-icon'); ?></button></span></label>
                 <?php get_template_part('template-parts/followup-repeat-toggle'); ?>
+                    <label>یادآوری مجری در روبیکا<select name="executor_reminder"><option value="once">فقط اعلان عادی</option><option value="daily">روزی یک بار در حال اجرا</option></select></label>
                     <label class="is-wide manager-project-document-picker">اتصال به پیش‌فاکتورها<span class="manager-project-document-picker__selected" data-document-selected="proforma" aria-live="polite"></span><select size="5" data-document-picker="proforma"><?php foreach ($proformas as $document): ?><option value="<?php echo (int) $document->id; ?>" data-document-number="<?php echo esc_attr(zigurat_invoice_object_number($document)); ?>"><?php echo esc_html(zigurat_workflow_project_document_label($document)); ?></option><?php endforeach; ?></select><small>برای افزودن، روی پیش‌فاکتور دوبار کلیک کنید. کارت تکراری خودکار در همین پروژه ادغام می‌شود.</small></label>
                     <label class="is-wide manager-project-document-picker">اتصال به فاکتورهای نهایی<span class="manager-project-document-picker__selected" data-document-selected="invoice" aria-live="polite"></span><select size="5" data-document-picker="invoice"><?php foreach ($invoices as $document): ?><option value="<?php echo (int) $document->id; ?>" data-document-number="<?php echo esc_attr(zigurat_invoice_object_number($document)); ?>"><?php echo esc_html(zigurat_workflow_project_document_label($document)); ?></option><?php endforeach; ?></select><small>برای افزودن، روی فاکتور دوبار کلیک کنید؛ انتخاب‌ها از بالای کادر قابل حذف هستند.</small></label>
                     <label class="is-wide">یادداشت‌ها<textarea name="notes" rows="4" maxlength="3000" placeholder="نتیجه تماس‌ها، توافق‌ها و نکات اجرایی پروژه"></textarea></label>
+                    <div class="is-wide manager-project-photo-picker" data-project-photo-picker>
+                        <strong>عکس‌های پروژه</strong>
+                        <div class="manager-project-photo-list" data-project-photo-list></div>
+                        <input type="file" data-project-photo-input accept="image/jpeg,image/png,image/webp" multiple hidden>
+                        <button type="button" data-project-photo-browse>انتخاب عکس</button>
+                        <small>فایل را اینجا رها کنید یا دکمهٔ انتخاب عکس را بزنید. حداکثر دو عکس، هرکدام تا ۵ مگابایت.</small>
+                    </div>
                 </div>
                 <section class="manager-project-work-editor">
                     <header>

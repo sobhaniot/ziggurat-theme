@@ -25,7 +25,7 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
             <a href="<?php echo esc_url(add_query_arg(array('manager-section'=>'pricing','calculator'=>'lightbox'), zigurat_manager_login_url())); ?>">
                 <span aria-hidden="true">▣</span>
                 <strong>محاسبه قیمت لایت‌باکس</strong>
-                <small>محاسبه براساس متر محیط یا مترمربع، هزینه‌های جانبی و سود</small>
+                <small>تفکیک هزینهٔ چاپ، دوخت، MDF، فریم‌لس، SMD، ترانس و نصب</small>
             </a>
             <a href="<?php echo esc_url(add_query_arg(array('manager-section'=>'pricing','calculator'=>'composite'), zigurat_manager_login_url())); ?>">
                 <span aria-hidden="true">▦</span>
@@ -53,50 +53,65 @@ $pricing_url = add_query_arg('manager-section', 'pricing', zigurat_manager_login
         <header class="manager-pricing__heading">
             <span>برآورد محصول</span>
             <h2 id="manager-pricing-title">محاسبه قیمت لایت‌باکس</h2>
-            <p>اگر یکی از اضلاع کمتر از ۱٫۵ متر باشد، متر محیط مبناست؛ در غیر این صورت قیمت براساس مترمربع محاسبه می‌شود.</p>
+            <p>ابعاد، مصرف متریال و هزینهٔ هر بخش جداگانه محاسبه می‌شود.</p>
         </header>
 
         <div class="manager-pricing-layout">
             <aside class="manager-pricing-rates">
-                <h3>تنظیم نرخ‌های پایه</h3>
-                <p>نرخ‌ها به ریال ذخیره می‌شوند و در محاسبات بعدی باقی می‌مانند.</p>
+                <h3>نرخ متریال و قطعات</h3>
+                <p>مبالغ به ریال هستند و نرخ‌ها برای محاسبه‌های بعدی ذخیره می‌شوند.</p>
                 <form data-pricing-rates-form="lightbox" data-ajax-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>" data-rates-nonce="<?php echo esc_attr(wp_create_nonce('zigurat_lightbox_rates')); ?>">
-                    <label>قیمت هر متر محیط (ریال)
-                        <input name="perimeter_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['perimeter_rate']); ?>" required>
-                    </label>
-                    <label>قیمت هر مترمربع (ریال)
-                        <input name="square_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['square_rate']); ?>" required>
-                    </label>
-                    <label>نرخ PVC بر اساس مبنای محاسبه (ریال)
-                        <input name="pvc_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['pvc_rate']); ?>" required>
-                    </label>
+                    <label>چاپ تکستایل هر مترمربع (ریال)<input name="textile_sqm_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['textile_sqm_rate']); ?>"></label>
+                    <label>دوخت هر متر محیط (ریال)<input name="stitching_perimeter_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['stitching_perimeter_rate']); ?>"></label>
+                    <label>قیمت MDF هر مترمربع (ریال)<input name="mdf_sqm_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['mdf_sqm_rate']); ?>"></label>
+                    <label>قیمت PVC هر مترمربع (ریال)<input name="pvc_sqm_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['pvc_sqm_rate']); ?>"></label>
+                    <label>قیمت هر شاخه فریم‌لس (ریال)<input name="frameless_bar_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['frameless_bar_rate']); ?>"></label>
+                    <label>طول شاخه فریم‌لس (متر)<input name="frameless_bar_length" type="text" inputmode="decimal" value="<?php echo esc_attr($settings['frameless_bar_length']); ?>"></label>
+                    <label>قیمت نبشی هر متر محیط (ریال)<input name="angle_perimeter_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['angle_perimeter_rate']); ?>"></label>
+                    <label>قیمت شاخه SMD یک‌متری (ریال)<input name="smd_bar_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['smd_bar_rate']); ?>"></label>
+                    <label>مصرف جریان هر شاخهٔ یک‌متری SMD (آمپر)<input name="smd_current_per_bar" type="text" inputmode="decimal" value="<?php echo esc_attr($settings['smd_current_per_bar']); ?>"><small>در ۱۲ ولت معمولاً حدود ۰٫۵ تا ۱٫۲ آمپر در متر دیده می‌شود؛ مقدار روی مشخصات همان ریسه را وارد کنید.</small></label>
+                    <label>ولتاژ SMD (ولت)<select name="smd_voltage"><option value="12" <?php selected((int) $settings['smd_voltage'], 12); ?>>۱۲ ولت</option><option value="24" <?php selected((int) $settings['smd_voltage'], 24); ?>>۲۴ ولت</option></select></label>
+                    <label>رزرو توان ترانس (درصد)<input name="transformer_reserve_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($settings['transformer_reserve_percent']); ?>"></label>
+                    <label>قیمت سیم هر متر (ریال)<input name="wire_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['wire_rate']); ?>"></label>
+                    <details class="manager-lightbox-transformer-rates"><summary>قیمت انواع ترانس</summary><div>
+                        <?php foreach (array(60=>'۶۰ وات',100=>'۱۰۰ وات',120=>'۱۲۰ وات',200=>'۲۰۰ وات',300=>'۳۰۰ وات',400=>'۴۰۰ وات') as $watts => $label): ?>
+                            <label>ترانس <?php echo esc_html($label); ?> — قیمت (ریال)<input name="transformer_<?php echo esc_attr($watts); ?>_rate" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $settings['transformer_' . $watts . '_rate']); ?>"></label>
+                        <?php endforeach; ?>
+                    </div></details>
                     <small class="manager-pricing-rates__status <?php echo $pricing_status === 'saved' ? 'is-saved' : ($pricing_status ? 'is-error' : ''); ?>" data-pricing-rates-status role="<?php echo $pricing_status && $pricing_status !== 'saved' ? 'alert' : 'status'; ?>"><?php echo $pricing_status === 'saved' ? 'نرخ‌های پایه با موفقیت ذخیره شدند.' : ($pricing_status ? 'ذخیره نرخ‌ها انجام نشد؛ دوباره تلاش کنید.' : 'تغییر نرخ‌ها به‌صورت خودکار ذخیره می‌شود.'); ?></small>
                 </form>
                 <?php if (!empty($settings['updated_at'])): ?><small class="manager-pricing-rates__updated">آخرین به‌روزرسانی: <?php echo esc_html($settings['updated_at']); ?></small><?php endif; ?>
             </aside>
 
-            <form class="manager-lightbox-calculator" data-lightbox-calculator data-perimeter-rate="<?php echo esc_attr((int) $settings['perimeter_rate']); ?>" data-square-rate="<?php echo esc_attr((int) $settings['square_rate']); ?>" data-pvc-rate="<?php echo esc_attr((int) $settings['pvc_rate']); ?>" data-ajax-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>" data-costs-nonce="<?php echo esc_attr(wp_create_nonce('zigurat_lightbox_last_costs')); ?>">
+            <form class="manager-lightbox-calculator" data-lightbox-calculator data-rates="<?php echo esc_attr(wp_json_encode($settings)); ?>" data-ajax-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>" data-costs-nonce="<?php echo esc_attr(wp_create_nonce('zigurat_lightbox_last_costs')); ?>">
                 <div class="manager-lightbox-fields">
                     <label>طول لایت‌باکس (متر) *<input name="length" type="text" inputmode="decimal" placeholder="مثلاً ۲.۴" required></label>
                     <label>عرض لایت‌باکس (متر) *<input name="width" type="text" inputmode="decimal" placeholder="مثلاً ۱.۸" required></label>
-                    <label>هزینه نصب (ریال)<input name="installation" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_costs['installation']); ?>"></label>
+                    <label>روش محاسبه نصب<select name="installation_mode"><option value="fixed" <?php selected($last_costs['installation_mode'], 'fixed'); ?>>هزینه نصب کلی</option><option value="perimeter" <?php selected($last_costs['installation_mode'], 'perimeter'); ?>>براساس متر محیط</option></select></label>
+                    <label><span data-lightbox-installation-label><?php echo $last_costs['installation_mode'] === 'perimeter' ? 'نرخ نصب هر متر محیط (ریال)' : 'هزینه نصب کلی (ریال)'; ?></span><input name="installation" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_costs['installation']); ?>"></label>
+                    <label>فاصلهٔ بین شاخه‌های SMD (سانتی‌متر)<input name="smd_spacing_cm" type="text" inputmode="decimal" value="<?php echo esc_attr($last_costs['smd_spacing_cm']); ?>"><small>تعداد ردیف‌ها و شاخه‌های یک‌متری از این فاصله و ابعاد محاسبه می‌شود.</small></label>
                     <label>هزینه ایاب و ذهاب (ریال)<input name="travel" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_costs['travel']); ?>"></label>
-                    <label>هزینه لوازم (ریال)<input name="supplies" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_costs['supplies']); ?>"></label>
-                    <label>هزینه ترانس (ریال)<input name="transformer" type="text" inputmode="numeric" data-money-input value="<?php echo esc_attr((int) $last_costs['transformer']); ?>"></label>
-                    <label>درصد سود<input name="profit_percent" type="text" inputmode="decimal" value="0" placeholder="مثلاً ۲۵"></label>
-                    <label class="manager-pricing-check"><input name="use_pvc" type="checkbox" value="1"><span><strong>استفاده از PVC</strong><small>با فعال‌شدن این گزینه، نرخ PVC به مبنای محاسبه اضافه می‌شود.</small></span></label>
+                    <label>درصد سود<input name="profit_percent" type="text" inputmode="decimal" value="<?php echo esc_attr($last_costs['profit_percent']); ?>" placeholder="مثلاً ۲۵"></label>
+                    <label class="manager-lightbox-back-material">جنس پشت لایت‌باکس<select name="back_material"><option value="mdf" <?php selected($last_costs['back_material'], 'mdf'); ?>>MDF</option><option value="pvc" <?php selected($last_costs['back_material'], 'pvc'); ?>>PVC</option></select></label>
                 </div>
                 <small class="manager-pricing-autosave">آخرین مبلغ واردشده در هزینه‌های جانبی به‌صورت خودکار ذخیره می‌شود.</small>
-                <div class="manager-pricing-formula"><strong>فرمول:</strong> قیمت پایه + هزینه PVC (در صورت انتخاب) + نصب + ایاب‌وذهاب + لوازم + ترانس؛ سپس درصد سود به جمع هزینه‌ها اضافه می‌شود.</div>
+                <div class="manager-pricing-formula"><strong>مبنای برآورد:</strong> چاپ و پشت انتخاب‌شده (PVC یا MDF) براساس مترمربع؛ دوخت و نبشی براساس متر محیط؛ تعداد شاخهٔ فریم‌لس و پرت واقعی برش از ابعاد و طول شاخه محاسبه می‌شود؛ سیم به‌اندازهٔ یک طول و یک عرض؛ شاخه‌های SMD با فاصلهٔ نصب و ترانس براساس توان مصرفی همراه با درصد رزرو.</div>
                 <div class="manager-pricing-error" data-pricing-error role="alert" hidden></div>
                 <section class="manager-pricing-result" data-pricing-result aria-live="polite">
-                    <div><span>روش محاسبه</span><strong data-price-method>—</strong></div>
-                    <div><span>مقدار مبنا</span><strong data-price-measure>—</strong></div>
-                    <div><span>نرخ مبنا</span><strong data-price-rate>۰ ریال</strong></div>
-                    <div><span>قیمت پایه محصول</span><strong data-price-base>۰ ریال</strong></div>
-                    <div><span>هزینه PVC</span><strong data-price-pvc>۰ ریال</strong></div>
-                    <div><span>جمع هزینه‌های جانبی</span><strong data-price-extras>۰ ریال</strong></div>
-                    <div><span>جمع قبل از سود</span><strong data-price-subtotal>۰ ریال</strong></div>
+                    <div><span>مساحت</span><strong data-price-area>—</strong></div>
+                    <div><span>متر محیط</span><strong data-price-perimeter>—</strong></div>
+                    <div><span>چاپ تکستایل</span><strong data-price-textile>—</strong></div>
+                    <div><span>دوخت</span><strong data-price-stitching>—</strong></div>
+                    <div><span>پشت PVC</span><strong data-price-pvc>—</strong></div>
+                    <div><span>MDF</span><strong data-price-mdf>—</strong></div>
+                    <div><span>شاخه فریم‌لس</span><strong data-price-frameless>—</strong></div>
+                    <div><span>مصرف SMD</span><strong data-price-smd>—</strong></div>
+                    <div><span>ترانس پیشنهادی</span><strong data-price-transformer>—</strong></div>
+                    <div><span>سیم</span><strong data-price-wire>—</strong></div>
+                    <div><span>نبشی</span><strong data-price-angle>—</strong></div>
+                    <div><span>نصب</span><strong data-price-installation>—</strong></div>
+                    <div><span>ایاب و ذهاب</span><strong data-price-travel>—</strong></div>
+                    <div><span>جمع هزینه</span><strong data-price-subtotal>۰ ریال</strong></div>
                     <div><span>مبلغ سود</span><strong data-price-profit>۰ ریال</strong></div>
                     <div class="manager-pricing-result__final"><span>قیمت نهایی</span><strong data-price-final>۰ ریال</strong></div>
                 </section>

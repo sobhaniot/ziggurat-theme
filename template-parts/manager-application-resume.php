@@ -43,17 +43,18 @@ $edit_status = isset($_GET['application-edit']) && is_string($_GET['application-
     : '';
 ?>
 <div class="manager-resume-page">
+    <?php get_template_part('template-parts/manager-application-delete-dialog'); ?>
     <div class="manager-applications__toolbar manager-resume-actions no-print">
         <a class="manager-resume-actions__back" href="<?php echo esc_url($list_url); ?>">بازگشت به درخواست‌ها</a>
         <button class="manager-resume-actions__print" type="button" onclick="window.print()">چاپ رزومه</button>
         <?php if (current_user_can('manage_options')): ?>
             <button type="button" class="manager-application-edit-toggle manager-resume-actions__edit" aria-expanded="false" aria-controls="manager-application-edit-form" onclick="var panel=document.getElementById('manager-application-edit-form'); var open=panel.hidden; panel.hidden=!open; this.setAttribute('aria-expanded', open ? 'true' : 'false'); if(open){panel.scrollIntoView({behavior:'smooth', block:'start'});}">ویرایش رزومه</button>
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('این رزومه به زباله‌دان منتقل شود؟');">
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <input type="hidden" name="action" value="zigurat_delete_partner_application">
                 <input type="hidden" name="application_id" value="<?php echo esc_attr($application_id); ?>">
                 <input type="hidden" name="redirect_to" value="<?php echo esc_url($list_url); ?>">
                 <?php wp_nonce_field('zigurat_delete_partner_application_' . $application_id); ?>
-                <button class="manager-application-delete" type="submit">حذف رزومه</button>
+                <button class="manager-application-delete" type="button" data-application-delete>حذف رزومه</button>
             </form>
         <?php endif; ?>
     </div>
@@ -225,6 +226,60 @@ $edit_status = isset($_GET['application-edit']) && is_string($_GET['application-
             <?php endif; ?>
         </div>
 
+        <?php if (zigurat_statement_manager_access() && zigurat_statement_partner($application_id)): ?>
+            <?php $statement = get_option('zigurat_statement_' . $application_id); ?>
+            <section id="collaborator-statement" class="manager-resume__section no-print">
+                <h3>صورت‌حساب همکار</h3>
+                <?php $pdf_status = $_GET['statement-pdf'] ?? ''; ?>
+                <?php if ($pdf_status === 'saved'): ?>
+                    <p class="manager-applications__notice is-success" role="status">PDF صورت‌حساب ذخیره شد.</p>
+                <?php elseif ($pdf_status === 'error'): ?>
+                    <p class="manager-applications__notice is-error" role="alert">بارگذاری انجام نشد. یک فایل PDF معتبر تا ۵ مگابایت انتخاب کنید.</p>
+                <?php endif; ?>
+                <?php if (get_post_meta($application_id, '_zigurat_statement_sample_pdf', true)): ?>
+                    <p><a class="manager-statement-view" href="<?php echo esc_url(wp_nonce_url(add_query_arg(array(
+                        'action' => 'zigurat_statement_pdf',
+                        'collaborator' => $application_id,
+                    ), admin_url('admin-post.php')), 'zigurat_statement_pdf_' . $application_id)); ?>"
+                        target="_blank" rel="noopener">مشاهدهٔ صورت‌حساب (PDF)</a></p>
+                <?php endif; ?>
+                <form class="manager-statement-upload" data-statement-upload method="post" enctype="multipart/form-data" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                    <input type="hidden" name="action" value="zigurat_statement_upload_pdf">
+                    <input type="hidden" name="collaborator" value="<?php echo esc_attr($application_id); ?>">
+                    <?php wp_nonce_field('zigurat_statement_upload_pdf_' . $application_id); ?>
+                    <div class="manager-statement-upload__actions">
+                        <input class="screen-reader-text" id="statement-pdf-file" type="file" name="statement_pdf" accept=".pdf,application/pdf" required>
+                        <label class="manager-statement-upload__choose" for="statement-pdf-file">انتخاب PDF</label>
+                        <span class="manager-statement-upload__filename" data-statement-filename aria-live="polite" dir="auto"></span>
+                        <button class="manager-application-edit__save" type="submit" hidden>بارگذاری PDF</button>
+                    </div>
+                    <small>حداکثر ۵ مگابایت. فایل جدید جایگزین PDF قبلی می‌شود.</small>
+                </form>
+                <?php if (is_array($statement)): ?>
+                    <p>واحد: <?php echo esc_html($statement['currency'] === 'IRR' ? 'ریال' : 'تومان'); ?>
+                        | ماندهٔ اول دوره: <bdi><?php echo esc_html($statement['opening_balance']); ?></bdi>
+                        | آخرین همگام‌سازی: <bdi><?php echo esc_html(wp_date('Y/m/d H:i', strtotime($statement['synced_at']))); ?></bdi></p>
+                    <div class="manager-application-table-wrap">
+                        <table class="manager-application-table">
+                            <thead><tr><th>تاریخ</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th><th>مانده</th></tr></thead>
+                            <tbody>
+                                <?php foreach ($statement['rows'] as $row): ?>
+                                    <tr>
+                                        <td><?php echo esc_html($row['date']); ?></td>
+                                        <td><?php echo esc_html($row['description']); ?></td>
+                                        <td><bdi><?php echo esc_html($row['debit']); ?></bdi></td>
+                                        <td><bdi><?php echo esc_html($row['credit']); ?></bdi></td>
+                                        <td><bdi><?php echo esc_html($row['balance']); ?></bdi></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <p>هنوز صورت‌حسابی از اکسل همگام نشده است.</p>
+                <?php endif; ?>
+            </section>
+        <?php endif; ?>
         <footer class="manager-resume__footer">
             <span><?php echo esc_html(get_bloginfo('name')); ?></span>
             <span>این رزومه از درخواست خصوصی ثبت‌شده در سایت ایجاد شده است.</span>

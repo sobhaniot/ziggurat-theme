@@ -587,6 +587,25 @@ function zigurat_workflow_project_assignment_keys($work_items)
 function zigurat_workflow_active_collaborators($records = null)
 {
     $records = is_array($records) ? $records : zigurat_workflow_project_records();
+    $archived = get_posts(array(
+        'post_type' => 'zig_work_project',
+        'post_status' => 'trash',
+        'posts_per_page' => -1,
+        'meta_query' => array(
+            array('key' => '_zigurat_work_project_archived_at', 'compare' => 'EXISTS'),
+            array('key' => '_zigurat_work_project_deleted_at', 'compare' => 'NOT EXISTS'),
+        ),
+    ));
+    foreach ($archived as $project) {
+        $records[] = array(
+            'id' => (int) $project->ID,
+            'title' => $project->post_title,
+            'stage' => 'archived',
+            'stage_label' => 'بایگانی‌شده',
+            'client' => (string) get_post_meta($project->ID, '_zigurat_work_project_client', true),
+            'work_items' => zigurat_workflow_project_work_items($project->ID),
+        );
+    }
     $partners = array();
     foreach (zigurat_workflow_project_partners() as $partner) {
         $partners[$partner['id']] = $partner;
@@ -699,6 +718,7 @@ function zigurat_workflow_project_record($project)
             'time' => $history_time,
         );
     }
+    $photo_urls = zigurat_project_handoff_photo_urls($project->ID);
     return array(
         'id' => (int) $project->ID,
         'archived' => $project->post_status === 'trash',
@@ -710,8 +730,11 @@ function zigurat_workflow_project_record($project)
         'followup' => (string) get_post_meta($project->ID, '_zigurat_work_project_followup', true),
         'followup_due' => ($followup_time = zigurat_project_followup_timestamp(get_post_meta($project->ID, '_zigurat_work_project_followup', true))) && $followup_time <= time(),
         'repeat_daily' => (bool)get_post_meta($project->ID, '_zigurat_work_project_repeat_daily', true),
+        'executor_reminder' => get_post_meta($project->ID, '_zigurat_executor_reminder', true) === 'daily' ? 'daily' : 'once',
         'work_items' => zigurat_workflow_project_work_items($project->ID),
         'notes' => (string) get_post_meta($project->ID, '_zigurat_work_project_notes', true),
+        'photo' => reset($photo_urls) ?: '',
+        'photos' => array((string) ($photo_urls[0] ?? ''), (string) ($photo_urls[1] ?? '')),
         'proforma_ids' => array_values(array_map(static function ($document) { return (int) $document->id; }, $proformas)),
         'proformas' => array_values(array_map(static function ($document) {
             return array(
@@ -952,6 +975,32 @@ function zigurat_ajax_get_workflow_project_by_document()
 }
 add_action('wp_ajax_zigurat_get_workflow_project_by_document', 'zigurat_ajax_get_workflow_project_by_document');
 
+function zigurat_workflow_unlink_trashed_invoice($invoice)
+{
+    $invoice_id = absint($invoice->id ?? 0);
+    if (!$invoice_id || ($invoice->document_type ?? '') !== 'invoice') return;
+
+    $GLOBALS['zigurat_workflow_document_cache'][$invoice_id] = null;
+    $project_ids = get_posts(array(
+        'post_type' => 'zig_work_project',
+        'post_status' => array('private', 'trash'),
+        'posts_per_page' => -1,
+        'fields' => 'ids',
+        'no_found_rows' => true,
+        'meta_query' => array(
+            'relation' => 'OR',
+            array('key' => '_zigurat_work_project_invoices', 'value' => $invoice_id),
+            array('key' => '_zigurat_work_project_invoice', 'value' => $invoice_id),
+        ),
+    ));
+    foreach ($project_ids as $project_id) {
+        $ids = zigurat_workflow_project_document_ids($project_id, 'invoice');
+        zigurat_workflow_project_set_document_ids($project_id, 'invoice', array_diff($ids, array($invoice_id)));
+        zigurat_workflow_archive_if_settled($project_id);
+    }
+}
+add_action('zigurat_invoice_trashed', 'zigurat_workflow_unlink_trashed_invoice');
+
 function zigurat_workflow_archive_if_settled($project_id)
 {
     $post = get_post($project_id);
@@ -959,8 +1008,21 @@ function zigurat_workflow_archive_if_settled($project_id)
     $ids = zigurat_workflow_project_document_ids($project_id, 'invoice');
     if (!$ids) return false;
     $documents = zigurat_workflow_project_documents($project_id, 'invoice');
-    // Missing or partially linked documents must never produce a false settlement.
-    if (count($documents) !== count($ids)) return false;
+    if (!$documents) return false;
+    if (count($documents) !== count($ids)) {
+        // Repair old links only when the invoice trash confirms their deletion.
+        global $wpdb;
+        $valid_ids = array_map(static function ($document) { return (int) $document->id; }, $documents);
+        $missing_ids = array_values(array_diff($ids, $valid_ids));
+        $placeholders = implode(',', array_fill(0, count($missing_ids), '%d'));
+        $trash_table = zigurat_invoice_trash_table_name();
+        $trashed_ids = $wpdb->get_col($wpdb->prepare(
+            "SELECT DISTINCT original_invoice_id FROM {$trash_table} WHERE document_type = 'invoice' AND original_invoice_id IN ({$placeholders})",
+            $missing_ids
+        ));
+        if (array_diff($missing_ids, $trashed_ids)) return false;
+        zigurat_workflow_project_set_document_ids($project_id, 'invoice', $valid_ids);
+    }
     foreach ($documents as $document) {
         if (($document->payment_status ?? '') !== 'settled') {
             delete_post_meta($project_id, '_zigurat_work_project_reopened_from_archive');
@@ -1068,6 +1130,11 @@ function zigurat_workflow_merge_projects($target_id, $source_id)
     });
     update_post_meta($target_id, '_zigurat_work_project_history', array_slice($history, -99));
     zigurat_workflow_project_add_history($target_id, '', '', 'merged');
+    $source_photo = get_post_meta($source_id, '_zigurat_work_project_photo', true);
+    if ($source_photo && !get_post_meta($target_id, '_zigurat_work_project_photo', true)
+        && update_post_meta($target_id, '_zigurat_work_project_photo', wp_slash($source_photo))) {
+        delete_post_meta($source_id, '_zigurat_work_project_photo');
+    }
     wp_delete_post($source_id, true);
     return true;
 }
@@ -1173,12 +1240,34 @@ function zigurat_workflow_project_save_from_request($data)
 function zigurat_ajax_save_workflow_project()
 {
     check_ajax_referer('zigurat_workflow_projects', 'nonce');
+    if (!zigurat_is_manager()) wp_send_json_error(array('message' => 'دسترسی مجاز نیست.'), 403);
+    $photos = zigurat_project_handoff_upload_photos($_FILES);
+    if (is_wp_error($photos)) wp_send_json_error(array('message' => $photos->get_error_message()), 400);
     $record = zigurat_workflow_project_save_from_request($_POST);
     if (is_wp_error($record)) {
+        foreach ($photos as $photo) zigurat_project_handoff_remove_photo($photo);
         wp_send_json_error(array('message' => $record->get_error_message()), $record->get_error_code() === 'forbidden' ? 403 : 400);
     }
+    $message = empty($_POST['project_id']) ? 'پروژه ایجاد شد.' : 'تغییرات پروژه ذخیره شد.';
+    if (isset($_POST['executor_reminder'])) {
+        update_post_meta($record['id'], '_zigurat_executor_reminder', $_POST['executor_reminder'] === 'daily' ? 'daily' : 'once');
+        $record['executor_reminder'] = get_post_meta($record['id'], '_zigurat_executor_reminder', true) === 'daily' ? 'daily' : 'once';
+    }
+    $removed = array_intersect_key((array) ($_POST['remove_project_photos'] ?? array()), array(0, 1));
+    $photos_saved = true;
+    if ($photos || $removed) {
+        if (zigurat_project_handoff_save_photos($record['id'], $photos, $removed)) {
+            $record = zigurat_workflow_project_record($record['id']);
+        } else {
+            $message .= ' ذخیرهٔ عکس‌ها انجام نشد.';
+            $photos_saved = false;
+        }
+    }
+    if ($photos_saved && !empty($_POST['project_id'])) {
+        do_action('zigurat_workflow_project_edit_saved', $record['id']);
+    }
     wp_send_json_success(array(
-        'message' => empty($_POST['project_id']) ? 'پروژه ایجاد شد.' : 'تغییرات پروژه ذخیره شد.',
+        'message' => $message,
         'project' => $record,
     ));
 }

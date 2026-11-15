@@ -815,7 +815,7 @@ body.invoice-row-sorting { cursor: grabbing !important; user-select: none; }
 }
 
 @media print {
-  @page { margin: 0 8mm; }
+  @page { size: A4 landscape; margin: 0 8mm; }
   .no-print,
   #wpadminbar { display: none !important; }
   html,

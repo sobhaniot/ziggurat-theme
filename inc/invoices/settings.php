@@ -289,7 +289,7 @@ function zigurat_invoice_buyer_filter_matches($term, $brand, $limit = 50, $filte
     $values = array($brand);
     if ($term !== '') {
         $where[] = 'customer_name LIKE %s';
-        $values[] = $wpdb->esc_like($term) . '%';
+        $values[] = '%' . $wpdb->esc_like($term) . '%';
     }
     $type = $filters['filter_type'] ?? '';
     if ($type === 'proforma') {

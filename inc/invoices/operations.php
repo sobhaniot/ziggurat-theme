@@ -690,8 +690,12 @@ function zigurat_invoice_delete($invoice_id)
         }
     }
 
-    $wpdb->query('COMMIT');
+    if ($wpdb->query('COMMIT') === false) {
+        $wpdb->query('ROLLBACK');
+        return new WP_Error('database', 'انتقال فاکتور به سطل زباله ثبت نشد.');
+    }
     $invoice = (object) $invoice_row;
+    do_action('zigurat_invoice_trashed', $invoice);
     if (function_exists('zigurat_activity_invoice_event')) zigurat_activity_invoice_event($invoice, 'به سطل زباله منتقل شد');
     return $invoice;
 }
@@ -1022,13 +1026,13 @@ function zigurat_invoice_save($data)
     $base_amount = $subtotal + $shipping;
     $overhead_amount = (int) round($base_amount * $overhead_rate / 100);
     $amount_with_overhead = $base_amount + $overhead_amount;
-    $insurance_amount = (int) round($amount_with_overhead * $insurance_rate / 100);
+    $discount = min($requested_discount, $amount_with_overhead);
+    $amount_after_discount = max(0, $amount_with_overhead - $discount);
+    $insurance_amount = (int) round($amount_after_discount * $insurance_rate / 100);
     $tax_rate = max(0, min(100, (float) zigurat_invoice_normalize_digits($data['tax_rate'] ?? 0)));
-    $taxable = $amount_with_overhead + $insurance_amount;
+    $taxable = $amount_after_discount + $insurance_amount;
     $tax_amount = (int) round($taxable * $tax_rate / 100);
-    $gross_total = $taxable + $tax_amount;
-    $discount = min($requested_discount, $gross_total);
-    $grand_total = max(0, $gross_total - $discount);
+    $grand_total = $taxable + $tax_amount;
     $deduction_amount = 0;
     $deduction_note = '';
     $paid_amount = 0;

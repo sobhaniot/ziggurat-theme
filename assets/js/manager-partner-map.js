@@ -137,10 +137,11 @@
     var status = loader && loader.querySelector('[data-partner-map-load-status]');
     var config = window.ziguratPartnerMapConfig || {};
     if (!loader || !button || !config.ajaxUrl || !config.nonce) return;
-    button.addEventListener('click', function () {
+    function loadMap() {
+      if (button.disabled) return;
       button.disabled = true;
-      button.textContent = 'در حال بارگذاری…';
-      if (status) status.hidden = true;
+      button.hidden = true;
+      if (status) status.textContent = 'در حال بارگذاری نقشه…';
       var body = new URLSearchParams();
       body.set('action', 'zigurat_load_partner_map');
       body.set('nonce', config.nonce);
@@ -163,10 +164,12 @@
         initMaps(map.parentNode || document);
       }).catch(function (error) {
         button.disabled = false;
-        button.textContent = 'تلاش دوباره';
-        if (status) { status.textContent = error.message; status.hidden = false; }
+        button.hidden = false;
+        if (status) status.textContent = error.message;
       });
-    });
+    }
+    button.addEventListener('click', loadMap);
+    loadMap();
   }
 
   document.addEventListener('DOMContentLoaded', function () {

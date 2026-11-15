@@ -1,0 +1,134 @@
+.manager-project-handoff-trigger {
+  border: 1px solid #c89b3c;
+  border-radius: 8px;
+  background: #fffaf0;
+  color: #493618;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+.manager-projects__primary-actions:has([data-project-handoff-bulk]) {
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+.manager-projects__primary-actions:has([data-project-handoff-bulk]) .manager-projects__new,
+.manager-projects__primary-actions > [data-project-handoff-bulk] {
+  width: auto;
+  flex: 1 1 auto;
+}
+.manager-projects__primary-actions > [data-project-handoff-bulk] {
+  display: inline-flex;
+  min-height: 46px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 14px;
+  border-radius: 9px;
+  font: inherit;
+  font-weight: 800;
+}
+.manager-project-card .manager-project-handoff-trigger { flex: 0 0 auto; font-size: 11px; }
+.manager-project-photo-picker {
+  grid-column: 1 / -1;
+  padding: 12px;
+  border: 1px dashed #c89b3c;
+  border-radius: 9px;
+}
+.manager-project-photo-picker.is-dragover { background: #fff4d4; }
+.manager-project-photo-list { display: flex; flex-wrap: wrap; gap: 10px; margin-block: 8px; }
+.manager-project-photo-tile {
+  position: relative;
+  flex: 0 1 auto;
+  align-self: flex-start;
+  width: fit-content;
+  max-width: min(240px, 100%);
+}
+.manager-project-photo {
+  display: block;
+  box-sizing: border-box;
+  max-width: 100%;
+  max-height: 140px;
+  border: 2px solid #c89b3c;
+  border-radius: 9px;
+}
+.manager-project-photo-picker [data-project-photo-browse], .manager-project-photo-remove {
+  border: 1px solid #c89b3c;
+  border-radius: 8px;
+  background: #fffaf0;
+  color: #493618;
+  font: inherit;
+  cursor: pointer;
+}
+.manager-project-photo-picker [data-project-photo-browse] { padding: 6px 12px; }
+.manager-project-photo-picker [data-project-photo-browse]:disabled { opacity: .5; cursor: default; }
+.manager-project-photo-remove {
+  position: absolute;
+  inset-block-start: 5px;
+  inset-inline-start: 5px;
+  inset-inline-end: auto;
+  margin: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: #a93232;
+  color: #fff;
+}
+.manager-project-photo-picker small { display: block; margin-block-start: 6px; }
+.manager-project-handoff-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(620px, calc(100% - 28px));
+  max-height: 86vh;
+  overflow: auto;
+  border: 1px solid #e4d9c1;
+  border-radius: 16px;
+  padding: 20px;
+  color: #242522;
+  background: #f4f1ea;
+  direction: rtl;
+}
+.manager-project-handoff-dialog::backdrop { background: rgb(0 0 0 / 50%); }
+.manager-project-handoff-person-warning:not(:empty) {
+  display: block;
+  margin-block-start: 6px;
+  padding: 10px 12px;
+  border: 1px solid #c6544d;
+  border-radius: 8px;
+  background: #fff2f1;
+  color: #8c2823;
+  font-weight: 700;
+}
+.manager-project-handoff-header, .manager-project-handoff-actions { display: flex; align-items: center; gap: 8px; }
+.manager-project-handoff-header { justify-content: space-between; margin-bottom: 12px; }
+.manager-project-handoff-header h3 { margin: 0; }
+.manager-project-handoff-dialog select { display: block; width: 100%; margin-top: 6px; }
+.manager-project-handoff-preview { display: grid; gap: 10px; }
+.manager-project-handoff-preview article { padding: 12px; border: 1px solid #e4d9c1; border-radius: 10px; background: white; }
+.manager-project-handoff-preview img { display: block; max-width: 100%; max-height: 145px; object-fit: contain; margin-block: 8px; }
+.manager-project-handoff-preview label { display: flex; align-items: flex-start; gap: 8px; padding-block: 5px; overflow-wrap: anywhere; }
+.manager-project-handoff-preview .manager-project-handoff-person { display: block; }
+.manager-project-handoff-person select {
+  box-sizing: border-box;
+  min-height: 38px;
+  padding-block: 5px;
+  padding-inline-start: 12px;
+  padding-inline-end: 10px;
+  border: 1px solid #ded8cc;
+  border-radius: 8px;
+  background-color: #fff;
+  color: inherit;
+  font: inherit;
+}
+.manager-project-handoff-preview input { flex: none; margin-top: 5px; accent-color: #a87824; }
+.manager-project-handoff-actions { justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+.manager-project-handoff-dialog button {
+  border: 1px solid #b58935;
+  border-radius: 8px;
+  background: #fff;
+  color: #322714;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.manager-project-handoff-dialog button[data-handoff-download="pdf"] { background: #c89b3c; }
+.manager-project-handoff-dialog button:disabled { opacity: .5; cursor: default; }
+.manager-project-handoff-dialog [hidden] { display: none !important; }

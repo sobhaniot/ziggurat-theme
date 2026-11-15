@@ -7,6 +7,79 @@
 
   var dialog = board.querySelector('[data-project-dialog]');
   var form = board.querySelector('[data-project-form]');
+  var photoPicker = form.querySelector('[data-project-photo-picker]');
+  var photoInput = photoPicker.querySelector('[data-project-photo-input]');
+  var photoBrowse = photoPicker.querySelector('[data-project-photo-browse]');
+  var photoList = photoPicker.querySelector('[data-project-photo-list]');
+  var savedPhotos = [];
+  var draftPhotos = [];
+
+  function renderProjectPhotos() {
+    photoList.replaceChildren();
+    draftPhotos.forEach(function (photo, slot) {
+      if (!photo) return;
+      var tile = document.createElement('div');
+      tile.className = 'manager-project-photo-tile';
+      var image = document.createElement('img');
+      image.className = 'manager-project-photo';
+      image.alt = 'عکس پروژه';
+      image.src = photo.url;
+      var remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'manager-project-photo-remove';
+      remove.textContent = '×';
+      remove.setAttribute('aria-label', 'حذف عکس ' + (slot + 1));
+      remove.addEventListener('click', function () {
+        if (photo.file) URL.revokeObjectURL(photo.url);
+        draftPhotos[slot] = null;
+        renderProjectPhotos();
+        photoBrowse.focus();
+      });
+      tile.append(image, remove);
+      photoList.appendChild(tile);
+    });
+    photoBrowse.disabled = draftPhotos.every(Boolean);
+  }
+
+  function addProjectPhotos(files) {
+    if (form.classList.contains('is-busy')) return;
+    var message = '';
+    for (var file of files) {
+      var slot = draftPhotos.findIndex(function (photo) { return !photo; });
+      if (slot < 0) {
+        message = 'هر پروژه حداکثر دو عکس می‌پذیرد.';
+        break;
+      }
+      if (!/\.(jpe?g|png|webp)$/i.test(file.name) || file.size > 5 * 1024 * 1024) {
+        message = 'عکس باید JPG، PNG یا WebP و حداکثر ۵ مگابایت باشد.';
+        continue;
+      }
+      draftPhotos[slot] = {file: file, url: URL.createObjectURL(file)};
+    }
+    renderProjectPhotos();
+    showFormResult(message, message ? 'error' : '');
+  }
+
+  photoBrowse.addEventListener('click', function () { photoInput.click(); });
+  photoInput.addEventListener('change', function () {
+    addProjectPhotos(photoInput.files);
+    photoInput.value = '';
+  });
+  photoPicker.addEventListener('dragover', function (event) {
+    if (!event.dataTransfer.types.includes('Files')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = photoBrowse.disabled ? 'none' : 'copy';
+    photoPicker.classList.toggle('is-dragover', !photoBrowse.disabled);
+  });
+  photoPicker.addEventListener('dragleave', function (event) {
+    if (!photoPicker.contains(event.relatedTarget)) photoPicker.classList.remove('is-dragover');
+  });
+  photoPicker.addEventListener('drop', function (event) {
+    if (!event.dataTransfer.files.length) return;
+    event.preventDefault();
+    photoPicker.classList.remove('is-dragover');
+    addProjectPhotos(event.dataTransfer.files);
+  });
   var notice = board.querySelector('[data-project-notice]');
   window.ziguratFollowupPicker(board);
   window.ziguratFollowupPush(board, config, showNotice);
@@ -115,7 +188,7 @@
   }
 
   function request(action, values) {
-    var body = new URLSearchParams();
+    var body = values instanceof FormData ? new FormData() : new URLSearchParams();
     body.set('action', action);
     body.set('nonce', config.nonce);
     if (values instanceof FormData) {
@@ -132,8 +205,7 @@
     return window.fetch(config.ajaxUrl, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-      body: body.toString()
+      body: body
     }).then(function (response) {
       return response.json().catch(function () { return null; }).then(function (json) {
         if (!response.ok || !json || !json.success) {
@@ -146,6 +218,7 @@
 
   function setBusy(isBusy) {
     Array.prototype.forEach.call(form.elements, function (element) { element.disabled = isBusy; });
+    photoBrowse.disabled = isBusy || draftPhotos.every(Boolean);
     form.classList.toggle('is-busy', isBusy);
   }
 
@@ -271,9 +344,17 @@
     form.elements.stage.value = project ? project.stage : 'lead';
     form.elements.followup.value = project ? project.followup : '';
     if (form.elements.repeat_daily) form.elements.repeat_daily.checked = !!(project && project.repeat_daily);
+    if (form.elements.executor_reminder) form.elements.executor_reminder.value = project?.executor_reminder === 'daily' ? 'daily' : 'once';
     renderDocumentSelection('proforma', project && Array.isArray(project.proformas) ? project.proformas : []);
     renderDocumentSelection('invoice', project && Array.isArray(project.invoices) ? project.invoices : []);
     form.elements.notes.value = project ? project.notes : '';
+    draftPhotos.forEach(function (photo) { if (photo?.file) URL.revokeObjectURL(photo.url); });
+    savedPhotos = project?.photos || [project?.photo];
+    draftPhotos = [0, 1].map(function (slot) {
+      return savedPhotos[slot] ? {url: savedPhotos[slot]} : null;
+    });
+    photoInput.value = '';
+    renderProjectPhotos();
     renderWorkItems(project && Array.isArray(project.work_items) ? project.work_items : []);
     board.querySelector('[data-project-dialog-eyebrow]').textContent = project ? 'ویرایش پروژه' : 'پروژه جدید';
     board.querySelector('[data-project-dialog-title]').textContent = project ? project.title : 'ثبت پروژه';
@@ -502,6 +583,12 @@
     title.textContent = record.title || 'بدون عنوان';
     edit.appendChild(title);
     top.appendChild(edit);
+    var handoff = document.createElement('button');
+    handoff.type = 'button';
+    handoff.className = 'manager-project-handoff-trigger';
+    handoff.setAttribute('data-project-handoff', '');
+    handoff.textContent = 'برگه اجرا';
+    top.appendChild(handoff);
     card.appendChild(top);
 
     if (record.client) {
@@ -697,6 +784,9 @@
     }).then(function (data) {
       card.classList.remove('is-saving');
       var confirmedStage = data.stage || stage;
+      if (confirmedStage !== previousStage && (confirmedStage === 'production' || previousStage === 'production')) {
+        document.dispatchEvent(new CustomEvent('ziggurat:rubika-render', {detail: card.getAttribute('data-project-id')}));
+      }
       var confirmedColumn = board.querySelector('[data-project-stage="' + confirmedStage + '"]');
       if (confirmedColumn) {
         var confirmedList = confirmedColumn.querySelector('[data-project-card-list]');
@@ -969,13 +1059,18 @@
     event.preventDefault();
     if (!form.reportValidity()) return;
     var values = new FormData(form);
+    draftPhotos.forEach(function (photo, slot) {
+      if (photo?.file) values.set(slot === 0 ? 'project_photo' : 'project_photo_2', photo.file);
+      if (!photo && savedPhotos[slot]) values.set('remove_project_photos[' + slot + ']', '1');
+    });
     setBusy(true);
     showFormResult('در حال ذخیره پروژه…', 'success');
     request('zigurat_save_workflow_project', values)
       .then(function (data) {
         clearProjectHistory();
         showFormResult(data.message, 'success');
-        window.setTimeout(function () { window.location.reload(); }, 450);
+        return Promise.resolve(window.zigguratPrepareRubikaRender?.(data.project?.id))
+          .then(function () { window.setTimeout(function () { window.location.reload(); }, 450); });
       })
       .catch(function (error) {
         showFormResult(error.message, 'error');
@@ -1356,12 +1451,20 @@
       var row = document.createElement('article');
       row.className = 'manager-project-archive__item';
       row.setAttribute('data-project-archive-row', '');
+      row.setAttribute('data-project-handoff-card', '');
+      row.dataset.projectId = item.id;
       row.dataset.startTs = item.timeline_start_ts || 0;
       row.dataset.endTs = item.timeline_end_ts || 0;
       row.innerHTML = '<div class="manager-project-archive__item-head"><strong></strong><span></span></div>' +
         '<div class="manager-project-archive__timeline"><div class="manager-project-archive__track"><span data-project-archive-bar><b></b></span></div><small class="manager-project-archive__dates"><span></span><span></span></small></div>';
       row.querySelector('.manager-project-archive__item-head strong').textContent = item.title || '';
       row.querySelector('.manager-project-archive__item-head span').textContent = item.client || 'بدون نام مشتری';
+      var handoffButton = document.createElement('button');
+      handoffButton.type = 'button';
+      handoffButton.className = 'manager-project-handoff-trigger';
+      handoffButton.setAttribute('data-project-handoff', '');
+      handoffButton.textContent = 'برگه اجرا';
+      row.querySelector('.manager-project-archive__item-head').appendChild(handoffButton);
       row.querySelector('[data-project-archive-bar] b').textContent = item.title || '';
       row.querySelector('.manager-project-archive__dates span:first-child').textContent = item.created_at || '';
       row.querySelector('.manager-project-archive__dates span:last-child').textContent = item.archived_at || '';

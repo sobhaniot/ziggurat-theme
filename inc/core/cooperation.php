@@ -742,10 +742,6 @@ function zigurat_handle_partner_application()
         ? $valid_uploads(zigurat_normalize_uploads($_FILES['national_card']))
         : array();
     $portfolio_files = isset($_FILES['portfolio']) ? array_slice($valid_uploads(zigurat_normalize_uploads($_FILES['portfolio'])), 0, 5) : array();
-    if (!$is_manager_entry && (!$photo_files || !$portfolio_files || ($type !== 'supplier' && !$card_files))) {
-        $status_redirect('upload-error');
-    }
-
     $stored_files = array('photo' => array(), 'national_card' => array(), 'portfolio' => array());
     $upload_groups = array('photo' => $photo_files, 'portfolio' => $portfolio_files);
     if ($type !== 'supplier') {

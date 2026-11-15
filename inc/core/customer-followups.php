@@ -1036,8 +1036,9 @@ function zigurat_crm_serve_service_worker()
     header('Service-Worker-Allowed: /');
     header('Cache-Control: no-cache, no-store, must-revalidate');
     $icon_url = esc_js(get_template_directory_uri() . '/assets/images/zigurat-logo.svg');
+    $badge_url = esc_js(get_template_directory_uri() . '/assets/images/zigurat-notification-badge.svg');
     $manager_url = esc_js(zigurat_crm_url());
-    echo "self.addEventListener('push',function(event){var data={};try{data=event.data.json();}catch(e){data={title:'پیگیری مشتری',body:event.data?event.data.text():''};}event.waitUntil(self.registration.showNotification(data.title||'پیگیری مشتری',{body:data.body||'',icon:'{$icon_url}',badge:'{$icon_url}',tag:data.tag||'zigurat-crm',renotify:true,data:{url:data.url||'{$manager_url}'}}));});self.addEventListener('notificationclick',function(event){event.notification.close();var url=event.notification.data&&event.notification.data.url?event.notification.data.url:'{$manager_url}';event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(function(items){for(var i=0;i<items.length;i++){if('focus' in items[i]){items[i].navigate(url);return items[i].focus();}}return clients.openWindow(url);}));});";
+    echo "self.addEventListener('push',function(event){var data={};try{data=event.data.json();}catch(e){data={title:'پیگیری مشتری',body:event.data?event.data.text():''};}event.waitUntil(self.registration.showNotification(data.title||'پیگیری مشتری',{body:data.body||'',icon:'{$icon_url}',badge:'{$badge_url}',tag:data.tag||'zigurat-crm',renotify:true,data:{url:data.url||'{$manager_url}'}}));});self.addEventListener('notificationclick',function(event){event.notification.close();var url=event.notification.data&&event.notification.data.url?event.notification.data.url:'{$manager_url}';event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(function(items){for(var i=0;i<items.length;i++){if('focus' in items[i]){items[i].navigate(url);return items[i].focus();}}return clients.openWindow(url);}));});";
     exit;
 }
 add_action('template_redirect', 'zigurat_crm_serve_service_worker', 0);

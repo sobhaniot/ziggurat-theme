@@ -108,9 +108,9 @@ $accounting_totals = function_exists('zigurat_invoice_accounting_totals')
             <div><dt>جمع اقلام:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->subtotal)); ?></dd></div>
             <?php if ($show_shipping): ?><div><dt>هزینه حمل و بسته‌بندی:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->shipping)); ?></dd></div><?php endif; ?>
             <?php if ($show_overhead): ?><div><dt>بالاسری/سود پیمانکار <bdi class="invoice-rate" dir="ltr"><?php echo esc_html($rate_label($invoice->overhead_rate ?? 0)); ?>٪</bdi>:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->overhead_amount ?? 0)); ?></dd></div><?php endif; ?>
+            <?php if ($show_discount): ?><div><dt>تخفیف کلی:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->discount)); ?></dd></div><?php endif; ?>
             <?php if ($show_insurance): ?><div><dt>بیمه <bdi class="invoice-rate" dir="ltr"><?php echo esc_html($rate_label($invoice->insurance_rate ?? 0)); ?>٪</bdi>:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->insurance_amount ?? 0)); ?></dd></div><?php endif; ?>
             <?php if ($show_tax): ?><div><dt>مالیات ارزش افزوده <bdi class="invoice-rate" dir="ltr"><?php echo esc_html($rate_label($invoice->tax_rate)); ?>٪</bdi>:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->tax_amount)); ?></dd></div><?php endif; ?>
-            <?php if ($show_discount): ?><div><dt>تخفیف کلی:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->discount)); ?></dd></div><?php endif; ?>
             <?php if ($show_grand_total): ?><div><dt>جمع کل:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->grand_total)); ?></dd></div><?php endif; ?>
             <?php if ($show_paid): ?><div class="is-paid"><dt>مبلغ پرداخت شده:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($invoice->paid_amount)); ?></dd></div><?php endif; ?>
             <div class="is-payable"><dt>مانده:</dt><dd><?php echo esc_html(zigurat_invoice_format_money($accounting_totals['balance'])); ?></dd></div>

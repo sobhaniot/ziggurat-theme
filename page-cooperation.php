@@ -111,17 +111,17 @@ $is_manager_entry = function_exists('zigurat_is_manager') && zigurat_is_manager(
 
                     <div class="application-files">
                         <div class="application-dropzone" data-upload-zone>
-                            <label>عکس متقاضی یا مجموعه<?php echo $is_manager_entry ? '' : ' *'; ?><span class="application-dropzone__prompt">فایل را اینجا رها کنید یا برای انتخاب کلیک کنید</span><input type="file" name="applicant_photo" accept="image/jpeg,image/png,image/webp" data-upload-input data-max-files="1" <?php echo $is_manager_entry ? '' : 'required'; ?>><small>JPG، PNG یا WEBP؛ حداکثر ۵ مگابایت<?php echo $is_manager_entry ? ' — برای ثبت توسط مدیر اختیاری است' : ''; ?></small></label>
+                            <label>عکس متقاضی یا مجموعه<span class="application-dropzone__prompt">فایل را اینجا رها کنید یا برای انتخاب کلیک کنید</span><input type="file" name="applicant_photo" accept="image/jpeg,image/png,image/webp" data-upload-input data-max-files="1"><small>JPG، PNG یا WEBP؛ حداکثر ۵ مگابایت</small></label>
                             <div class="application-upload-preview" data-upload-preview></div>
                         </div>
                         <?php if ($selected_type !== 'supplier'): ?>
                             <div class="application-dropzone" data-upload-zone>
-                                <label>عکس کارت ملی<?php echo $is_manager_entry ? '' : ' *'; ?><span class="application-dropzone__prompt">فایل را اینجا رها کنید یا برای انتخاب کلیک کنید</span><input type="file" name="national_card" accept="image/jpeg,image/png,image/webp" data-upload-input data-max-files="1" <?php echo $is_manager_entry ? '' : 'required'; ?>><small>این فایل فقط برای مدیر قابل مشاهده است.<?php echo $is_manager_entry ? ' ثبت آن برای مدیر اختیاری است.' : ''; ?></small></label>
+                                <label>عکس کارت ملی<span class="application-dropzone__prompt">فایل را اینجا رها کنید یا برای انتخاب کلیک کنید</span><input type="file" name="national_card" accept="image/jpeg,image/png,image/webp" data-upload-input data-max-files="1"><small>این فایل فقط برای مدیر قابل مشاهده است.</small></label>
                                 <div class="application-upload-preview" data-upload-preview></div>
                             </div>
                         <?php endif; ?>
                         <div class="application-dropzone" data-upload-zone>
-                            <label>نمونه‌کارها<?php echo $is_manager_entry ? '' : ' *'; ?><span class="application-dropzone__prompt">چند فایل را باهم یا در چند مرحله انتخاب کنید</span><input type="file" name="portfolio[]" accept="image/jpeg,image/png,image/webp,application/pdf" data-upload-input data-append-files="1" data-max-files="5" multiple <?php echo $is_manager_entry ? '' : 'required'; ?>><small>حداکثر ۵ فایل تصویر یا PDF، هر فایل تا ۵ مگابایت<?php echo $is_manager_entry ? ' — برای ثبت توسط مدیر اختیاری است' : ''; ?></small></label>
+                            <label>نمونه‌کارها<span class="application-dropzone__prompt">چند فایل را باهم یا در چند مرحله انتخاب کنید</span><input type="file" name="portfolio[]" accept="image/jpeg,image/png,image/webp,application/pdf" data-upload-input data-append-files="1" data-max-files="5" multiple><small>حداکثر ۵ فایل تصویر یا PDF، هر فایل تا ۵ مگابایت</small></label>
                             <div class="application-upload-preview" data-upload-preview></div>
                         </div>
                     </div>

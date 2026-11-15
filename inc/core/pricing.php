@@ -43,9 +43,24 @@ function zigurat_pricing_insurance_tax_percent($data)
 function zigurat_get_lightbox_pricing_settings()
 {
     $defaults = array(
-        'perimeter_rate' => 0,
-        'square_rate' => 0,
-        'pvc_rate' => 0,
+        'textile_sqm_rate' => 0,
+        'stitching_perimeter_rate' => 0,
+        'mdf_sqm_rate' => 0,
+        'pvc_sqm_rate' => 0,
+        'frameless_bar_rate' => 0,
+        'frameless_bar_length' => 6,
+        'smd_bar_rate' => 0,
+        'smd_current_per_bar' => 1,
+        'smd_voltage' => 12,
+        'transformer_reserve_percent' => 20,
+        'wire_rate' => 0,
+        'angle_perimeter_rate' => 0,
+        'transformer_60_rate' => 0,
+        'transformer_100_rate' => 0,
+        'transformer_120_rate' => 0,
+        'transformer_200_rate' => 0,
+        'transformer_300_rate' => 0,
+        'transformer_400_rate' => 0,
         'updated_at' => '',
         'updated_by' => 0,
     );
@@ -57,13 +72,25 @@ function zigurat_save_lightbox_pricing_settings($data)
     if (!zigurat_is_manager()) {
         return new WP_Error('forbidden', 'دسترسی به تنظیمات محاسبه قیمت مجاز نیست.');
     }
-    $settings = array(
-        'perimeter_rate' => zigurat_pricing_money($data['perimeter_rate'] ?? 0),
-        'square_rate' => zigurat_pricing_money($data['square_rate'] ?? 0),
-        'pvc_rate' => zigurat_pricing_money($data['pvc_rate'] ?? 0),
-        'updated_at' => current_time('mysql'),
-        'updated_by' => get_current_user_id(),
-    );
+    $settings = zigurat_get_lightbox_pricing_settings();
+    foreach (array('textile_sqm_rate','stitching_perimeter_rate','mdf_sqm_rate','pvc_sqm_rate','frameless_bar_rate','smd_bar_rate','wire_rate','angle_perimeter_rate') as $key) {
+        $settings[$key] = zigurat_pricing_money($data[$key] ?? 0);
+    }
+    foreach (array('frameless_bar_length','smd_current_per_bar') as $key) {
+        $settings[$key] = max(0.1, zigurat_pricing_decimal($data[$key] ?? $settings[$key]));
+    }
+    $requested_smd_voltage = (int) ($data['smd_voltage'] ?? 12);
+    $settings['smd_voltage'] = in_array($requested_smd_voltage, array(12, 24), true) ? $requested_smd_voltage : 12;
+    $settings['transformer_reserve_percent'] = min(100, zigurat_pricing_decimal($data['transformer_reserve_percent'] ?? 20));
+    foreach (array(400,300,200,120,100,60) as $watts) {
+        $settings['transformer_' . $watts . '_rate'] = zigurat_pricing_money($data['transformer_' . $watts . '_rate'] ?? 0);
+        unset($settings['transformer_' . $watts . '_capacity']);
+    }
+    unset($settings['smd_bar_length']);
+    unset($settings['smd_watts_per_bar']);
+    unset($settings['frameless_waste_percent']);
+    $settings['updated_at'] = current_time('mysql');
+    $settings['updated_by'] = get_current_user_id();
     update_option('zigurat_lightbox_pricing', $settings, false);
     return $settings;
 }
@@ -82,10 +109,12 @@ add_action('wp_ajax_zigurat_save_lightbox_rates', 'zigurat_ajax_save_lightbox_pr
 function zigurat_get_lightbox_last_costs()
 {
     $defaults = array(
+        'installation_mode' => 'fixed',
         'installation' => 0,
         'travel' => 0,
-        'supplies' => 0,
-        'transformer' => 0,
+        'smd_spacing_cm' => 10,
+        'back_material' => 'mdf',
+        'profit_percent' => 0,
     );
     return wp_parse_args(get_option('zigurat_lightbox_last_costs', array()), $defaults);
 }
@@ -95,11 +124,15 @@ function zigurat_save_lightbox_last_costs($data)
     if (!zigurat_is_manager()) {
         return new WP_Error('forbidden', 'دسترسی به ذخیره هزینه‌ها مجاز نیست.');
     }
+    $mode = sanitize_key($data['installation_mode'] ?? 'fixed');
+    $back_material = sanitize_key($data['back_material'] ?? 'mdf');
     $costs = array(
+        'installation_mode' => in_array($mode, array('fixed', 'perimeter'), true) ? $mode : 'fixed',
+        'back_material' => in_array($back_material, array('pvc', 'mdf'), true) ? $back_material : 'mdf',
         'installation' => zigurat_pricing_money($data['installation'] ?? 0),
         'travel' => zigurat_pricing_money($data['travel'] ?? 0),
-        'supplies' => zigurat_pricing_money($data['supplies'] ?? 0),
-        'transformer' => zigurat_pricing_money($data['transformer'] ?? 0),
+        'smd_spacing_cm' => max(1, zigurat_pricing_decimal($data['smd_spacing_cm'] ?? 10)),
+        'profit_percent' => min(1000, zigurat_pricing_decimal($data['profit_percent'] ?? 0)),
     );
     update_option('zigurat_lightbox_last_costs', $costs, false);
     return $costs;
@@ -116,6 +149,33 @@ function zigurat_ajax_save_lightbox_last_costs()
 }
 add_action('wp_ajax_zigurat_save_lightbox_last_costs', 'zigurat_ajax_save_lightbox_last_costs');
 
+/** برآورد برش چهار ضلع فریم‌لس و پرت واقعی باقی‌مانده در شاخه‌ها. */
+function zigurat_plan_lightbox_frameless_bars($length, $width, $bar_length)
+{
+    $bar_length = max(0.1, (float) $bar_length);
+    $cuts = array();
+    foreach (array((float) $length, (float) $length, (float) $width, (float) $width) as $side) {
+        while ($side > $bar_length + 0.000001) {
+            $cuts[] = $bar_length;
+            $side -= $bar_length;
+        }
+        if ($side > 0.000001) $cuts[] = $side;
+    }
+    rsort($cuts, SORT_NUMERIC);
+    $remaining = array();
+    foreach ($cuts as $cut) {
+        $placed = false;
+        foreach ($remaining as $index => $space) {
+            if ($space + 0.000001 < $cut) continue;
+            $remaining[$index] = max(0, $space - $cut);
+            $placed = true;
+            break;
+        }
+        if (!$placed) $remaining[] = max(0, $bar_length - $cut);
+    }
+    return array('bars' => count($remaining), 'waste_m' => array_sum($remaining));
+}
+
 /** محاسبه مرجع سمت سرور؛ رابط کاربری همین فرمول را به‌صورت لحظه‌ای اجرا می‌کند. */
 function zigurat_calculate_lightbox_price($data, $settings = null)
 {
@@ -126,34 +186,122 @@ function zigurat_calculate_lightbox_price($data, $settings = null)
         return new WP_Error('invalid_dimensions', 'طول و عرض باید بیشتر از صفر باشند.');
     }
 
-    $use_perimeter = $length < 1.5 || $width < 1.5;
-    $measure = $use_perimeter ? 2 * ($length + $width) : $length * $width;
-    $rate = $use_perimeter
-        ? max(0, (int) ($settings['perimeter_rate'] ?? 0))
-        : max(0, (int) ($settings['square_rate'] ?? 0));
-    $base_price = (int) round($measure * $rate);
-    $use_pvc = !empty($data['use_pvc']);
-    $pvc_rate = $use_pvc ? max(0, (int) ($settings['pvc_rate'] ?? 0)) : 0;
-    $pvc_cost = (int) round($measure * $pvc_rate);
-    $installation = zigurat_pricing_money($data['installation'] ?? 0);
+    $area = $length * $width;
+    $perimeter = 2 * ($length + $width);
+    $textile = (int) round($area * (int) ($settings['textile_sqm_rate'] ?? 0));
+    $stitching = (int) round($perimeter * (int) ($settings['stitching_perimeter_rate'] ?? 0));
+    $back_material = sanitize_key($data['back_material'] ?? 'mdf');
+    $back_material = $back_material === 'pvc' ? 'pvc' : 'mdf';
+    $mdf = $back_material === 'mdf' ? (int) round($area * (int) ($settings['mdf_sqm_rate'] ?? 0)) : 0;
+    $pvc = $back_material === 'pvc' ? (int) round($area * (int) ($settings['pvc_sqm_rate'] ?? 0)) : 0;
+    $bar_length = max(0.1, (float) ($settings['frameless_bar_length'] ?? 6));
+    $frameless_plan = zigurat_plan_lightbox_frameless_bars($length, $width, $bar_length);
+    $frameless_bars = $frameless_plan['bars'];
+    $frameless_waste_m = $frameless_plan['waste_m'];
+    $frameless = $frameless_bars * (int) ($settings['frameless_bar_rate'] ?? 0);
+    $spacing_cm = max(1, zigurat_pricing_decimal($data['smd_spacing_cm'] ?? 10));
+    $smd_rows = (int) ceil(($width * 100) / $spacing_cm);
+    $smd_meters = $smd_rows * $length;
+    $smd_bars = (int) ceil($smd_meters);
+    $smd = $smd_bars * (int) ($settings['smd_bar_rate'] ?? 0);
+    $smd_current_per_bar = max(0.1, (float) ($settings['smd_current_per_bar'] ?? 1));
+    $smd_voltage = in_array((int) ($settings['smd_voltage'] ?? 12), array(12, 24), true) ? (int) $settings['smd_voltage'] : 12;
+    $smd_current = $smd_bars * $smd_current_per_bar;
+    $transformer_reserve_percent = min(100, max(0, (float) ($settings['transformer_reserve_percent'] ?? 20)));
+    $transformer_required_watts = (int) ceil($smd_current * $smd_voltage * (1 + $transformer_reserve_percent / 100));
+    $transformer_types = array();
+    foreach (array(400,300,200,120,100,60) as $watts) {
+        $transformer_types[] = array(
+            'watts' => $watts,
+            'capacity' => $watts,
+            'rate' => (int) ($settings['transformer_' . $watts . '_rate'] ?? 0),
+        );
+    }
+    $target_capacity = $transformer_required_watts;
+    $max_capacity = 1;
+    foreach ($transformer_types as &$type) {
+        $type['capacity_units'] = (int) $type['capacity'];
+        $max_capacity = max($max_capacity, $type['capacity_units']);
+    }
+    unset($type);
+    $prefer_transformer_quantities = function ($candidate, $current) {
+        foreach ($candidate as $index => $quantity) {
+            if ($quantity !== $current[$index]) return $quantity > $current[$index];
+        }
+        return false;
+    };
+    $limit = $target_capacity + $max_capacity - 1;
+    $plans = array(0 => array('count' => 0, 'quantities' => array_fill(0, count($transformer_types), 0)));
+    for ($capacity = 0; $capacity <= $limit; $capacity++) {
+        if (!isset($plans[$capacity])) continue;
+        foreach ($transformer_types as $type_index => $type) {
+            $next = $capacity + $type['capacity_units'];
+            if ($next > $limit) continue;
+            $candidate = $plans[$capacity];
+            $candidate['count']++;
+            $candidate['quantities'][$type_index]++;
+            if (!isset($plans[$next]) || $candidate['count'] < $plans[$next]['count'] || ($candidate['count'] === $plans[$next]['count'] && $prefer_transformer_quantities($candidate['quantities'], $plans[$next]['quantities']))) $plans[$next] = $candidate;
+        }
+    }
+    $selected = null;
+    for ($capacity = $target_capacity; $capacity <= $limit; $capacity++) {
+        if (!isset($plans[$capacity])) continue;
+        $candidate = $plans[$capacity];
+        if ($selected === null || $candidate['count'] < $selected['count'] || ($candidate['count'] === $selected['count'] && $capacity < $selected['capacity_units']) || ($candidate['count'] === $selected['count'] && $capacity === $selected['capacity_units'] && $prefer_transformer_quantities($candidate['quantities'], $selected['quantities']))) {
+            $selected = $candidate + array('capacity_units' => $capacity);
+        }
+    }
+    $transformer_count = $selected ? $selected['count'] : 0;
+    $transformer_cost = 0;
+    if ($selected) {
+        foreach ($selected['quantities'] as $type_index => $quantity) {
+            $transformer_cost += $quantity * $transformer_types[$type_index]['rate'];
+        }
+    }
+    $angle = (int) round($perimeter * (int) ($settings['angle_perimeter_rate'] ?? 0));
+    $wire_length = $length + $width;
+    $wire = (int) round($wire_length * (int) ($settings['wire_rate'] ?? 0));
+    $installation_mode = sanitize_key($data['installation_mode'] ?? 'fixed');
+    $installation_mode = $installation_mode === 'perimeter' ? 'perimeter' : 'fixed';
+    $installation_input = zigurat_pricing_money($data['installation'] ?? 0);
+    $installation = $installation_mode === 'perimeter' ? (int) round($perimeter * $installation_input) : $installation_input;
     $travel = zigurat_pricing_money($data['travel'] ?? 0);
-    $supplies = zigurat_pricing_money($data['supplies'] ?? 0);
-    $transformer = zigurat_pricing_money($data['transformer'] ?? 0);
     $profit_percent = min(1000, zigurat_pricing_decimal($data['profit_percent'] ?? 0));
-    $extra_costs = $installation + $travel + $supplies + $transformer;
-    $subtotal = $base_price + $pvc_cost + $extra_costs;
+    $base_price = $textile + $stitching + $mdf + $pvc + $frameless + $smd + $transformer_cost + $wire + $angle + $installation + $travel;
+    $subtotal = $base_price;
     $profit_amount = (int) round($subtotal * $profit_percent / 100);
 
     return array(
-        'method' => $use_perimeter ? 'perimeter' : 'square',
-        'measure' => $measure,
-        'rate' => $rate,
+        'area_sqm' => $area,
+        'perimeter_m' => $perimeter,
+        'textile' => $textile,
+        'stitching' => $stitching,
+        'back_material' => $back_material,
+        'mdf' => $mdf,
+        'pvc' => $pvc,
+        'frameless_bars' => $frameless_bars,
+        'frameless_waste_m' => $frameless_waste_m,
+        'frameless' => $frameless,
+        'smd_rows' => $smd_rows,
+        'smd_meters' => $smd_meters,
+        'smd_bars' => $smd_bars,
+        'smd_current_per_bar' => $smd_current_per_bar,
+        'smd_current' => $smd_current,
+        'smd_voltage' => $smd_voltage,
+        'smd' => $smd,
+        'transformer_count' => $transformer_count,
+        'transformer_capacity_watts' => $selected ? $selected['capacity_units'] : 0,
+        'transformer_required_watts' => $transformer_required_watts,
+        'transformer' => $transformer_cost,
+        'wire_length_m' => $wire_length,
+        'wire' => $wire,
+        'angle' => $angle,
+        'installation_mode' => $installation_mode,
+        'installation_rate_or_amount' => $installation_input,
+        'installation' => $installation,
+        'travel' => $travel,
         'base_price' => $base_price,
-        'use_pvc' => $use_pvc,
-        'pvc_rate' => $pvc_rate,
-        'pvc_cost' => $pvc_cost,
-        'transformer' => $transformer,
-        'extra_costs' => $extra_costs,
+        'extra_costs' => $installation + $travel,
         'subtotal' => $subtotal,
         'profit_percent' => $profit_percent,
         'profit_amount' => $profit_amount,

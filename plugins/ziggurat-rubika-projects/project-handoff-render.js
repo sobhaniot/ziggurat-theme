@@ -44,6 +44,36 @@
   var pdfLibrary;
   var resultUrl;
 
+  async function prepareRubikaRender(projectId) {
+    if (!window.zigguratRubikaBrowserRender) return;
+    async function call(action, fields) {
+      var response = await fetch(workflow.ajaxUrl, {
+        method: 'POST', credentials: 'same-origin',
+        body: new URLSearchParams(Object.assign({action: action, nonce: workflow.nonce, project_id: projectId}, fields))
+      });
+      var result = await response.json();
+      if (!response.ok || !result.success) throw new Error('ساخت عکس اعلان روبیکا انجام نشد.');
+      return result.data;
+    }
+    try {
+      var jobs = await call('ziggurat_rubika_render_jobs');
+      if (!jobs.length) return;
+      await loadHandoffFont();
+      var logo = await loadImage(config.logo).catch(function () { return null; });
+      for (var job of jobs) {
+        await renderCard(job.card, logo, false, function (canvas) {
+          return call('ziggurat_rubika_store_render', {key: job.key, png: canvas.toDataURL('image/png')});
+        });
+      }
+    } catch (error) {
+      console.warn(error.message);
+    }
+  }
+  window.zigguratPrepareRubikaRender = prepareRubikaRender;
+  document.addEventListener('ziggurat:rubika-render', function (event) {
+    prepareRubikaRender(event.detail);
+  });
+
   function element(tag, text) {
     var node = document.createElement(tag);
     if (text) node.textContent = text;
@@ -215,8 +245,29 @@
         });
       }});
     }
-    font(measure, 30, true);
-    var nameLines = wrap(measure, person?.name || 'نصاب تعیین نشده', 690);
+    if (card.companyMessage) {
+      font(measure, 24, true);
+      var companyLines = wrap(measure, card.companyName || '', 800);
+      font(measure, 27, false);
+      var messageLines = card.companyMessage.split('\n').flatMap(function (line) {
+        return wrap(measure, line, 800);
+      });
+      var companyHeight = 32 + companyLines.length * 35 + messageLines.length * 39;
+      blocks.push({height: companyHeight + 14, draw: function (ctx, y) {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.roundRect(48, y, 864, companyHeight, 18);
+        ctx.fill();
+        companyLines.forEach(function (line, index) {
+          write(ctx, line, 880, y + 34 + index * 35, 24, '#695a3d', true);
+        });
+        messageLines.forEach(function (line, index) {
+          write(ctx, line, 880, y + 35 + companyLines.length * 35 + index * 39, 27, '#242522');
+        });
+      }});
+    } else if (card.showExecutor !== false) {
+      font(measure, 30, true);
+      var nameLines = wrap(measure, person?.name || 'نصاب تعیین نشده', 690);
     var personHeight = Math.max(122, 60 + nameLines.length * 40);
     blocks.push({height: personHeight + 14, draw: function (ctx, y) {
       ctx.fillStyle = '#fff';
@@ -234,6 +285,23 @@
       write(ctx, 'همکار اجرایی', 778, y + 33, 21, '#695a3d');
       nameLines.forEach(function (line, i) { write(ctx, line, 778, y + 73 + i * 40, 30, '#242522', true); });
     }});
+    }
+    if (!card.companyMessage && card.projectDetails) {
+      Object.entries(card.projectDetails).forEach(function (entry) {
+        font(measure, 24, false);
+        var detailLines = wrap(measure, entry[0] + ': ' + entry[1], 800);
+        var detailHeight = 24 + detailLines.length * 36;
+        blocks.push({height: detailHeight + 8, draw: function (ctx, y) {
+          ctx.fillStyle = '#fff';
+          ctx.beginPath();
+          ctx.roundRect(48, y, 864, detailHeight, 14);
+          ctx.fill();
+          detailLines.forEach(function (line, index) {
+            write(ctx, line, 880, y + 32 + index * 36, 24, '#242522');
+          });
+        }});
+      });
+    }
     var tasks = card.tasks.filter(function (task, index) { return card.included[index]; });
     blocks.push({height: 52, draw: function (ctx, y) { write(ctx, 'کارهای اجرایی', 912, y + 35, 30, '#242522', true); }});
     if (!tasks.length) {

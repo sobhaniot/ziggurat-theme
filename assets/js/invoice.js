@@ -1373,8 +1373,8 @@
     mode = mode === 'percent' ? 'percent' : 'fixed';
     shippingModeField.value = mode;
     if (shippingModeToggle) shippingModeToggle.checked = mode === 'percent';
-    if (shippingLabel) shippingLabel.textContent = mode === 'percent' ? 'درصد حمل و بسته‌بندی' : 'مبلغ حمل و بسته‌بندی';
-    shippingValueField.setAttribute('aria-label', mode === 'percent' ? 'درصد حمل و بسته‌بندی' : 'مبلغ حمل و بسته‌بندی');
+    if (shippingLabel) shippingLabel.textContent = mode === 'percent' ? 'درصد ایاب ذهاب' : 'مبلغ ایاب ذهاب';
+    shippingValueField.setAttribute('aria-label', mode === 'percent' ? 'درصد ایاب ذهاب' : 'مبلغ ایاب ذهاب');
     shippingValueField.inputMode = mode === 'percent' ? 'decimal' : 'numeric';
     shippingValueField.value = mode === 'percent' ? shippingPercentValue : shippingFixedValue;
     if (mode === 'fixed') formatMoneyInput(shippingValueField);

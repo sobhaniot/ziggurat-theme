@@ -1,12 +1,43 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-function ziggurat_handoff_image($project, $person) {
-    $browser = defined('ZIGGURAT_RENDER_BROWSER') ? ZIGGURAT_RENDER_BROWSER : 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-    if (!is_file($browser) || !function_exists('proc_open')) return false;
+function ziggurat_handoff_image($project, $person, $person_id = 0, $company_fields = []) {
+    if (!function_exists('proc_open')) return false;
+    if (defined('ZIGGURAT_RENDER_BROWSER')) {
+        $candidates = [ZIGGURAT_RENDER_BROWSER];
+    } elseif (PHP_OS_FAMILY === 'Windows') {
+        $candidates = ['C:/Program Files/Google/Chrome/Application/chrome.exe'];
+    } else {
+        $candidates = [
+            '/usr/bin/chromium',
+            '/usr/bin/chromium-browser',
+            '/usr/bin/google-chrome',
+            '/usr/bin/google-chrome-stable',
+            '/usr/local/bin/chromium',
+            '/opt/google/chrome/chrome',
+        ];
+    }
+    $browser = '';
+    foreach ($candidates as $candidate) {
+        if (is_string($candidate) && is_file($candidate) && is_executable($candidate)) {
+            $browser = $candidate;
+            break;
+        }
+    }
+    if ($browser === '') return false;
     $theme = get_template_directory();
     $script = file_get_contents(__DIR__ . '/project-handoff-render.js');
     if (strpos($script, 'zigguratHandoffRender') === false) return false;
+    $person_photo = '';
+    if ($person_id) {
+        $files = (array) get_post_meta($person_id, '_application_files', true);
+        $photo = $files['photo'][0] ?? [];
+        $photo_path = zigurat_resolve_private_application_file_path($photo);
+        $mime = is_array($photo) ? (string) ($photo['mime'] ?? '') : '';
+        if ($photo_path && in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) && filesize($photo_path) <= 5 * MB_IN_BYTES) {
+            $person_photo = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($photo_path));
+        }
+    }
     $photos = [];
     foreach (zigurat_project_handoff_photo_slots(get_post_meta($project['id'], '_zigurat_work_project_photo', true)) as $photo) {
         $path = zigurat_resolve_private_application_file_path($photo);
@@ -16,8 +47,8 @@ function ziggurat_handoff_image($project, $person) {
     $tasks = array_values(array_filter(array_map('trim', preg_split('/\R/u', $project['notes']) ?: []), 'strlen'));
     $job = [
         'logo' => 'data:image/svg+xml;base64,' . base64_encode(file_get_contents($theme . '/assets/images/zigurat-logo.svg')),
-        'card' => ['title'=>$project['title'], 'photos'=>$photos, 'selectedPerson'=>['name'=>$person],
-            'tasks'=>$tasks, 'included'=>array_fill(0,count($tasks),true)],
+        'card' => ['title'=>$project['title'], 'photos'=>$photos, 'selectedPerson'=>['name'=>$person, 'photo'=>$person_photo],
+            'tasks'=>$tasks, 'included'=>array_fill(0,count($tasks),true)] + ($company_fields ?: ziggurat_installer_handoff_fields($project)),
     ];
     $font = base64_encode(file_get_contents($theme . '/assets/fonts/Tanha.woff2'));
     $file = tempnam(get_temp_dir(), 'zig-handoff-');
@@ -30,7 +61,7 @@ function ziggurat_handoff_image($project, $person) {
         $page = $file . '.html';
         if (!rename($file,$page)) return false;
         $file = $page;
-        $url = 'file:///' . implode('/', array_map('rawurlencode', explode('/', str_replace('\\','/',$file))));
+        $url = 'file:///' . implode('/', array_map('rawurlencode', explode('/', ltrim(str_replace('\\','/',$file), '/'))));
         $url = str_replace('%3A', ':', $url);
         $process = proc_open([$browser,'--headless','--incognito','--disable-background-networking','--no-first-run','--dump-dom','--virtual-time-budget=6000',$url],
             [0=>['pipe','r'],1=>['pipe','w'],2=>['file',PHP_OS_FAMILY==='Windows'?'NUL':'/dev/null','a']], $pipes);

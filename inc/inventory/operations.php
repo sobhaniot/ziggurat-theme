@@ -280,7 +280,13 @@ function zigurat_inventory_adjust_stock($action, $data)
 /** Reverse a wrong transaction without erasing the audit trail. */
 function zigurat_inventory_reverse_transaction($transaction_id, $reason)
 {
-    if (!current_user_can('manage_options')) {
+    return zigurat_inventory_reverse_transaction_internal($transaction_id, $reason, false);
+}
+
+// The sync caller already owns the transaction; never start or commit a nested one.
+function zigurat_inventory_reverse_transaction_internal($transaction_id, $reason, $within_sync = false)
+{
+    if (!current_user_can('manage_options') && !($within_sync && function_exists('zigurat_inventory_sync_manager_access') && zigurat_inventory_sync_manager_access())) {
         return new WP_Error('forbidden', 'فقط مدیرکل می‌تواند تراکنش را ابطال کند.');
     }
     $transaction_id = absint($transaction_id);
@@ -296,7 +302,7 @@ function zigurat_inventory_reverse_transaction($transaction_id, $reason)
     $inventory_table = zigurat_inventory_table_name();
     $transactions_table = zigurat_inventory_transactions_table_name();
     $now = current_time('mysql', true);
-    $wpdb->query('START TRANSACTION');
+    if (!$within_sync) $wpdb->query('START TRANSACTION');
 
     $transaction = $wpdb->get_row($wpdb->prepare(
         "SELECT * FROM {$transactions_table} WHERE id = %d LIMIT 1 FOR UPDATE",
@@ -380,8 +386,8 @@ function zigurat_inventory_reverse_transaction($transaction_id, $reason)
         $wpdb->query('ROLLBACK');
         return new WP_Error('database', 'اتصال سند ابطال به تراکنش اصلی انجام نشد.');
     }
-    $wpdb->query('COMMIT');
-    if (function_exists('zigurat_activity_log')) zigurat_activity_log('گردش انبار شمارهٔ '.$transaction_id.' ابطال شد.');
+    if (!$within_sync) $wpdb->query('COMMIT');
+    if (!$within_sync && function_exists('zigurat_activity_log')) zigurat_activity_log('گردش انبار شمارهٔ '.$transaction_id.' ابطال شد.');
     return array('reversal_id' => $reversal_id, 'quantity_before' => $before, 'quantity_after' => $after);
 }
 

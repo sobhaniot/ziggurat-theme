@@ -41,7 +41,7 @@ function zigurat_install_inventory_tables()
     $transactions_table = zigurat_inventory_transactions_table_name();
     $categories_table = zigurat_inventory_categories_table_name();
     $products_table = zigurat_inventory_products_table_name();
-    $schema_version = '6';
+    $schema_version = '7';
 
     // نسخه جدول‌ها فقط هنگام تغییر ساختار بررسی می‌شود؛ اجرای چهار SHOW TABLES
     // در تمام بازدیدهای سایت، حتی صفحات عمومی، زمان پاسخ را بی‌دلیل افزایش می‌داد.
@@ -101,12 +101,15 @@ function zigurat_install_inventory_tables()
         notes text NULL,
         created_at datetime NOT NULL,
         legacy_post_id bigint(20) unsigned DEFAULT NULL,
+        source_key char(64) DEFAULT NULL,
+        source_hash char(64) DEFAULT NULL,
         reverses_transaction_id bigint(20) unsigned DEFAULT NULL,
         reversed_by_transaction_id bigint(20) unsigned DEFAULT NULL,
         reversed_at datetime DEFAULT NULL,
         reversed_by_user_id bigint(20) unsigned DEFAULT NULL,
         PRIMARY KEY  (id),
         UNIQUE KEY legacy_post_id (legacy_post_id),
+        UNIQUE KEY source_key (source_key),
         KEY inventory_id (inventory_id),
         KEY action (action),
         KEY project_id (project_id),

@@ -7,6 +7,34 @@
 
   var dialog = board.querySelector('[data-project-dialog]');
   var form = board.querySelector('[data-project-form]');
+  var companyInput = form.elements.client;
+  var companySuggestions = form.querySelector('#project-company-suggestions');
+  var companyTimer;
+  var companyRequest = 0;
+
+  function lookupCompanies() {
+    var term = companyInput.value.trim();
+    var current = ++companyRequest;
+    request('zigurat_workflow_company_lookup', {term: term}).then(function (names) {
+      if (current !== companyRequest || companyInput.value.trim() !== term) return;
+      companySuggestions.replaceChildren();
+      names.forEach(function (name) {
+        var option = document.createElement('option');
+        option.value = name;
+        companySuggestions.appendChild(option);
+      });
+    }).catch(function () {
+      if (current === companyRequest) companySuggestions.replaceChildren();
+    });
+  }
+  companyInput.addEventListener('focus', lookupCompanies);
+  companyInput.addEventListener('input', function () {
+    clearTimeout(companyTimer);
+    companyRequest += 1;
+    companySuggestions.replaceChildren();
+    companyTimer = setTimeout(lookupCompanies, 250);
+  });
+
   var photoPicker = form.querySelector('[data-project-photo-picker]');
   var photoInput = photoPicker.querySelector('[data-project-photo-input]');
   var photoBrowse = photoPicker.querySelector('[data-project-photo-browse]');
@@ -341,6 +369,8 @@
     form.elements.title.value = project ? project.title : '';
     form.elements.client.value = project ? project.client : '';
     form.elements.phone.value = project ? project.phone : '';
+    form.elements.address.value = project ? (project.address || '') : '';
+    form.elements.execution_site.value = project ? (project.execution_site || '') : '';
     form.elements.stage.value = project ? project.stage : 'lead';
     form.elements.followup.value = project ? project.followup : '';
     if (form.elements.repeat_daily) form.elements.repeat_daily.checked = !!(project && project.repeat_daily);
@@ -598,6 +628,18 @@
       clientName.textContent = record.client;
       client.appendChild(clientName);
       card.appendChild(client);
+    }
+    if (record.execution_site) {
+      var executionSite = document.createElement('div');
+      executionSite.className = 'manager-project-card__meta';
+      executionSite.textContent = 'محل اجرا / مشتری نهایی: ' + record.execution_site;
+      card.appendChild(executionSite);
+    }
+    if (record.address) {
+      var address = document.createElement('div');
+      address.className = 'manager-project-card__meta';
+      address.textContent = 'آدرس: ' + record.address;
+      card.appendChild(address);
     }
     if (record.followup) {
       var meta = document.createElement('div');

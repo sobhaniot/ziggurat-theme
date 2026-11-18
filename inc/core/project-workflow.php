@@ -668,6 +668,31 @@ function zigurat_workflow_active_collaborators($records = null)
     return array_values($columns);
 }
 
+function zigurat_workflow_company_lookup()
+{
+    check_ajax_referer('zigurat_workflow_projects', 'nonce');
+    if (!zigurat_is_manager()) {
+        wp_send_json_error(array('message' => 'دسترسی مجاز نیست.'), 403);
+    }
+    global $wpdb;
+    $term = sanitize_text_field(wp_unslash((string) ($_POST['term'] ?? '')));
+    $like = '%' . $wpdb->esc_like($term) . '%';
+    $names = $wpdb->get_col($wpdb->prepare(
+        "SELECT DISTINCT TRIM(pm.meta_value) FROM {$wpdb->postmeta} pm
+         INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+         WHERE pm.meta_key = '_zigurat_work_project_client'
+         AND p.post_type = 'zig_work_project' AND p.post_status = 'private'
+         AND TRIM(pm.meta_value) <> '' AND pm.meta_value LIKE %s
+         ORDER BY TRIM(pm.meta_value) LIMIT 20",
+        $like
+    ));
+    if (function_exists('zigurat_invoice_customer_matches')) {
+        $names = array_merge($names, array_column(zigurat_invoice_customer_matches($term, 20), 'customer_name'));
+    }
+    wp_send_json_success(array_slice(array_values(array_unique(array_map('strval', $names))), 0, 40));
+}
+add_action('wp_ajax_zigurat_workflow_company_lookup', 'zigurat_workflow_company_lookup');
+
 function zigurat_workflow_project_add_history($project_id, $from_stage, $to_stage, $action = 'stage')
 {
     $history = get_post_meta($project_id, '_zigurat_work_project_history', true);
@@ -733,6 +758,8 @@ function zigurat_workflow_project_record($project)
         'executor_reminder' => get_post_meta($project->ID, '_zigurat_executor_reminder', true) === 'daily' ? 'daily' : 'once',
         'work_items' => zigurat_workflow_project_work_items($project->ID),
         'notes' => (string) get_post_meta($project->ID, '_zigurat_work_project_notes', true),
+        'address' => (string) get_post_meta($project->ID, '_zigurat_work_project_address', true),
+        'execution_site' => (string) get_post_meta($project->ID, '_zigurat_work_project_execution_site', true),
         'photo' => reset($photo_urls) ?: '',
         'photos' => array((string) ($photo_urls[0] ?? ''), (string) ($photo_urls[1] ?? '')),
         'proforma_ids' => array_values(array_map(static function ($document) { return (int) $document->id; }, $proformas)),
@@ -1090,7 +1117,7 @@ function zigurat_workflow_merge_projects($target_id, $source_id)
     }
     update_post_meta($target_id, '_zigurat_work_project_stage', $merged_stage);
 
-    foreach (array('client', 'phone', 'followup', 'notes') as $field) {
+    foreach (array('client', 'phone', 'followup', 'notes', 'address', 'execution_site') as $field) {
         $key = '_zigurat_work_project_' . $field;
         if (trim((string) get_post_meta($target_id, $key, true)) === '') {
             $source_value = get_post_meta($source_id, $key, true);
@@ -1204,6 +1231,12 @@ function zigurat_workflow_project_save_from_request($data)
     update_post_meta($result, '_zigurat_work_project_closed_partners', $closed_partners);
     delete_post_meta($result, '_zigurat_work_project_owner');
     update_post_meta($result, '_zigurat_work_project_notes', sanitize_textarea_field(wp_unslash((string) ($data['notes'] ?? ''))));
+    if (array_key_exists('execution_site', $data)) {
+        update_post_meta($result, '_zigurat_work_project_execution_site', sanitize_text_field(wp_unslash((string) $data['execution_site'])));
+    }
+    if (array_key_exists('address', $data)) {
+        update_post_meta($result, '_zigurat_work_project_address', sanitize_textarea_field(wp_unslash((string) $data['address'])));
+    }
     $duplicate_project_ids = array();
     foreach ($proforma_ids as $document_id) {
         $duplicate_id = zigurat_workflow_project_find_by_document('_zigurat_work_project_proforma', $document_id);

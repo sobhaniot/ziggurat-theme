@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Zigurat Project API
  * Description: Authenticated API for the Ziggurat project manager.
- * Version: 1.1.0
+ * Version: 1.2.2
  *
  * Routes reuse the existing project save and photo-storage functions so the
  * API and manager board keep the same validation, history, and private files.
@@ -24,8 +24,40 @@ function zigurat_manager_project_api_authorize()
     return true;
 }
 
+function zigurat_manager_is_draft_agent($user)
+{
+    return $user->user_login === 'ziggurat_wp_agent'
+        && in_array('contributor', $user->roles, true);
+}
+
+function zigurat_manager_draft_agent_upload_cap($capabilities, $required, $args, $user)
+{
+    if (in_array('upload_files', $required, true) && zigurat_manager_is_draft_agent($user)) {
+        $capabilities['upload_files'] = true;
+    }
+    return $capabilities;
+}
+add_filter('user_has_cap', 'zigurat_manager_draft_agent_upload_cap', 10, 4);
+
+function zigurat_manager_can_create_content_draft()
+{
+    return current_user_can('manage_options') || zigurat_manager_is_draft_agent(wp_get_current_user());
+}
+
 function zigurat_manager_project_api_register_routes()
 {
+    register_rest_route('zigurat-manager/v1', '/content-projects/draft/(?P<id>[1-9]\d*)', array(
+        'methods' => 'PATCH',
+        'callback' => 'zigurat_manager_update_content_draft',
+        'permission_callback' => 'zigurat_manager_can_create_content_draft',
+    ));
+
+    register_rest_route('zigurat-manager/v1', '/content-projects/draft', array(
+        'methods' => WP_REST_Server::CREATABLE,
+        'callback' => 'zigurat_manager_content_project_draft',
+        'permission_callback' => 'zigurat_manager_can_create_content_draft',
+    ));
+
     register_rest_route('zigurat-manager/v1', '/projects', array(
         array(
             'methods' => WP_REST_Server::READABLE,
@@ -67,6 +99,114 @@ function zigurat_manager_project_api_register_routes()
     ));
 }
 add_action('rest_api_init', 'zigurat_manager_project_api_register_routes');
+
+function zigurat_manager_update_content_draft(WP_REST_Request $request)
+{
+    $url = $request->get_url_params();
+    $post = get_post((int) $url['id']);
+    if (!$post || $post->post_type !== 'project' || $post->post_status !== 'draft'
+        || (!current_user_can('manage_options') && (int) $post->post_author !== get_current_user_id())) {
+        return new WP_Error('zigurat_content_draft_not_found', 'پیش‌نویس قابل ویرایش پیدا نشد.', array('status' => 404));
+    }
+
+    $input = $request->get_json_params();
+    if (!is_array($input) || array_keys($input) !== array('content') || !is_string($input['content'])) {
+        return new WP_Error('zigurat_content_draft_invalid', 'فقط متن پروژه را در فیلد content بفرستید.', array('status' => 400));
+    }
+    $content = wp_kses_post($input['content']);
+    if (trim(wp_strip_all_tags($content)) === '') {
+        return new WP_Error('zigurat_content_draft_empty', 'متن پروژه نباید خالی باشد.', array('status' => 400));
+    }
+
+    $result = wp_update_post(wp_slash(array('ID' => $post->ID, 'post_content' => $content)), true);
+    if (is_wp_error($result)) {
+        return $result;
+    }
+    $saved = get_post($result);
+    return rest_ensure_response(array('id' => $saved->ID, 'status' => $saved->post_status, 'content' => $saved->post_content));
+}
+
+function zigurat_manager_content_project_draft(WP_REST_Request $request)
+{
+    if (!zigurat_manager_can_create_content_draft()) {
+        return new WP_Error('zigurat_content_project_forbidden', 'اجازه ساخت پیش‌نویس پروژه را ندارید.', array('status' => 403));
+    }
+
+    $input = $request->get_json_params();
+    if (!is_array($input)) {
+        $input = $request->get_body_params();
+    }
+    foreach ($input as $field => $value) {
+        if ($field !== 'gallery' && !is_string($value)) {
+            return new WP_Error('zigurat_content_project_invalid_field', 'مقدار فیلد باید متن باشد.', array('status' => 400, 'field' => $field));
+        }
+    }
+
+    $gallery = $input['gallery'] ?? array();
+    if (!is_array($gallery)) {
+        return new WP_Error('zigurat_content_project_invalid_gallery', 'گالری باید آرایه‌ای از شناسه‌های تصاویر باشد.', array('status' => 400));
+    }
+    foreach ($gallery as $attachment_id) {
+        if (!is_int($attachment_id) || $attachment_id <= 0 || !wp_attachment_is_image($attachment_id) || !current_user_can('edit_post', $attachment_id)) {
+            return new WP_Error('zigurat_content_project_invalid_gallery', 'شناسهٔ تصویر معتبر یا قابل استفاده نیست.', array('status' => 400));
+        }
+    }
+    $gallery = array_unique($gallery);
+    $title = sanitize_text_field($input['title'] ?? '');
+    if ($title === '') {
+        return new WP_Error('zigurat_content_project_title_required', 'عنوان پروژه الزامی است.', array('status' => 400));
+    }
+
+    $post_id = wp_insert_post(wp_slash(array(
+        'post_type' => 'project',
+        'post_status' => 'draft',
+        'post_title' => $title,
+        'post_name' => sanitize_title((string) ($input['slug'] ?? $title)),
+        'post_content' => wp_kses_post((string) ($input['content'] ?? '')),
+        'post_excerpt' => sanitize_textarea_field((string) ($input['excerpt'] ?? '')),
+    )), true);
+    if (is_wp_error($post_id)) {
+        return $post_id;
+    }
+
+    $meta_fields = array(
+        '_project_city' => 'sanitize_text_field',
+        '_project_neighborhood' => 'sanitize_text_field',
+        '_project_province' => 'sanitize_text_field',
+        '_project_client' => 'sanitize_text_field',
+        '_project_date' => 'sanitize_text_field',
+        '_project_type' => 'sanitize_text_field',
+        '_project_duration' => 'sanitize_text_field',
+        '_zigurat_seo_title' => 'sanitize_text_field',
+        '_zigurat_seo_description' => 'sanitize_textarea_field',
+        '_zigurat_seo_focus_keyword' => 'sanitize_text_field',
+        '_zigurat_seo_related_keywords' => 'sanitize_textarea_field',
+        '_zigurat_seo_image_alt' => 'sanitize_text_field',
+    );
+    foreach ($meta_fields as $key => $sanitizer) {
+        $field = ltrim($key, '_');
+        if (isset($input[$field]) && is_scalar($input[$field])) {
+            update_post_meta($post_id, $key, call_user_func($sanitizer, (string) $input[$field]));
+        }
+    }
+
+    if ($gallery) {
+        update_post_meta($post_id, '_project_gallery', implode(',', $gallery));
+        set_post_thumbnail($post_id, $gallery[0]);
+    }
+
+    zigurat_sync_project_taxonomies($post_id, true);
+
+    $post = get_post($post_id);
+    return new WP_REST_Response(array(
+        'id' => $post_id,
+        'status' => $post->post_status,
+        'gallery' => array_values(array_map('intval', array_filter(explode(',', (string) get_post_meta($post_id, '_project_gallery', true))))),
+        'featured_media' => (int) get_post_thumbnail_id($post_id),
+        'edit_url' => get_edit_post_link($post_id, 'raw'),
+        'link' => get_permalink($post_id),
+    ), 201);
+}
 
 function zigurat_manager_project_api_list(WP_REST_Request $request)
 {

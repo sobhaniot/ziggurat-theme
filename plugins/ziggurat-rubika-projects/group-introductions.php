@@ -1,20 +1,20 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-function ziggurat_rubika_intro_status($id, $group, $status) {
-    update_post_meta($id, '_ziggurat_rubika_intro', ['group' => $group, 'status' => $status]);
+function ziggurat_rubika_intro_status($id, $group, $status, $provider = 'rubika') {
+    update_post_meta($id, '_' . ziggurat_bot_option($provider, 'intro'), ['group' => $group, 'status' => $status]);
 }
 
-function ziggurat_rubika_queue_introductions($previous, $groups) {
+function ziggurat_rubika_queue_introductions($previous, $groups, $provider = 'rubika') {
     $previous = (array) $previous;
     foreach ((array) $groups as $id => $group) {
         $id = (int) $id;
         if (!is_string($group) || $group === '' || ($previous[$id] ?? '') === $group) continue;
-        $args = [$id, $group];
-        ziggurat_rubika_intro_status($id, $group, 'queued');
+        $args = [$id, $group, $provider];
+        ziggurat_rubika_intro_status($id, $group, 'queued', $provider);
         if (!wp_next_scheduled('ziggurat_rubika_group_intro', $args)
             && !wp_schedule_single_event(time(), 'ziggurat_rubika_group_intro', $args)) {
-            ziggurat_rubika_intro_status($id, $group, 'failed');
+            ziggurat_rubika_intro_status($id, $group, 'failed', $provider);
         }
     }
 }
@@ -24,24 +24,31 @@ add_action('add_option_ziggurat_rubika_groups', static function ($option, $group
     ziggurat_rubika_queue_introductions([], $groups);
 }, 10, 2);
 
-function ziggurat_rubika_send_introduction($id, $group, $automatic = false) {
-    if (!is_string($group) || !preg_match('/^g0[A-Za-z0-9_-]{1,126}$/D', $group)
-        || ziggurat_rubika_statement_partner($group) !== $id) {
+add_action('update_option_ziggurat_bale_groups', static function ($previous, $groups) {
+    ziggurat_rubika_queue_introductions($previous, $groups, 'bale');
+}, 10, 2);
+add_action('add_option_ziggurat_bale_groups', static function ($option, $groups) {
+    ziggurat_rubika_queue_introductions([], $groups, 'bale');
+}, 10, 2);
+
+function ziggurat_rubika_send_introduction($id, $group, $automatic = false, $provider = 'rubika') {
+    if (!is_string($group) || !ziggurat_bot_valid_group($provider, $group)
+        || ziggurat_rubika_statement_partner($group, $provider) !== $id) {
         return 'invalid_group';
     }
     $lock = 'ziggurat_rubika_intro_' . hash('sha256', $id . ':' . $group);
     if (!add_option($lock, time(), '', false)) return 'busy';
     try {
-        $state = get_post_meta($id, '_ziggurat_rubika_intro', true);
+        $state = get_post_meta($id, '_' . ziggurat_bot_option($provider, 'intro'), true);
         if ($automatic && (($state['group'] ?? '') !== $group || ($state['status'] ?? '') !== 'queued')) {
             return 'skipped';
         }
         $partners = function_exists('zigurat_workflow_project_partners')
             ? array_column(zigurat_workflow_project_partners(), 'name', 'id') : [];
         $name = $partners[$id] ?? '';
-        $token = ziggurat_bot_token('rubika');
+        $token = ziggurat_bot_token($provider);
         $status = 'failed';
-        if ($token && $name !== '') {
+        if ($token && $name !== '' && ($provider !== 'bale' || ziggurat_bale_is_group($group))) {
             $text = "سلام {$name} عزیز\nاین گروه برای دریافت اعلان‌های پروژه‌های اجرایی شما در زیگورات است.";
             if (get_option('ziggurat_rubika_daily_enabled')) {
                 $text .= "\nبرای کارت‌هایی که روی حالت روزانه هستند، یادآوری پروژه هم در همین گروه فرستاده می‌شود.";
@@ -49,11 +56,11 @@ function ziggurat_rubika_send_introduction($id, $group, $automatic = false) {
             if (get_option('ziggurat_rubika_statements_enabled')) {
                 $text .= "\n\nبرای دریافت آخرین PDF صورت‌حساب، در همین گروه پیام /حساب یا /صورت حساب را بفرستید. بات فایل را در پاسخ به همان پیام می‌فرستد.";
             }
-            $result = ziggurat_rubika_statement_api($token, 'sendMessage', ['chat_id' => $group, 'text' => $text]);
+            $result = ziggurat_rubika_statement_api($token, 'sendMessage', ['chat_id' => $group, 'text' => $text], $provider);
             if (!empty($result['message_id'])) $status = 'sent';
         }
-        if (ziggurat_rubika_statement_partner($group) === $id) {
-            ziggurat_rubika_intro_status($id, $group, $status);
+        if (ziggurat_rubika_statement_partner($group, $provider) === $id) {
+            ziggurat_rubika_intro_status($id, $group, $status, $provider);
         }
         return $status;
     } finally {
@@ -61,11 +68,11 @@ function ziggurat_rubika_send_introduction($id, $group, $automatic = false) {
     }
 }
 
-add_action('ziggurat_rubika_group_intro', static function ($id, $group) {
-    if (ziggurat_rubika_send_introduction((int) $id, $group, true) === 'busy') {
-        wp_schedule_single_event(time() + 30, 'ziggurat_rubika_group_intro', [(int) $id, $group]);
+add_action('ziggurat_rubika_group_intro', static function ($id, $group, $provider = 'rubika') {
+    if (ziggurat_rubika_send_introduction((int) $id, $group, true, $provider) === 'busy') {
+        wp_schedule_single_event(time() + 30, 'ziggurat_rubika_group_intro', [(int) $id, $group, $provider]);
     }
-}, 10, 2);
+}, 10, 3);
 
 add_action('admin_post_ziggurat_rubika_send_intro', static function () {
     if (!current_user_can('manage_options') || ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -73,8 +80,9 @@ add_action('admin_post_ziggurat_rubika_send_intro', static function () {
     }
     $id = absint($_POST['partner_id'] ?? 0);
     check_admin_referer('ziggurat_rubika_send_intro_' . $id);
-    $groups = (array) get_option(ziggurat_bot_group_option('rubika'), []);
-    $status = ziggurat_rubika_send_introduction($id, $groups[$id] ?? '');
+    $provider = ($_POST['provider'] ?? '') === 'bale' ? 'bale' : 'rubika';
+    $groups = (array) get_option(ziggurat_bot_group_option($provider), []);
+    $status = ziggurat_rubika_send_introduction($id, $groups[$id] ?? '', false, $provider);
     wp_safe_redirect(add_query_arg([
         'page' => 'ziggurat-rubika',
         'intro_result' => $status,
